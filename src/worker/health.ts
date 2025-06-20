@@ -28,9 +28,10 @@ function startHealthCheckServer(): void {
   serverStartAttempts = 0;
   isStarting = true;
 
-  // Use WORKER_PORT if available, otherwise use 8002 as default
+  // Use the standard PORT variable provided by platforms like Leapcell/Vercel first.
+  // Fallback to WORKER_PORT and then to a default for local development.
   const defaultPort = 8002;
-  const PORT = parseInt(process.env.WORKER_PORT || '') || defaultPort;
+  const PORT = parseInt(process.env.PORT || process.env.WORKER_PORT || '') || defaultPort;
   
   try {
     // Create a new server instance
@@ -63,7 +64,9 @@ function startHealthCheckServer(): void {
         const envInfo = {
           nodeEnv: process.env.NODE_ENV || 'not set',
           isLeapcell: process.env.LEAPCELL === 'true' || process.env.DEPLOYMENT_ENV === 'leapcell',
-          workerPort: process.env.WORKER_PORT || '8002',
+          port: process.env.PORT || 'not set',
+          workerPort: process.env.WORKER_PORT || 'not set',
+          finalPort: serverPort || 'not set'
         };
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -1,8 +1,12 @@
 // 🔒 AUTHENTICATION UTILITIES FOR MONITORING SECURITY
 // Prevents unauthorized access to sensitive monitoring data
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { neon } from '@neondatabase/serverless';
+import { User } from '@clerk/nextjs/server';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 export interface AuthResult {
   authorized: boolean;
@@ -108,4 +112,53 @@ export async function secureMonitoringEndpoint(
   // }
   
   return handler();
+}
+
+export async function getUserId() {
+  const { userId } = await auth();
+  return userId;
+}
+
+/**
+ * A robust, centralized function to get or create a user in the database.
+ * This function prevents race conditions and duplicate user errors by handling
+ * user creation and updates in a single, reliable place.
+ * 
+ * It will:
+ * 1. Find the user by their Clerk ID.
+ * 2. If not found, find by email to link accounts (e.g., Google login then GitHub login).
+ * 3. If not found by either, create a new user record.
+ * 
+ * @param user The user object from `currentUser()`.
+ * @returns The user record from the database.
+ */
+export async function getOrCreateUser(user: User) {
+  // 1. Try to find the user by their Clerk ID.
+  let dbUser = (await sql`SELECT id, email FROM users WHERE id = ${user.id}`)[0];
+
+  if (dbUser) {
+    // User found by ID. Ensure email is up-to-date.
+    if (dbUser.email !== user.emailAddresses[0].emailAddress) {
+      await sql`UPDATE users SET email = ${user.emailAddresses[0].emailAddress}, updated_at = NOW() WHERE id = ${user.id}`;
+    }
+    return (await sql`SELECT * FROM users WHERE id = ${user.id}`)[0];
+  }
+
+  // 2. User not found by ID. Try to find by email to link a new login method to an existing account.
+  const userEmail = user.emailAddresses[0].emailAddress;
+  dbUser = (await sql`SELECT id, email FROM users WHERE email = ${userEmail}`)[0];
+
+  if (dbUser) {
+    // User found by email. Update their record with the new Clerk ID.
+    await sql`UPDATE users SET id = ${user.id}, updated_at = NOW() WHERE email = ${userEmail}`;
+    return (await sql`SELECT * FROM users WHERE id = ${user.id}`)[0];
+  }
+
+  // 3. User not found by ID or email. This is a genuinely new user.
+  await sql`
+    INSERT INTO users (id, email, subscription_tier, subscription_status, credits_used, last_credit_reset)
+    VALUES (${user.id}, ${userEmail}, 'free', 'inactive', 0, NOW())
+  `;
+  
+  return (await sql`SELECT * FROM users WHERE id = ${user.id}`)[0];
 } 

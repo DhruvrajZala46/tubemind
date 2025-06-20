@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { getUserSubscription } from '../../../lib/subscription';
+import { getOrCreateUser } from '../../../lib/auth-utils';
+import { createLogger } from '../../../lib/logger';
+
+const logger = createLogger('api:usage');
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -11,14 +17,21 @@ export async function GET() {
         { error: 'Authentication required' },
         { status: 401 }
       );
-  }
+    }
 
+    // This is the critical fix:
+    // We now use a centralized, robust function to ensure the user exists
+    // in our database before trying to fetch their subscription.
+    // This eliminates the "duplicate key" and race condition errors.
+    await getOrCreateUser(user);
+    
     const userId = user.id;
 
     // 2. 🛠️ Get subscription with fallback
     const subscription = await getUserSubscription(userId);
     
     if (!subscription) {
+      logger.error('User subscription not found after getOrCreateUser call', { userId: userId });
       return NextResponse.json(
         { error: 'User subscription not found' },
         { status: 404 }
@@ -54,6 +67,8 @@ export async function GET() {
       }
     };
 
+    logger.info('Usage API response sent', { userId: userId, plan: response.plan });
+
     console.log('✅ Usage API response:', {
       plan: response.plan,
       usage: response.usage,
@@ -71,7 +86,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Usage API error:', error);
+    logger.error('Usage API error', { error: error instanceof Error ? error.message : String(error) });
     
     // 🛠️ Graceful error response with fallback data
     return NextResponse.json(
