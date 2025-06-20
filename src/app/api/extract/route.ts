@@ -9,9 +9,9 @@ import { dbWithRetry } from '../../../lib/error-recovery';
 import { metrics } from '../../../lib/monitoring';
 import { trackVideoProcessing } from '../../../lib/api-middleware';
 import { calculateVideoCredits } from '../../../lib/credit-utils';
-import { enqueueVideoJob, getJobStatus } from '../../../lib/job-queue';
+import { addJobToQueue } from '../../../lib/job-queue';
 import { validateVideoProcessingRequest } from '../../../lib/security-utils';
-import { canUserPerformAction, reserveCredits } from '../../../lib/subscription';
+import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
@@ -198,16 +198,16 @@ export async function POST(request: NextRequest) {
         return await executeQuery(async (sql) => {
           return await sql`
             INSERT INTO video_summaries (video_id, processing_status, main_title, overall_summary, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds)
-            VALUES (${videoDbId}, 'processing', ${metadata.title}, 'Processing...', '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds})
+            VALUES (${videoDbId}, 'queued', ${metadata.title}, 'Your video is in the queue and will be processed shortly.', '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds})
             RETURNING id
           `;
         });
       }, 'Create Summary Entry');
       summaryId = summaryInsertResult[0].id;
 
-      // Start processing the video
+      // Start processing the video by adding it to the queue
       try {
-        const jobId = await enqueueVideoJob({
+        const job = await addJobToQueue({
           videoId,
           videoDbId,
           summaryDbId: summaryId,
@@ -219,69 +219,48 @@ export async function POST(request: NextRequest) {
           creditsNeeded
         });
 
-        logger.info('Job enqueued successfully', {
+        logger.info('Job added to queue successfully', {
           userId,
-          data: { videoId, jobId: jobId || 'N/A', creditsNeeded }
+          data: { videoId, jobId: job.id, creditsNeeded }
         });
 
-        // Note: Backup processing disabled to avoid getJobStatus undefined error
-        // The worker now has built-in backup processing instead
-        
         return NextResponse.json({
           success: true,
           data: {
             videoId: videoDbId,
-            message: "Video processing started",
+            summaryId: summaryId,
+            message: "Video is now in the processing queue.",
             redirectUrl: `/dashboard/${videoDbId}`
           }
         }, { status: 202 });
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to start video processing: ${errorMessage}`);
-
-        // If job queue fails completely, process directly immediately
-        logger.info('Job queue failed, falling back to direct processing immediately');
+        logger.error('Failed to add job to queue. Releasing reserved credits.', { userId, data: { videoId, error: errorMessage } });
         
-        try {
-          const { processVideoDirectly } = await import('../../../worker/extract');
-          await processVideoDirectly(
-            videoId,
-            videoDbId,
-            summaryId,
-            userId,
-            userEmail,
-            metadata,
-            totalDurationSeconds,
-            creditsNeeded
-          );
+        // IMPORTANT: If we can't add to the queue, we MUST release the credits
+        await releaseCredits(userId, creditsNeeded);
+        cache.invalidateUserSubscription(userId);
 
-          return NextResponse.json({
-            success: true,
-            videoId: videoDbId,
-            message: "Video processed successfully (direct processing)"
-          }, { status: 200 });
-
-        } catch (directError) {
-          const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
-          logger.error(`Direct processing also failed: ${directErrorMessage}`);
-          
-          return NextResponse.json({
-            success: false,
-            error: "Video processing failed",
-            details: directErrorMessage
-          }, { status: 500 });
-        }
+        return NextResponse.json({ error: 'Failed to add video to processing queue. Your credits have been returned. Please try again in a moment.' }, { status: 500 });
       }
-
     } catch (error: any) {
-      logger.error('Failed to enqueue job', { userId, data: { videoId, error: error.message } });
-      return NextResponse.json({ error: 'Failed to queue video for processing. Please try again.' }, { status: 500 });
+      logger.error('Failed to create summary entry', { userId, data: { videoId, error: error.message } });
+       
+      // If summary creation fails, we must also release credits
+      await releaseCredits(userId, creditsNeeded);
+      cache.invalidateUserSubscription(userId);
+      
+      return NextResponse.json({ error: 'Failed to create summary entry. Your credits have been restored.' }, { status: 500 });
     }
-
   } catch (error: any) {
-    logger.error('Unhandled error in video extraction endpoint', { data: { error: error.message } });
-    metrics.apiRequest('/extract', 'POST', 500, startTime);
-    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
+    // This is a general catch-all for unexpected errors
+    const e = error?.message || 'An unexpected error occurred.';
+    logger.error('Unhandled error in video extraction endpoint', { data: { error: e } });
+    return NextResponse.json({ error: 'An unexpected error occurred. If this persists, please contact support.' }, { status: 500 });
+  } finally {
+    const duration = Date.now() - startTime;
+    logger.info(`🎬 Video extraction API request finished in ${duration}ms`);
+    metrics.apiRequest('/extract', 'POST', duration, startTime);
   }
 } 

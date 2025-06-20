@@ -2,6 +2,9 @@ import { currentUser } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
 import { PLAN_LIMITS as SUBSCRIPTION_LIMITS, PlanTier } from '../config/plans';
 import { getCacheManager } from './cache';
+import { createLogger } from './logger';
+
+const logger = createLogger('subscription');
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -220,6 +223,7 @@ export async function canUserPerformAction(
  * Consume credits for a user action
  */
 export async function consumeCredits(userId: string, credits: number): Promise<boolean> {
+  logger.info('Consuming credits', { userId, data: { credits } });
   try {
     const result = await sql`
       UPDATE users 
@@ -312,4 +316,15 @@ export async function requireSubscription(minTier: 'free' | 'basic' | 'pro' = 'f
 }
 
 // Re-export for backward compatibility
-export { SUBSCRIPTION_LIMITS }; 
+export { SUBSCRIPTION_LIMITS };
+
+export async function releaseCredits(userId: string, credits: number) {
+  logger.info('Releasing credits', { userId, data: { credits } });
+  if (credits <= 0) return;
+
+  await sql`
+    UPDATE users
+    SET credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
+    WHERE id = ${userId}
+  `;
+} 
