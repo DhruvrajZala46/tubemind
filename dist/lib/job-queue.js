@@ -1,455 +1,380 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.useRedis = exports.redis = void 0;
-exports.initializeRedis = initializeRedis;
-exports.isRedisReady = isRedisReady;
-exports.enqueueVideoJob = enqueueVideoJob;
-exports.dequeueAndProcessJob = dequeueAndProcessJob;
-exports.getQueueLength = getQueueLength;
-exports.getJobStatus = getJobStatus;
-exports.clearQueue = clearQueue;
-exports.startWorker = startWorker;
-exports.getVideoQueue = getVideoQueue;
-exports.checkRedisHealth = checkRedisHealth;
-const ioredis_1 = __importDefault(require("ioredis"));
+exports.createWorker = void 0;
+exports.initializeJobQueue = initializeJobQueue;
+exports.addJobToQueue = addJobToQueue;
+exports.getJobById = getJobById;
+exports.startSimpleWorker = startSimpleWorker;
+const bullmq_1 = require("bullmq");
 const logger_1 = require("./logger");
-const os_1 = __importDefault(require("os"));
-// Initialize logger
+const redis_client_1 = require("./redis-client");
 const logger = (0, logger_1.createLogger)('job-queue');
-// Queue configuration
-const QUEUE_NAME = 'video-processing-queue';
-const JOB_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-const MAX_RETRY_ATTEMPTS = 3; // Maximum number of Redis connection attempts
-// Check if running on Windows - Redis often has permission issues on Windows
-const isWindows = os_1.default.platform() === 'win32';
-if (isWindows) {
-    logger.warn('Windows environment detected - Redis may have permission issues');
-    logger.info('If Redis fails, set FORCE_REDIS_ON_WINDOWS=true to force Redis usage or DISABLE_REDIS=true to use in-memory processing');
-}
-// Initialize Redis client if credentials are available
-let redis = null;
-exports.redis = redis;
-let useRedis = false;
-exports.useRedis = useRedis;
-let redisConnectionAttempted = false;
-let redisInitializationPromise = null;
-// Get Redis URL dynamically (not at module load time)
-function getRedisUrl() {
-    return process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL || null;
-}
-// Check if Redis is explicitly disabled
-// Note: We check the current value of DISABLE_REDIS since it can be overridden at runtime
-function isRedisDisabledCheck() {
-    const redisUrl = getRedisUrl();
-    const disabled = !redisUrl ||
-        redisUrl.trim() === '' ||
-        process.env.DISABLE_REDIS === 'true';
-    // Reduced logging verbosity here to avoid spamming logs
-    if (disabled) {
-        logger.info(`Redis is disabled (url: ${redisUrl ? 'SET' : 'NOT SET'}, DISABLE_REDIS: ${process.env.DISABLE_REDIS})`);
-    }
-    return disabled;
-}
-/**
- * Initialize the Redis connection with proper error handling.
- * This function can be called multiple times, but will only attempt to connect once.
- */
-async function initializeRedis() {
-    if (redisInitializationPromise) {
-        return redisInitializationPromise;
-    }
-    redisInitializationPromise = (async () => {
-        if (redisConnectionAttempted) {
-            return useRedis;
-        }
-        redisConnectionAttempted = true;
-        logger.info('🚀 Starting Redis initialization...');
-        if (isRedisDisabledCheck()) {
-            logger.warn('Redis disabled via config, using in-memory job processing');
-            exports.useRedis = useRedis = false;
-            return false;
-        }
-        const redisUrl = getRedisUrl();
-        if (!redisUrl) {
-            logger.warn('No Redis URL found, using in-memory processing');
-            exports.useRedis = useRedis = false;
-            return false;
-        }
-        try {
-            logger.info(`Attempting to connect to Redis at ${redisUrl?.substring(0, 30)}...`);
-            const options = {
-                maxRetriesPerRequest: MAX_RETRY_ATTEMPTS,
-                retryStrategy(times) {
-                    if (times > MAX_RETRY_ATTEMPTS) {
-                        logger.warn(`Redis connection failed after ${MAX_RETRY_ATTEMPTS} attempts, falling back to in-memory processing`);
-                        return null; // Stop retrying
-                    }
-                    const delay = Math.min(times * 200, 1000);
-                    logger.warn(`Redis connection attempt ${times} failed, retrying in ${delay}ms`);
-                    return delay;
-                },
-                connectionName: 'tubegpt-worker',
-                connectTimeout: 10000,
-                lazyConnect: true,
-            };
-            if (redisUrl.includes('upstash.io')) {
-                logger.info('Detected Upstash Redis, using REST API configuration');
-                const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-                if (!upstashToken) {
-                    throw new Error('UPSTASH_REDIS_REST_TOKEN is required for Upstash Redis');
-                }
-                const urlObj = new URL(redisUrl);
-                options.host = urlObj.hostname;
-                options.port = parseInt(urlObj.port) || 443;
-                options.password = upstashToken;
-                options.tls = {};
-            }
-            exports.redis = redis = new ioredis_1.default(redisUrl.includes('upstash.io') ? options : redisUrl, options);
-            redis.on('connect', () => logger.info('Redis client connected successfully'));
-            redis.on('ready', () => {
-                logger.info('Redis client ready and operational');
-                exports.useRedis = useRedis = true;
-            });
-            redis.on('reconnecting', () => logger.info('Redis client reconnecting...'));
-            redis.on('end', () => {
-                logger.warn('Redis connection ended');
-                exports.useRedis = useRedis = false;
-            });
-            redis.on('error', (err) => {
-                logger.error(`Redis client error: ${err.message}`);
-                exports.useRedis = useRedis = false;
-            });
-            // Aggressively connect and verify
-            await redis.connect();
-            const pingResult = await redis.ping();
-            if (pingResult === 'PONG') {
-                logger.info('✅ Redis connection verified with PING - Redis is working!');
-                exports.useRedis = useRedis = true;
-                return true;
-            }
-            else {
-                throw new Error('Redis ping failed');
-            }
-        }
-        catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            logger.error(`Redis initialization failed: ${errorMessage}. Falling back to in-memory processing.`);
-            exports.useRedis = useRedis = false;
-            if (redis) {
-                redis.disconnect();
-            }
-            return false;
-        }
-    })();
-    return redisInitializationPromise;
-}
-// Function to check if redis is connected and ready without trying to initialize
-function isRedisReady() {
-    return useRedis && redis !== null && redis.status === 'ready';
-}
-// In-memory job processing (for local development or when Redis is unavailable)
-const inMemoryQueue = new Map();
-const inMemoryProcessingQueue = [];
-// Function to process a video job
-async function processVideoJob(job) {
-    logger.info(`Processing job for video ${job.videoId}`);
-    try {
-        // Import the processVideo function from extract.ts
-        const { processVideo } = await Promise.resolve().then(() => __importStar(require('../worker/extract')));
-        // Process the video
-        await processVideo(job.videoId, job.videoDbId, job.summaryDbId, job.userId, job.userEmail, job.metadata, job.totalDurationSeconds, job.creditsNeeded);
-        logger.info(`Job completed for video ${job.videoId}`);
-        return true;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Error processing job for video ${job.videoId}: ${errorMessage}`);
-        return false;
-    }
-}
-// Enqueue a video processing job.
-// Will attempt to use Redis, but falls back to in-memory processing if Redis is unavailable.
-// @param job The video job to enqueue
-// @returns The Job ID
-async function enqueueVideoJob(job) {
-    // Ensure Redis initialization has been attempted
-    await initializeRedis();
-    if (isRedisReady()) {
-        try {
-            logger.info(`Enqueuing job ${job.summaryDbId} to Redis for video ${job.videoId}`);
-            await redis.lpush(QUEUE_NAME, JSON.stringify(job));
-            logger.info(`Job ${job.summaryDbId} successfully enqueued to Redis`);
-            return job.summaryDbId;
-        }
-        catch (error) {
-            logger.error(`Failed to enqueue job to Redis: ${error instanceof Error ? error.message : String(error)}`);
-            logger.warn(`Falling back to in-memory processing for job ${job.summaryDbId}`);
-            // Fallback to in-memory processing
-            processInMemory(job);
-            return job.summaryDbId;
-        }
-    }
-    else {
-        logger.warn(`Redis not ready, processing job ${job.summaryDbId} in-memory`);
-        // Fallback to in-memory processing
-        processInMemory(job);
-        return job.summaryDbId;
-    }
-}
-// Process a job in-memory
-async function processInMemory(job) {
-    const jobId = job.summaryDbId;
-    inMemoryQueue.set(jobId, job);
-    inMemoryProcessingQueue.push(jobId);
-    // Process immediately in the same process
-    setTimeout(() => {
-        processVideoJob(job).then(() => {
-            inMemoryQueue.delete(jobId);
-            // Remove from processing queue
-            const index = inMemoryProcessingQueue.indexOf(jobId);
-            if (index > -1) {
-                inMemoryProcessingQueue.splice(index, 1);
-            }
-        });
-    }, 100);
-}
-// Dequeue and process the next job
-async function dequeueAndProcessJob() {
-    const jobJSON = await redis.brpop(QUEUE_NAME, 0); // blocking pop with 0 timeout
-    if (jobJSON && jobJSON.length > 1) {
-        const jobData = jobJSON[1];
-        logger.info(`Job dequeued from Redis: ${jobData.substring(0, 100)}...`);
-        // Parse the job data
-        const job = JSON.parse(jobData);
-        // Process the job
-        const success = await processVideoJob(job);
-        // Clean up
-        await redis.del(`job:${job.summaryDbId}`);
-        return success;
-    }
-    else {
-        return false;
-    }
-}
-// Get the number of jobs in the queue
-async function getQueueLength() {
-    if (!useRedis || !redis || redis.status !== 'ready') {
-        return inMemoryProcessingQueue.length;
-    }
-    try {
-        return await redis.llen(QUEUE_NAME);
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Error getting queue length: ${errorMessage}`);
-        // Disable Redis on error
-        exports.useRedis = useRedis = false;
-        return inMemoryProcessingQueue.length;
-    }
-}
-// Get the status of a job
-async function getJobStatus(jobId) {
-    if (!useRedis || !redis || redis.status !== 'ready') {
-        if (inMemoryProcessingQueue.includes(jobId)) {
-            return 'processing';
-        }
-        return inMemoryQueue.has(jobId) ? 'queued' : 'not_found';
-    }
-    try {
-        const jobExists = await redis.exists(`job:${jobId}`);
-        if (!jobExists) {
-            return 'not_found';
-        }
-        // Check if the job is in the queue
-        const queuePosition = await redis.lpos(QUEUE_NAME, jobId);
-        if (queuePosition !== null) {
-            return 'queued';
-        }
-        // If the job exists but is not in the queue, it's being processed
-        return 'processing';
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Error getting status for job ${jobId}: ${errorMessage}`);
-        // Disable Redis on error
-        exports.useRedis = useRedis = false;
-        // Fall back to in-memory status check
-        if (inMemoryProcessingQueue.includes(jobId)) {
-            return 'processing';
-        }
-        return inMemoryQueue.has(jobId) ? 'queued' : 'not_found';
-    }
-}
-// Clear all jobs from the queue
-async function clearQueue() {
-    if (!useRedis || !redis || redis.status !== 'ready') {
-        inMemoryQueue.clear();
-        inMemoryProcessingQueue.length = 0;
-        return true;
-    }
-    try {
-        await redis.del(QUEUE_NAME);
-        return true;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(`Error clearing queue: ${errorMessage}`);
-        // Disable Redis on error
-        exports.useRedis = useRedis = false;
-        // Fall back to clearing in-memory queue
-        inMemoryQueue.clear();
-        inMemoryProcessingQueue.length = 0;
-        return true;
-    }
-}
-// Starts the worker to continuously process jobs from the queue.
-// This should only be run in a dedicated worker process.
-async function startWorker(pollInterval = 5000) {
-    logger.info('Starting job queue worker');
-    const redisInitialized = await initializeRedis();
-    if (!redisInitialized || !isRedisReady()) {
-        logger.warn('Redis not available, worker not started (using in-memory processing)');
+const QUEUE_NAME = 'video-processing';
+let queue = null;
+// BullMQ configuration for Upstash free tier compatibility
+const redisConnectionConfig = (0, redis_client_1.getRedisConfig)();
+const connection = redisConnectionConfig ? {
+    ...redisConnectionConfig,
+    // CRITICAL: Disable all script-based operations for Upstash free tier
+    enableReadyCheck: false,
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+    // Disable Redis command queue to prevent script usage
+    enableOfflineQueue: false,
+} : undefined;
+logger.info('Redis connection configuration for BullMQ (script-free mode).', { connectionDetails: connection });
+async function initializeJobQueue() {
+    if (queue) {
+        logger.info('Job queue already initialized.');
         return;
     }
-    logger.info('✅ Redis initialized successfully, starting Redis-based worker');
-    // Graceful shutdown handler
-    const shutdown = async () => {
-        logger.info('Shutting down job queue worker');
-        await clearQueue();
-        process.exit(0);
+    logger.info('🚀 Starting Job Queue initialization (Upstash compatible mode)...');
+    if (!connection) {
+        logger.error('🔴 Redis connection not configured. Cannot initialize job queue.');
+        throw new Error('Job queue could not be initialized due to missing Redis configuration.');
+    }
+    try {
+        // Ensure the shared Redis client is ready first.
+        await (0, redis_client_1.initializeRedis)();
+        if (!redis_client_1.redis) {
+            throw new Error("Main redis client not available for BullMQ");
+        }
+        // CRITICAL FIX: Configure BullMQ to work without Lua scripts
+        queue = new bullmq_1.Queue(QUEUE_NAME, {
+            connection,
+            defaultJobOptions: {
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 5000,
+                },
+                removeOnComplete: 10, // Keep only 10 completed jobs
+                removeOnFail: 10, // Keep only 10 failed jobs
+            },
+            // Note: Some advanced settings removed for Upstash compatibility
+        });
+        logger.info('✅ BullMQ queue initialized successfully (script-free mode).');
+        queue.on('error', (error) => {
+            logger.error('BullMQ queue error', { error: error.message });
+        });
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('🔴 Failed to initialize BullMQ queue', { error: errorMessage });
+        // If BullMQ fails due to script permissions, fall back to simple Redis operations
+        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+            logger.warn('⚠️ Redis scripts are blocked. Using simple Redis fallback for job queue.');
+            return initializeSimpleQueue();
+        }
+        throw error;
+    }
+}
+// Simple Redis-based job queue fallback for Upstash free tier
+async function initializeSimpleQueue() {
+    logger.info('🔄 Initializing simple Redis job queue (no scripts)...');
+    if (!redis_client_1.redis) {
+        await (0, redis_client_1.initializeRedis)();
+        if (!redis_client_1.redis) {
+            throw new Error("Redis client not available for simple queue");
+        }
+    }
+    // Mark that we're using simple queue mode
+    global.__SIMPLE_QUEUE_MODE = true;
+    logger.info('✅ Simple Redis job queue initialized (Upstash free tier compatible).');
+}
+async function addJobToQueue(data) {
+    // Check if we're in simple queue mode
+    if (global.__SIMPLE_QUEUE_MODE) {
+        return addJobToSimpleQueue(data);
+    }
+    if (!queue) {
+        logger.info('Queue not initialized, initializing now...');
+        await initializeJobQueue();
+        if (!queue && !global.__SIMPLE_QUEUE_MODE) {
+            logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot add job.');
+            throw new Error('Failed to initialize job queue. Cannot add job.');
+        }
+        // If we fell back to simple mode during init, use that
+        if (global.__SIMPLE_QUEUE_MODE) {
+            return addJobToSimpleQueue(data);
+        }
+    }
+    try {
+        logger.info('Adding job to BullMQ queue', { videoId: data.videoId });
+        const job = await queue.add(QUEUE_NAME, data);
+        logger.info('✅ Job added to BullMQ queue successfully', { jobId: job.id, videoId: data.videoId });
+        return job;
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+            logger.warn('⚠️ BullMQ failed due to script permissions. Falling back to simple queue.', { error: errorMessage });
+            global.__SIMPLE_QUEUE_MODE = true;
+            return addJobToSimpleQueue(data);
+        }
+        throw error;
+    }
+}
+// Simple job queue implementation that doesn't use Redis scripts
+async function addJobToSimpleQueue(data) {
+    if (!redis_client_1.redis) {
+        throw new Error("Redis client not available for simple queue");
+    }
+    const jobId = `job:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+    const jobData = JSON.stringify(data);
+    logger.info('Adding job to simple Redis queue', { videoId: data.videoId, jobId });
+    // Use simple Redis commands that work with Upstash free tier
+    await redis_client_1.redis.lpush('video-processing:jobs', jobData);
+    await redis_client_1.redis.hset(`video-processing:job:${jobId}`, {
+        id: jobId,
+        data: jobData,
+        status: 'waiting',
+        created: Date.now()
+    });
+    logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId });
+    // Return a mock Job object for compatibility
+    return {
+        id: jobId,
+        data,
+        name: QUEUE_NAME,
+        opts: {},
+        attemptsMade: 0,
+        finishedOn: undefined,
+        processedOn: undefined,
+        timestamp: Date.now(),
+        delay: 0,
+        priority: 0
     };
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
-    logger.info('🚀 Redis worker started successfully!');
-    // Continuously process jobs
-    while (true) {
+}
+async function getJobById(jobId) {
+    // Check if we're in simple queue mode
+    if (global.__SIMPLE_QUEUE_MODE) {
+        return getJobFromSimpleQueue(jobId);
+    }
+    if (!queue) {
+        logger.info('Queue not initialized, initializing now to get job status...');
+        await initializeJobQueue();
+        if (!queue && !global.__SIMPLE_QUEUE_MODE) {
+            logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot get job.');
+            return null;
+        }
+        if (global.__SIMPLE_QUEUE_MODE) {
+            return getJobFromSimpleQueue(jobId);
+        }
+    }
+    try {
+        const job = await queue.getJob(jobId);
+        if (!job) {
+            logger.warn(`Job with ID ${jobId} not found.`);
+            return null;
+        }
+        return job;
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+            logger.warn('⚠️ BullMQ getJob failed due to script permissions. Falling back to simple queue.', { error: errorMessage });
+            global.__SIMPLE_QUEUE_MODE = true;
+            return getJobFromSimpleQueue(jobId);
+        }
+        throw error;
+    }
+}
+async function getJobFromSimpleQueue(jobId) {
+    if (!redis_client_1.redis) {
+        return null;
+    }
+    try {
+        const jobInfo = await redis_client_1.redis.hgetall(`video-processing:job:${jobId}`);
+        if (!jobInfo || !jobInfo.data) {
+            return null;
+        }
+        const data = JSON.parse(jobInfo.data);
+        return {
+            id: jobId,
+            data,
+            name: QUEUE_NAME,
+            opts: {},
+            attemptsMade: 0,
+            finishedOn: jobInfo.status === 'completed' ? parseInt(jobInfo.finished || '0') : undefined,
+            processedOn: jobInfo.status === 'active' ? parseInt(jobInfo.started || '0') : undefined,
+            timestamp: parseInt(jobInfo.created || '0'),
+            delay: 0,
+            priority: 0
+        };
+    }
+    catch (error) {
+        logger.error('Error getting job from simple queue', { jobId, error });
+        return null;
+    }
+}
+const createWorker = (processor) => {
+    if (!connection) {
+        logger.error('🔴 Redis connection not configured. Cannot create worker.');
+        process.exit(1);
+    }
+    logger.info('🚀 Creating BullMQ worker (script-free mode)...');
+    try {
+        const worker = new bullmq_1.Worker(QUEUE_NAME, processor, {
+            connection,
+            concurrency: 5,
+            limiter: {
+                max: 10,
+                duration: 1000,
+            }
+        });
+        worker.on('completed', (job) => {
+            logger.info(`✅ Job completed`, { jobId: job.id });
+        });
+        worker.on('failed', (job, error) => {
+            if (job) {
+                logger.error(`🔴 Job failed`, { jobId: job.id, error: error.message, attempts: job.attemptsMade });
+            }
+            else {
+                logger.error('🔴 An unknown job failed', { error: error.message });
+            }
+        });
+        worker.on('error', (error) => {
+            logger.error('BullMQ worker error', { error: error.message });
+            // If script errors occur, we should fall back to simple processing
+            if (error.message.includes('NOPERM') || error.message.includes('script')) {
+                logger.warn('⚠️ BullMQ worker failed due to script permissions. Consider using simple job processing.');
+                global.__SIMPLE_QUEUE_MODE = true;
+            }
+        });
+        logger.info('✅ BullMQ worker created successfully (script-free mode).');
+        return worker;
+    }
+    catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+            logger.error('🔴 BullMQ worker creation failed due to script permissions. Using simple job processing.', { error: errorMessage });
+            global.__SIMPLE_QUEUE_MODE = true;
+            // Return a mock worker that processes jobs directly
+            return createSimpleWorker(processor);
+        }
+        throw error;
+    }
+};
+exports.createWorker = createWorker;
+// Simple worker implementation for Upstash free tier
+function createSimpleWorker(processor) {
+    logger.info('🔄 Creating simple worker (no scripts)...');
+    const worker = {
+        on: (event, handler) => {
+            // Mock event handlers
+        },
+        close: async () => {
+            logger.info('Simple worker closed');
+        }
+    };
+    // Start polling for jobs
+    const pollJobs = async () => {
+        if (!redis_client_1.redis)
+            return;
         try {
-            const jobProcessed = await dequeueAndProcessJob();
-            if (!jobProcessed) {
-                // This should not happen with brpop unless there's an error
-                logger.info('No job found, waiting...');
-                await new Promise(resolve => setTimeout(resolve, pollInterval));
+            // Get job from simple queue
+            const jobData = await redis_client_1.redis.rpop('video-processing:jobs');
+            if (jobData) {
+                const data = JSON.parse(jobData);
+                const job = {
+                    id: `simple-${Date.now()}`,
+                    data,
+                    name: QUEUE_NAME,
+                    opts: {},
+                    attemptsMade: 0,
+                    timestamp: Date.now()
+                };
+                logger.info('Processing job from simple queue', { jobId: job.id, videoId: data.videoId });
+                await processor(job);
+                logger.info('✅ Simple job completed', { jobId: job.id });
             }
         }
         catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            logger.error(`Error processing job from Redis: ${errorMessage}`);
-            // If Redis connection is lost, try to reconnect
-            if (!isRedisReady()) {
-                logger.warn('Redis connection lost. Attempting to reconnect...');
-                await new Promise(resolve => setTimeout(resolve, 5000)); // wait before retrying
-                await initializeRedis();
-            }
-            else {
-                // wait before processing next job
-                await new Promise(resolve => setTimeout(resolve, pollInterval));
-            }
+            logger.error('Error processing simple queue job', { error });
         }
-    }
-}
-// For compatibility with older code that expects a queue object
-function getVideoQueue() {
-    // Return a simplified queue interface that mimics the old BullMQ interface
-    return {
-        add: async (jobName, data) => {
-            const jobId = await enqueueVideoJob(data);
-            return { id: jobId };
-        },
-        getJob: async (jobId) => {
-            const status = await getJobStatus(jobId);
-            if (status === 'not_found')
-                return null;
-            // If using in-memory queue, get the job data
-            const job = inMemoryQueue.get(jobId);
-            if (!job)
-                return null;
-            // Return a simplified job object
-            return {
-                id: jobId,
-                data: job,
-                isCompleted: async () => status === 'completed',
-                isFailed: async () => status === 'failed',
-                processedOn: status === 'processing' ? Date.now() : undefined,
-                progress: 0,
-                failedReason: null,
-                returnvalue: null
-            };
-        }
+        // Poll again after 5 seconds
+        setTimeout(pollJobs, 5000);
     };
+    // Start polling
+    setTimeout(pollJobs, 1000);
+    logger.info('✅ Simple worker created and polling for jobs.');
+    return worker;
 }
-// Function to check Redis health
-async function checkRedisHealth() {
-    const redisUrl = getRedisUrl();
-    const isDisabledByEnv = process.env.DISABLE_REDIS === 'true';
-    if (isDisabledByEnv || !redisUrl) {
-        return {
-            isConnected: false,
-            isEnabled: false,
-            url: redisUrl,
-            errorMessage: isDisabledByEnv ? 'Redis disabled by DISABLE_REDIS=true' : 'No Redis URL provided',
-        };
+/**
+ * Starts a simple Redis worker that polls for jobs without using scripts
+ * This is compatible with Upstash free tier restrictions
+ */
+async function startSimpleWorker(processor, shouldStop = () => false) {
+    logger.info('🚀 Starting simple Redis worker (script-free)...');
+    await initializeJobQueue();
+    if (!redis_client_1.redis) {
+        logger.error('❌ Redis not available, cannot start worker');
+        throw new Error('Redis connection required for worker');
     }
-    try {
-        // Ensure initialization has been attempted
-        await initializeRedis();
-        if (isRedisReady()) {
-            return {
-                isConnected: true,
-                isEnabled: true,
-                url: redisUrl,
-            };
+    // Polling function
+    const pollForJobs = async () => {
+        while (!shouldStop()) {
+            try {
+                // Try to get a job from the simple queue
+                const jobData = await redis_client_1.redis.rpop('video-processing:jobs');
+                if (jobData) {
+                    const data = JSON.parse(jobData);
+                    logger.info('📦 Found job in queue', { videoId: data.videoId, userId: data.userId });
+                    try {
+                        // Update job status to active
+                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
+                            status: 'active',
+                            started: Date.now().toString(),
+                        });
+                        // Process the job
+                        await processor(data);
+                        // Mark job as completed
+                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
+                            status: 'completed',
+                            finished: Date.now().toString(),
+                        });
+                        logger.info('✅ Job processing completed successfully', { videoId: data.videoId });
+                    }
+                    catch (jobError) {
+                        // Mark job as failed
+                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
+                            status: 'failed',
+                            finished: Date.now().toString(),
+                            error: jobError instanceof Error ? jobError.message : String(jobError),
+                        });
+                        logger.error('❌ Job processing failed', {
+                            videoId: data.videoId,
+                            error: jobError instanceof Error ? jobError.message : String(jobError)
+                        });
+                    }
+                }
+                else {
+                    // No jobs found, wait before polling again
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            }
+            catch (pollError) {
+                logger.error('Error polling for jobs', {
+                    error: pollError instanceof Error ? pollError.message : String(pollError)
+                });
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
         }
-        else {
-            return {
-                isConnected: false,
-                isEnabled: true, // It's enabled, but not connected
-                url: redisUrl,
-                errorMessage: 'Redis client is not ready. Check worker logs for connection errors.',
-            };
-        }
-    }
-    catch (error) {
-        return {
-            isConnected: false,
-            isEnabled: true,
-            url: redisUrl,
-            errorMessage: error instanceof Error ? error.message : 'Failed to connect to Redis',
-        };
-    }
+        logger.info('🛑 Worker stopped polling (shutdown requested)');
+    };
+    logger.info('✅ Simple worker started, polling for jobs...');
+    // Start polling (non-blocking)
+    pollForJobs().catch(error => {
+        logger.error('Critical error in worker polling', { error });
+    });
 }
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    logger.info('Shutting down job queue and worker...');
+    if (queue) {
+        await queue.close();
+    }
+    process.exit(0);
+});

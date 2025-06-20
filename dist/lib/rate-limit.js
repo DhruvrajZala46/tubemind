@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.authLimiter = exports.videoProcessingLimiter = exports.generalApiLimiter = void 0;
 exports.rateLimiter = rateLimiter;
 const ratelimit_1 = require("@upstash/ratelimit");
 const redis_1 = require("@upstash/redis");
 const server_1 = require("next/server");
+const logger_1 = require("./logger");
+const logger = (0, logger_1.createLogger)('rate-limit');
 // In-memory rate limiter for development/restricted environments
 class InMemoryRateLimiter {
     constructor(maxRequests, windowMs) {
@@ -41,48 +44,57 @@ class InMemoryRateLimiter {
         };
     }
 }
-// Check for Redis URL and clean it if it has quotes
-let redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-let redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-if (redisUrl && (redisUrl.startsWith('"') || redisUrl.startsWith("'"))) {
-    redisUrl = redisUrl.replace(/^['"](.*)['"]$/, '$1');
-    console.log('⚠️ Cleaned quotes from Redis URL in rate-limit');
-}
-if (redisToken && (redisToken.startsWith('"') || redisToken.startsWith("'"))) {
-    redisToken = redisToken.replace(/^['"](.*)['"]$/, '$1');
-    console.log('⚠️ Cleaned quotes from Redis token in rate-limit');
-}
-// Debug Redis connection
-console.log('🔍 Rate limiter Redis check:');
-console.log(`- UPSTASH_REDIS_REST_URL: ${redisUrl ? redisUrl.substring(0, 15) + '...' : 'undefined'}`);
-console.log(`- UPSTASH_REDIS_REST_TOKEN: ${redisToken ? '[Set]' : 'undefined'}`);
-// Create appropriate rate limiter based on environment
-let ratelimit;
-if (redisUrl && redisToken) {
+const IS_RATE_LIMITING_ENABLED = true; // Set to false to disable all rate-limiting
+let redis = null;
+if (IS_RATE_LIMITING_ENABLED) {
     try {
-        const redis = new redis_1.Redis({
+        const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+        const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+        if (!redisUrl || !redisToken) {
+            throw new Error('Redis credentials are not configured for rate limiting.');
+        }
+        redis = new redis_1.Redis({
             url: redisUrl,
             token: redisToken,
         });
-        // Use a more limited set of Redis commands for compatibility with free tier
-        ratelimit = new ratelimit_1.Ratelimit({
-            redis,
-            limiter: ratelimit_1.Ratelimit.slidingWindow(10, "10 s"),
-            analytics: true,
-            prefix: "ratelimit",
-        });
-        console.log("✅ Using Upstash Redis for rate limiting (basic commands only)");
+        logger.info('Rate limiting enabled and connected to Redis.');
     }
     catch (error) {
-        console.warn("⚠️ Failed to initialize Redis rate limiter:", error);
-        ratelimit = new InMemoryRateLimiter(10, 10000); // 10 requests per 10 seconds
-        console.warn("⚠️ Fallback to in-memory rate limiting");
+        logger.warn('Failed to initialize Redis for rate limiting. Rate limiting will be disabled.', {
+            error: error instanceof Error ? error.message : String(error)
+        });
+        redis = null;
     }
 }
 else {
-    ratelimit = new InMemoryRateLimiter(10, 10000); // 10 requests per 10 seconds
-    console.warn("⚠️ Using memory-based rate limiting (no Redis credentials found)");
+    logger.warn('Rate limiting is globally disabled.');
 }
+// Upstash free tier doesn't support `EVAL` scripts, so we use the `fixedWindow` algorithm
+// which does not use scripts. This is a necessary workaround.
+const getRateLimiter = (limit, duration) => {
+    if (!redis) {
+        logger.warn('Redis client not available for rate limiting. A dummy limiter that allows all requests is being used.');
+        return {
+            limit: async (_identifier) => ({
+                success: true,
+                pending: Promise.resolve(),
+                limit: limit,
+                reset: 0,
+                remaining: limit,
+            }),
+        };
+    }
+    logger.info(`Using Fixed Window rate limiting due to Upstash Free Tier script limitations: ${limit} reqs / ${duration}`);
+    return new ratelimit_1.Ratelimit({
+        redis,
+        limiter: ratelimit_1.Ratelimit.fixedWindow(limit, duration),
+        analytics: true,
+        prefix: '@upstash/ratelimit',
+    });
+};
+exports.generalApiLimiter = getRateLimiter(20, '10s');
+exports.videoProcessingLimiter = getRateLimiter(10, '1h');
+exports.authLimiter = getRateLimiter(5, '1m');
 async function rateLimiter(request) {
     try {
         // Skip rate limiting in development to make testing easier
@@ -91,7 +103,7 @@ async function rateLimiter(request) {
         }
         const ip = request.ip ?? "127.0.0.1";
         // Both Ratelimit and InMemoryRateLimiter have a limit method
-        const result = await ratelimit.limit(ip);
+        const result = await exports.generalApiLimiter.limit(ip);
         if (!result.success) {
             return new server_1.NextResponse("Too Many Requests", {
                 status: 429,
