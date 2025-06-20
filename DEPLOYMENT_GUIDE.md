@@ -140,12 +140,11 @@ CANCEL_URL=https://tubegpt.vercel.app/payment/failure
 2. Create a new application
 3. Connect your GitHub repository
 4. Configure the environment variables (same as the Next.js app)
-5. Add the following additional variables:
+5. Add the following additional variable for deployment detection:
    ```
-   LEAPCELL=true
    DEPLOYMENT_ENV=leapcell
    ```
-6. Set the start command to: `node src/worker/extract.ts`
+6. Set the start command to: `npm run worker`
 7. Deploy the worker
 
 ### 2. Verify Worker Health

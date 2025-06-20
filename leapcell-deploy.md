@@ -34,8 +34,7 @@ NEXTAUTH_URL=https://your-leapcell-app.leapcell.io
 NODE_ENV=production
 WORKER_PORT=8001
 
-# Leapcell Specific
-LEAPCELL=true
+# Deployment Environment Detection
 DEPLOYMENT_ENV=leapcell
 ```
 

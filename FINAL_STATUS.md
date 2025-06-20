@@ -66,7 +66,7 @@
 4. **Deploy Worker to Leapcell**:
    - Follow the instructions in `PRODUCTION_DEPLOYMENT_GUIDE.md`
    - Use the same environment variables as Vercel
-   - Add `LEAPCELL=true` and `DEPLOYMENT_ENV=leapcell`
+   - Add `DEPLOYMENT_ENV=leapcell`
 
 5. **Final Testing**:
    - Test the entire flow from user registration to payment to video processing

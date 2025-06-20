@@ -88,9 +88,8 @@ npm run prod-test
 
 ### Leapcell.io Deployment
 When deploying to Leapcell.io, make sure to:
-1. Set `LEAPCELL=true` environment variable
-2. Set `DEPLOYMENT_ENV=leapcell` environment variable
-3. Use the worker script that doesn't require `.env.local`
+1. Set `DEPLOYMENT_ENV=leapcell` environment variable
+2. Use the worker script that doesn't require `.env.local`
 
 ## Automatic Adaptations
 

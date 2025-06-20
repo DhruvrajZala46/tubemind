@@ -70,81 +70,36 @@ Create `vercel.json` (already exists):
 
 ## ⚡ **STEP 2: DEPLOY WORKER TO LEAPCELL.IO**
 
-### 2.1 Create Worker Deployment Package
+### 2.1 Connect to Leapcell
+1. Go to [leapcell.io](https://leapcell.io) and create a new project.
+2. Connect your GitHub repository.
+
+### 2.2 Configure Environment Variables
+Set the following environment variables in your Leapcell project settings. These should be the same as your Vercel environment, with the exception of `DISABLE_REDIS`.
+
+**Required Environment Variables for Leapcell:**
 ```bash
-# Create worker deployment directory
-mkdir tubegpt-worker-deploy
-cd tubegpt-worker-deploy
-
-# Copy essential worker files
-cp ../package.json .
-cp ../package-lock.json .
-cp -r ../src/worker .
-cp -r ../src/lib .
-cp ../tsconfig.json .
-cp ../next.config.mjs .
-
-# Create worker-specific package.json
-cat > package.json << 'EOF'
-{
-  "name": "tubegpt-worker",
-  "version": "1.0.0",
-  "description": "TubeGPT Worker for Leapcell",
-  "main": "worker/extract.ts",
-  "scripts": {
-    "start": "tsx worker/extract.ts",
-    "build": "echo 'No build needed for TypeScript worker'"
-  },
-  "dependencies": {
-    "tsx": "^4.0.0",
-    "@clerk/nextjs": "^4.29.9",
-    "@neondatabase/serverless": "^0.9.0",
-    "ioredis": "^5.3.2",
-    "openai": "^4.28.4",
-    "dotenv": "^16.4.5",
-    "winston": "^3.11.0"
-  }
-}
-EOF
-```
-
-### 2.2 Create Worker Environment File
-Create `.env` for Leapcell:
-```bash
-# Worker Configuration
+# General
 NODE_ENV=production
-LEAPCELL=true
 DEPLOYMENT_ENV=leapcell
 
-# Force Redis Connection
+# Redis (MUST be enabled for worker)
 DISABLE_REDIS=false
-FORCE_REDIS_ON_WINDOWS=true
+UPSTASH_REDIS_REST_URL=https://your-upstash-url
+UPSTASH_REDIS_REST_TOKEN=your-token
 
 # Database
 DATABASE_URL=postgresql://your-neon-url
 
-# Redis (REQUIRED for worker)
-UPSTASH_REDIS_REST_URL=https://your-upstash-url
-UPSTASH_REDIS_REST_TOKEN=your-token
-
-# OpenAI
+# Other APIs
 OPENAI_API_KEY=sk-xxxxx
-
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-
-# YouTube Data API
 YOUTUBE_API_KEY=your-youtube-api-key
+# ... add any other required keys ...
 ```
 
 ### 2.3 Deploy to Leapcell
-1. Go to [leapcell.io](https://leapcell.io)
-2. Create new project
-3. Upload worker files
-4. Set environment variables
-5. Set startup command: `npm run start`
-6. Deploy
+1. Set the **Start Command** to `npm run worker`.
+2. Deploy your project.
 
 ---
 
@@ -262,3 +217,10 @@ Your TubeGPT app is now production-ready! 🎉
 
 **App URL**: https://your-app.vercel.app
 **Worker URL**: https://your-worker.leapcell.io 
+
+
+
+
+
+
+

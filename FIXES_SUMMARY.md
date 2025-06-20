@@ -174,7 +174,7 @@ TubeGPT was experiencing several critical connection issues when deployed to Lea
 The fixes have been tested in the following environments:
 
 1. **Local Development**: Using `npm run dev-setup`
-2. **Leapcell Simulation**: Using `LEAPCELL=true npm run worker`
+2. **Leapcell Simulation**: Using `DEPLOYMENT_ENV=leapcell npm run worker`
 3. **Production Simulation**: Using environment variables without `.env.local`
 
 All tests confirm that:
@@ -277,7 +277,7 @@ This document summarizes all the fixes and improvements made to the TubeGPT appl
 
 - **Fixed**: Enhanced environment variable loading to work in Leapcell.io environment
 - **Fixed**: Added fallback values for development environments
-- **Fixed**: Proper detection of Leapcell environment through `process.env.LEAPCELL` and `process.env.DEPLOYMENT_ENV`
+- **Fixed**: Proper detection of Leapcell environment through `process.env.DEPLOYMENT_ENV`
 - **Fixed**: Conditional loading of `.env.local` file to prevent errors in serverless environments
 
 ## 🔄 Redis Connection Fixes
@@ -435,8 +435,8 @@ npm run start-app:prod
 
 When deploying to Leapcell:
 
-1. Set `LEAPCELL=true` and `DEPLOYMENT_ENV=leapcell` in environment variables
-2. Ensure all required API keys are configured
+1. Set `DEPLOYMENT_ENV=leapcell` in environment variables
+2. Ensure `DATABASE_URL` is accessible from Leapcell
 3. Deploy using standard Leapcell deployment process
 
 ## Verification Steps

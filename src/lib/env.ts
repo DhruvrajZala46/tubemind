@@ -11,7 +11,7 @@ if (typeof process.env.NODE_ENV === 'undefined') {
 }
 
 // Detect Leapcell environment
-const isLeapcellEnvironment = process.env.LEAPCELL === 'true' || process.env.DEPLOYMENT_ENV === 'leapcell';
+const isLeapcellEnvironment = process.env.DEPLOYMENT_ENV === 'leapcell';
 
 // Only try to load .env.local if not in Leapcell environment
 if (!isLeapcellEnvironment) {
@@ -59,7 +59,7 @@ console.log(`🔧 Running in ${isTestOrDev ? 'development/test' : 'production'} 
 
 // Leapcell environment detection
 if (isLeapcellEnvironment) {
-  console.log('🚀 Running in Leapcell environment');
+  console.log('🚀 Running in Leapcell environment (detected via DEPLOYMENT_ENV)');
 }
 
 // Define the environment schema type
@@ -99,8 +99,7 @@ export type EnvType = {
   // Misc
   ANALYZE?: string;
   
-  // Leapcell detection
-  LEAPCELL?: string;
+  // Deployment environment
   DEPLOYMENT_ENV?: string;
   
   // Admin configuration
@@ -162,8 +161,7 @@ const EnvSchema = z.object({
   // Misc
   ANALYZE: z.string().optional(),
   
-  // Leapcell detection
-  LEAPCELL: z.string().optional(),
+  // Deployment environment
   DEPLOYMENT_ENV: z.string().optional(),
   
   // Admin configuration
