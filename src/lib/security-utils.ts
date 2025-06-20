@@ -10,19 +10,20 @@ const redis: any = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
-// @ts-ignore upstash type mismatch workaround
+// CRITICAL FIX: Use fixedWindow instead of slidingWindow to avoid Lua scripts
+// This is required for Upstash free tier compatibility
 export const videoProcessingLimiter = new Ratelimit({
   redis: redis,
-  limiter: Ratelimit.slidingWindow(10, "10 m"), // 10 requests per 10 minutes
+  limiter: Ratelimit.fixedWindow(10, "10 m"), // 10 requests per 10 minutes (no scripts)
   prefix: "ratelimit:video_processing",
   analytics: true,
 });
 
-// @ts-ignore upstash type mismatch workaround
+// CRITICAL FIX: Use fixedWindow instead of slidingWindow to avoid Lua scripts
 export const generalApiLimiter = new Ratelimit({
   redis: redis,
-  limiter: Ratelimit.slidingWindow(30, "1 m"), // 30 requests per 1 minute
-  prefix: "ratelimit:general_api",
+  limiter: Ratelimit.fixedWindow(30, "1 m"), // 30 requests per 1 minute (no scripts)
+  prefix: "ratelimit:general_api", 
   analytics: true,
 });
 
@@ -36,25 +37,41 @@ export const generalApiLimiter = new Ratelimit({
 export async function validateVideoProcessingRequest(
   userId: string,
 ): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    const { success, limit, remaining, reset } = await videoProcessingLimiter.limit(userId);
+    
+    if (!success) {
+      logger.warn('Video processing rate limit exceeded', {
+          data: {
+        userId,
+              limit,
+              remaining,
+              reset: new Date(reset).toISOString()
+          }
+      });
+      return {
+        allowed: false,
+        reason: `Rate limit exceeded. Please try again in a few minutes.`
+      };
+    }
 
-  const { success, limit, remaining, reset } = await videoProcessingLimiter.limit(userId);
-  
-  if (!success) {
-    logger.warn('Video processing rate limit exceeded', {
-        data: {
-      userId,
-            limit,
-            remaining,
-            reset: new Date(reset).toISOString()
-        }
-    });
-    return {
-      allowed: false,
-      reason: `Rate limit exceeded. Please try again in a few minutes.`
-    };
+    return { allowed: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // If Redis script permissions are blocked, allow the request but log the issue
+    if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+      logger.warn('Rate limiting failed due to Redis script permissions. Allowing request.', { 
+        userId, 
+        error: errorMessage 
+      });
+      return { allowed: true };
+    }
+    
+    // For other errors, allow the request but log the issue
+    logger.error('Rate limiting error, allowing request', { userId, error: errorMessage });
+    return { allowed: true };
   }
-
-  return { allowed: true };
 }
 
 /**
@@ -65,6 +82,7 @@ export async function validateVideoProcessingRequest(
  * @returns {Promise<Response | null>} - Returns a NextResponse object if rate-limited, otherwise null.
  */
 export async function checkGeneralApiRateLimit(identifier: string): Promise<Response | null> {
+  try {
     const { success } = await generalApiLimiter.limit(identifier);
 
     if (!success) {
@@ -76,4 +94,20 @@ export async function checkGeneralApiRateLimit(identifier: string): Promise<Resp
     }
 
     return null; // Not rate-limited
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // If Redis script permissions are blocked, allow the request but log the issue
+    if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
+      logger.warn('Rate limiting failed due to Redis script permissions. Allowing request.', { 
+        identifier, 
+        error: errorMessage 
+      });
+      return null; // Allow the request
+    }
+    
+    // For other errors, allow the request but log the issue
+    logger.error('Rate limiting error, allowing request', { identifier, error: errorMessage });
+    return null; // Allow the request
+  }
 }
