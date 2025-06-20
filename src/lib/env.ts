@@ -186,11 +186,35 @@ const EnvSchema = z.object({
   WORKER_PORT: z.string().optional(),
 });
 
-// Parse environment variables
+// Detect if we're running a worker process
+const isWorkerProcess = process.argv[1]?.includes('worker') || 
+                       process.env.WORKER_MODE === 'true' ||
+                       isLeapcellEnvironment;
+
+console.log(`🔧 Environment validation mode: ${isWorkerProcess ? 'WORKER' : 'API'}`);
+
+// Create worker-specific schema for lighter validation
+const WorkerEnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  DATABASE_URL: z.string().url({ message: 'DATABASE_URL must be a valid connection string URL' }),
+  UPSTASH_REDIS_REST_URL: z.string().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  DISABLE_REDIS: z.enum(['true', 'false']).optional().default('false'),
+  OPENAI_API_KEY: z.string(),
+  DEPLOYMENT_ENV: z.string().optional(),
+  WORKER_PORT: z.string().optional(),
+});
+
+// Parse environment variables with appropriate schema
 let env: EnvType;
 try {
-  env = EnvSchema.parse(process.env) as EnvType;
-  console.log('✅ Environment variables validated successfully');
+  if (isWorkerProcess) {
+    env = WorkerEnvSchema.parse(process.env) as EnvType;
+    console.log('✅ Worker environment variables validated successfully');
+  } else {
+    env = EnvSchema.parse(process.env) as EnvType;
+    console.log('✅ Environment variables validated successfully');
+  }
 } catch (error) {
   console.error('❌ Environment validation failed:', error);
   throw error;
@@ -202,24 +226,28 @@ if (!env.DATABASE_URL) {
   throw new Error('Missing required DATABASE_URL environment variable');
 }
 
-if (!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !env.CLERK_SECRET_KEY) {
-  console.error('❌ Missing required Clerk authentication keys');
-  throw new Error('Missing required Clerk authentication keys');
+// Only validate API-specific variables if not in worker mode
+if (!isWorkerProcess) {
+  if (!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !env.CLERK_SECRET_KEY) {
+    console.error('❌ Missing required Clerk authentication keys');
+    throw new Error('Missing required Clerk authentication keys');
+  }
+
+  if (!env.YOUTUBE_API_KEY) {
+    console.error('❌ Missing required YouTube API key');
+    throw new Error('Missing required YouTube API key');
+  }
+
+  if (!env.POLAR_WEBHOOK_SECRET || !env.POLAR_ACCESS_TOKEN) {
+    console.error('❌ Missing required Polar payment credentials');
+    throw new Error('Missing required Polar payment credentials');
+  }
 }
 
+// Always validate OpenAI API key (needed by both API and worker)
 if (!env.OPENAI_API_KEY) {
   console.error('❌ Missing required OpenAI API key');
   throw new Error('Missing required OpenAI API key');
-}
-
-if (!env.YOUTUBE_API_KEY) {
-  console.error('❌ Missing required YouTube API key');
-  throw new Error('Missing required YouTube API key');
-}
-
-if (!env.POLAR_WEBHOOK_SECRET || !env.POLAR_ACCESS_TOKEN) {
-  console.error('❌ Missing required Polar payment credentials');
-  throw new Error('Missing required Polar payment credentials');
 }
 
 export default env; 

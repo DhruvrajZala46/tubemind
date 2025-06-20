@@ -97,6 +97,11 @@ async function startWorker() {
     // This polls Redis directly without BullMQ to avoid script permission issues
     logger.info('👷‍♂️ Starting simple Redis worker...');
     
+    // Add a heartbeat to detect process termination
+    const heartbeat = setInterval(() => {
+      logger.info('💓 Worker heartbeat - process is alive');
+    }, 10000); // Every 10 seconds
+    
     try {
       logger.info('🔥 About to call startSimpleWorker - this should start polling...');
       await startSimpleWorker(handleJob, () => isShuttingDown);
@@ -106,7 +111,10 @@ async function startWorker() {
         error: workerError instanceof Error ? workerError.message : String(workerError),
         stack: workerError instanceof Error ? workerError.stack : undefined
       });
+      clearInterval(heartbeat);
       throw workerError;
+    } finally {
+      clearInterval(heartbeat);
     }
     
     logger.info('✅ Worker created and listening for jobs.');

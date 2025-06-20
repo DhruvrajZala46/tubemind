@@ -389,10 +389,12 @@ export async function startSimpleWorker(
     logger.info('✅ Redis connection verified, starting job polling...');
     
     // Test Redis connection before starting
+    logger.info('🏓 About to ping Redis...');
     const pingResult = await redis.ping();
     logger.info('🏓 Redis ping test successful', { result: pingResult });
     
     // Force simple queue mode for worker
+    logger.info('🔧 Setting simple queue mode...');
     (global as any).__SIMPLE_QUEUE_MODE = true;
     logger.info('✅ Simple queue mode enabled for worker');
     
