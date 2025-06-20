@@ -96,7 +96,19 @@ async function startWorker() {
     // 3. Start the simple Redis worker
     // This polls Redis directly without BullMQ to avoid script permission issues
     logger.info('👷‍♂️ Starting simple Redis worker...');
-    await startSimpleWorker(handleJob, () => isShuttingDown);
+    
+    try {
+      logger.info('🔥 About to call startSimpleWorker - this should start polling...');
+      await startSimpleWorker(handleJob, () => isShuttingDown);
+      logger.info('🛑 startSimpleWorker returned unexpectedly!');
+    } catch (workerError) {
+      logger.error('💥 CRITICAL: startSimpleWorker failed!', { 
+        error: workerError instanceof Error ? workerError.message : String(workerError),
+        stack: workerError instanceof Error ? workerError.stack : undefined
+      });
+      throw workerError;
+    }
+    
     logger.info('✅ Worker created and listening for jobs.');
 
     // Keep the process alive. In a containerized environment, the process

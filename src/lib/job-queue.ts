@@ -400,6 +400,8 @@ export async function startSimpleWorker(
     const pollForJobs = async () => {
       let pollCount = 0;
       
+      logger.info('🎯 POLLING LOOP STARTED - this should appear in logs!');
+      
       while (!shouldStop()) {
         pollCount++;
         
@@ -407,7 +409,11 @@ export async function startSimpleWorker(
           // Get queued jobs from database since Redis LPUSH/RPOP is restricted
           logger.info('🔍 Polling database for queued jobs...', { pollCount });
           
+          // Add database connection test
+          logger.info('📡 Testing database connection...');
           const { executeQuery } = await import('../lib/db');
+          
+          logger.info('📊 Executing database query for queued jobs...');
           const queuedJobs = await executeQuery(async (sql) => {
             return await sql`
               SELECT vs.video_id as video_db_id, v.video_id, v.user_id, v.title, vs.id as summary_id
@@ -521,7 +527,17 @@ export async function startSimpleWorker(
     logger.info('✅ Simple worker initialized, starting polling loop...');
     
     // Start polling and await it (blocking)
-    await pollForJobs();
+    try {
+      logger.info('🚀 About to call pollForJobs() - this should block...');
+      await pollForJobs();
+      logger.info('🛑 pollForJobs() returned unexpectedly!');
+    } catch (pollingError) {
+      logger.error('💥 CRITICAL: pollForJobs() threw an error!', { 
+        error: pollingError instanceof Error ? pollingError.message : String(pollingError),
+        stack: pollingError instanceof Error ? pollingError.stack : undefined
+      });
+      throw pollingError;
+    }
     
   } catch (error) {
     logger.error('❌ Critical error starting simple worker', { 
