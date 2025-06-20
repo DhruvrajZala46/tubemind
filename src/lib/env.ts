@@ -83,6 +83,7 @@ export type EnvType = {
   OPENAI_ORG_ID?: string;
   OPENAI_PROJECT_ID?: string;
   GOOGLE_GEMINI_API_KEY?: string;
+  SUPADATA_API_KEY?: string;
   
   // YouTube / Transcript service
   YOUTUBE_API_KEY: string;
@@ -145,6 +146,7 @@ const EnvSchema = z.object({
   OPENAI_ORG_ID: z.string().optional(),
   OPENAI_PROJECT_ID: z.string().optional(),
   GOOGLE_GEMINI_API_KEY: z.string().optional(),
+  SUPADATA_API_KEY: z.string().optional(),
   
   // YouTube / Transcript service
   YOUTUBE_API_KEY: z.string(),
@@ -201,6 +203,7 @@ const WorkerEnvSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   DISABLE_REDIS: z.enum(['true', 'false']).optional().default('false'),
   OPENAI_API_KEY: z.string(),
+  SUPADATA_API_KEY: z.string(), // Critical for transcript generation
   DEPLOYMENT_ENV: z.string().optional(),
   WORKER_PORT: z.string().optional(),
 });
@@ -248,6 +251,12 @@ if (!isWorkerProcess) {
 if (!env.OPENAI_API_KEY) {
   console.error('❌ Missing required OpenAI API key');
   throw new Error('Missing required OpenAI API key');
+}
+
+// Validate SUPADATA API key for worker (transcript generation)
+if (isWorkerProcess && !env.SUPADATA_API_KEY) {
+  console.error('❌ Missing required SUPADATA_API_KEY for transcript generation');
+  throw new Error('Missing required SUPADATA_API_KEY for transcript generation');
 }
 
 export default env; 
