@@ -6,8 +6,22 @@ import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import { monitoring } from '../../../lib/monitoring';
 
-const sql = neon(process.env.DATABASE_URL!);
 const logger = createLogger('health-check');
+
+// The DB connection is now initialized on-demand within the checkDatabase function.
+// This prevents the connection from being attempted during the build process.
+let sql: any = null;
+
+function getDbConnection() {
+  if (!sql) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is not set for health check.');
+    }
+    sql = neon(process.env.DATABASE_URL);
+    logger.info('Health check database connection initialized.');
+  }
+  return sql;
+}
 
 interface ServiceHealth {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -78,7 +92,8 @@ export async function GET(request: NextRequest) {
 async function checkDatabase(): Promise<ServiceHealth> {
   const start = Date.now();
   try {
-    await sql`SELECT 1 as test`;
+    const db = getDbConnection();
+    await db`SELECT 1 as test`;
     return {
       status: 'healthy',
       responseTime: Date.now() - start,

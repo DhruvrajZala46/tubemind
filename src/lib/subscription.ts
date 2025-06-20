@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { PLAN_LIMITS as SUBSCRIPTION_LIMITS, PlanTier } from '../config/plans';
 import { getCacheManager } from './cache';
 import { createLogger } from './logger';
+import { executeQuery } from './db';
 
 const logger = createLogger('subscription');
 
@@ -25,134 +26,51 @@ const USER_SUBSCRIPTION_CACHE_KEY = (userId: string) => `user:subscription:${use
 
 // Get user subscription data with caching
 export async function getUserSubscription(userId: string): Promise<UserSubscription | null> {
-  // Try to get from cache first
   const cache = getCacheManager();
-  const cachedSubscription = cache.getCachedUserSubscription(userId);
-  if (cachedSubscription) {
-    return cachedSubscription;
+  const cacheKey = `user-sub:${userId}`;
+  const cachedSub = cache.get<UserSubscription>(cacheKey);
+  if (cachedSub) {
+    logger.info('User subscription cache HIT', { userId });
+    return cachedSub;
+  }
+  logger.info('User subscription cache MISS', { userId });
+
+  const query = `
+    SELECT 
+      u.id, 
+      u.email, 
+      u.full_name,
+      s.stripe_price_id as subscription_tier, 
+      s.status as subscription_status,
+      s.current_period_end as subscription_end_date,
+      s.id as subscription_id,
+      u.credits_used,
+      p.credits as credits_limit,
+      u.credits_reserved,
+      u.last_credit_reset
+    FROM users u
+    LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+    LEFT JOIN plans p ON s.stripe_price_id = p.stripe_price_id
+    WHERE u.id = $1
+  `;
+  
+  const result = await executeQuery(async (sql) => {
+    return await sql.unsafe(query, [userId]);
+  });
+
+  if (result.length === 0) return null;
+
+  const subscription = result[0];
+
+  // For free users without a subscription record
+  if (!subscription.subscription_tier) {
+    subscription.subscription_tier = 'free';
+    subscription.credits_limit = 60; // Default free limit
+    subscription.subscription_status = 'active';
   }
 
-  try {
-    // Get user data from database
-    const userData = await sql`
-      SELECT 
-        u.subscription_tier as tier,
-        u.subscription_status as status,
-        u.credits_used,
-        u.subscription_end_date,
-        u.subscription_id,
-        u.credits_reserved
-      FROM users u
-      WHERE u.id = ${userId}
-      LIMIT 1
-    `;
-
-    if (!userData || userData.length === 0) {
-      // If user doesn't exist in the database, create a new entry with free tier
-      try {
-        const user = await currentUser();
-        if (!user) {
-          return null;
-        }
-        
-        const userEmail = user.emailAddresses[0]?.emailAddress;
-        if (!userEmail) {
-          return null;
-        }
-        
-        // Create new user with free tier
-        await sql`
-          INSERT INTO users (
-            id, 
-            email,
-            subscription_tier, 
-            subscription_status, 
-            credits_used,
-            credits_reserved,
-            last_credit_reset,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            ${userId},
-            ${userEmail},
-            'free',
-            'active',
-            0,
-            0,
-            NOW(),
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (id) DO NOTHING
-        `;
-        
-        // Fetch the newly created user
-        const newUserData = await sql`
-          SELECT 
-            u.subscription_tier as tier,
-            u.subscription_status as status,
-            u.credits_used,
-            u.subscription_end_date,
-            u.subscription_id,
-            u.credits_reserved
-          FROM users u
-          WHERE u.id = ${userId}
-          LIMIT 1
-        `;
-        
-        if (newUserData && newUserData.length > 0) {
-          const user = newUserData[0];
-          const tier = (user.tier || 'free') as PlanTier;
-          const planLimits = SUBSCRIPTION_LIMITS[tier] || SUBSCRIPTION_LIMITS.free;
-          
-          const subscription: UserSubscription = {
-            tier: tier,
-            status: user.status || 'active',
-            creditsUsed: user.credits_used || 0,
-            creditsLimit: planLimits.creditsPerMonth,
-            creditsReserved: user.credits_reserved || 0,
-            subscriptionEndDate: user.subscription_end_date,
-            subscriptionId: user.subscription_id,
-            features: [...planLimits.features] as string[]
-          };
-          
-          cache.cacheUserSubscription(userId, subscription);
-          return subscription;
-        }
-      } catch (createError) {
-        console.error('Error creating new user:', createError);
-      }
-      
-      return null;
-    }
-
-    const user = userData[0];
-    
-    // Get the plan limits for this tier
-    const tier = (user.tier || 'free') as PlanTier;
-    const planLimits = SUBSCRIPTION_LIMITS[tier] || SUBSCRIPTION_LIMITS.free;
-    
-    // Construct subscription object
-    const subscription: UserSubscription = {
-      tier: tier,
-      status: user.status || 'inactive',
-      creditsUsed: user.credits_used || 0,
-      creditsLimit: planLimits.creditsPerMonth,
-      creditsReserved: user.credits_reserved || 0,
-      subscriptionEndDate: user.subscription_end_date,
-      subscriptionId: user.subscription_id,
-      features: [...planLimits.features] as string[]
-    };
-
-    // Cache the subscription data
-    cache.cacheUserSubscription(userId, subscription);
-    
-    return subscription;
-  } catch (error) {
-    console.error('Error fetching user subscription:', error);
-    return null;
-  }
+  cache.set(cacheKey, subscription, 300); // Cache for 5 minutes
+  return subscription;
 }
 
 /**
@@ -224,24 +142,22 @@ export async function canUserPerformAction(
  */
 export async function consumeCredits(userId: string, credits: number): Promise<boolean> {
   logger.info('Consuming credits', { userId, data: { credits } });
-  try {
-    const result = await sql`
-      UPDATE users 
+  if (credits <= 0) return false;
+
+  await executeQuery(async (sql) => {
+    return await sql`
+      UPDATE users
       SET 
-        credits_used = credits_used + ${credits},
-        credits_reserved = GREATEST(0, credits_reserved - ${credits})
+        credits_used = COALESCE(credits_used, 0) + ${credits},
+        credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
       WHERE id = ${userId}
-      RETURNING credits_used
     `;
+  });
 
-    // Invalidate the user subscription cache to ensure real-time updates
-    getCacheManager().invalidateUserSubscription(userId);
+  // Invalidate the user subscription cache to ensure real-time updates
+  getCacheManager().invalidateUserSubscription(userId);
 
-    return result.length > 0;
-  } catch (error) {
-    console.error('Error consuming credits:', error);
-    return false;
-  }
+  return true;
 }
 
 /**
@@ -274,11 +190,13 @@ export async function resetMonthlyCredits(): Promise<void> {
  */
 export async function reserveCredits(userId: string, creditsToReserve: number): Promise<void> {
   try {
-    await sql`
-      UPDATE users
-      SET credits_reserved = credits_reserved + ${creditsToReserve}
-      WHERE id = ${userId}
-    `;
+    await executeQuery(async (sql) => {
+      return await sql`
+        UPDATE users
+        SET credits_reserved = COALESCE(credits_reserved, 0) + ${creditsToReserve}
+        WHERE id = ${userId}
+      `;
+    });
     getCacheManager().invalidateUserSubscription(userId);
   } catch (error) {
     console.error('Error reserving credits:', error);
@@ -322,9 +240,11 @@ export async function releaseCredits(userId: string, credits: number) {
   logger.info('Releasing credits', { userId, data: { credits } });
   if (credits <= 0) return;
 
-  await sql`
-    UPDATE users
-    SET credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
-    WHERE id = ${userId}
-  `;
+  await executeQuery(async (sql) => {
+    return await sql`
+      UPDATE users
+      SET credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
+      WHERE id = ${userId}
+    `;
+  });
 } 

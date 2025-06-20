@@ -95,6 +95,25 @@ export async function addJobToQueue(data: JobData): Promise<Job> {
   return job;
 }
 
+export async function getJobById(jobId: string): Promise<Job<JobData> | null> {
+  if (!queue) {
+    logger.info('Queue not initialized, initializing now to get job status...');
+    await initializeJobQueue();
+    if (!queue) {
+      logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot get job.');
+      return null;
+    }
+  }
+  
+  const job = await queue.getJob(jobId);
+  if (!job) {
+    logger.warn(`Job with ID ${jobId} not found.`);
+    return null;
+  }
+  
+  return job;
+}
+
 export const createWorker = (processor: (job: Job<JobData>) => Promise<void>) => {
   if (!connection) {
     logger.error('🔴 Redis connection not configured. Cannot create worker.');
