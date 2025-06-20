@@ -5,6 +5,7 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build && tsc --project tsconfig.worker.json",
+        "worker:build": "tsc --project tsconfig.worker.json",
         "start": "next start",
         "lint": "next lint",
         "clean": "rimraf .next dist",
