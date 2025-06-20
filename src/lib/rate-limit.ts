@@ -1,6 +1,9 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { NextRequest, NextResponse } from "next/server";
+import { createLogger } from './logger';
+
+const logger = createLogger('rate-limit');
 
 // In-memory rate limiter for development/restricted environments
 class InMemoryRateLimiter {
@@ -50,52 +53,53 @@ class InMemoryRateLimiter {
   }
 }
 
-// Check for Redis URL and clean it if it has quotes
-let redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-let redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+const IS_RATE_LIMITING_ENABLED = false; // Set to false to disable all rate-limiting
 
-if (redisUrl && (redisUrl.startsWith('"') || redisUrl.startsWith("'"))) {
-  redisUrl = redisUrl.replace(/^['"](.*)['"]$/, '$1');
-  console.log('⚠️ Cleaned quotes from Redis URL in rate-limit');
-}
+let redis: Redis | null = null;
 
-if (redisToken && (redisToken.startsWith('"') || redisToken.startsWith("'"))) {
-  redisToken = redisToken.replace(/^['"](.*)['"]$/, '$1');
-  console.log('⚠️ Cleaned quotes from Redis token in rate-limit');
-}
-
-// Debug Redis connection
-console.log('🔍 Rate limiter Redis check:');
-console.log(`- UPSTASH_REDIS_REST_URL: ${redisUrl ? redisUrl.substring(0, 15) + '...' : 'undefined'}`);
-console.log(`- UPSTASH_REDIS_REST_TOKEN: ${redisToken ? '[Set]' : 'undefined'}`);
-
-// Create appropriate rate limiter based on environment
-let ratelimit: Ratelimit | InMemoryRateLimiter;
-
-if (redisUrl && redisToken) {
+if (IS_RATE_LIMITING_ENABLED) {
   try {
-    const redis = new Redis({
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (!redisUrl || !redisToken) {
+      throw new Error('Redis credentials are not configured for rate limiting.');
+    }
+
+    redis = new Redis({
       url: redisUrl,
       token: redisToken,
     });
-    
-    // Use a more limited set of Redis commands for compatibility with free tier
-    ratelimit = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(10, "10 s"),
-      analytics: true,
-      prefix: "ratelimit",
-    });
-    console.log("✅ Using Upstash Redis for rate limiting (basic commands only)");
+    logger.info('Rate limiting enabled and connected to Redis.');
   } catch (error) {
-    console.warn("⚠️ Failed to initialize Redis rate limiter:", error);
-    ratelimit = new InMemoryRateLimiter(10, 10000); // 10 requests per 10 seconds
-    console.warn("⚠️ Fallback to in-memory rate limiting");
+    logger.warn('Failed to initialize Redis for rate limiting. Rate limiting will be disabled.', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    redis = null;
   }
 } else {
-  ratelimit = new InMemoryRateLimiter(10, 10000); // 10 requests per 10 seconds
-  console.warn("⚠️ Using memory-based rate limiting (no Redis credentials found)");
+  logger.warn('Rate limiting is globally disabled.');
 }
+
+const createLimiter = (limiter: any) => {
+  if (IS_RATE_LIMITING_ENABLED && redis) {
+    return new Ratelimit({ redis, limiter });
+  }
+  // If disabled, return a dummy object that always allows requests.
+  return {
+    limit: async (_identifier: string) => ({
+      success: true,
+      pending: Promise.resolve(),
+      limit: 0,
+      reset: 0,
+      remaining: 0,
+    }),
+  };
+};
+
+export const generalApiLimiter = createLimiter(Ratelimit.slidingWindow(20, '10s'));
+export const videoProcessingLimiter = createLimiter(Ratelimit.slidingWindow(10, '1h'));
+export const authLimiter = createLimiter(Ratelimit.slidingWindow(5, '1m'));
 
 export async function rateLimiter(request: NextRequest): Promise<NextResponse> {
   try {
@@ -107,7 +111,7 @@ export async function rateLimiter(request: NextRequest): Promise<NextResponse> {
     const ip = request.ip ?? "127.0.0.1";
     
     // Both Ratelimit and InMemoryRateLimiter have a limit method
-    const result = await ratelimit.limit(ip);
+    const result = await generalApiLimiter.limit(ip);
     
     if (!result.success) {
       return new NextResponse("Too Many Requests", {
