@@ -43,15 +43,17 @@ async function debugRedisQueue() {
     }
     console.log('');
 
-    // Check specific job status
+    // Check specific job status (avoiding KEYS command for Upstash)
     console.log('4️⃣ Checking recent job statuses...');
-    const jobKeys = await redis.keys('video-processing:job:*');
-    console.log(`🔑 Found ${jobKeys.length} job status keys`);
+    const recentJobIds = ['cee6b53a-3428-4ec2-8922-e406536b6265', 'fbfd77b5-2e05-4115-837d-343b66809f62', 'd7c0dee5-da5f-405b-99fa-476fb3fb3492'];
     
-    for (const key of jobKeys.slice(0, 5)) { // Check first 5
-      const jobInfo = await redis.hgetall(key);
-      const jobId = key.replace('video-processing:job:', '');
-      console.log(`   ${jobId}: ${jobInfo.status || 'unknown'} (created: ${jobInfo.created || 'unknown'})`);
+    for (const jobId of recentJobIds) {
+      const jobInfo = await redis.hgetall(`video-processing:job:${jobId}`);
+      if (jobInfo && Object.keys(jobInfo).length > 0) {
+        console.log(`   ${jobId}: ${jobInfo.status || 'unknown'} (created: ${jobInfo.created || 'unknown'})`);
+      } else {
+        console.log(`   ${jobId}: NOT FOUND`);
+      }
     }
     console.log('');
 

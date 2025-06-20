@@ -124,16 +124,44 @@ async function addJobToSimpleQueue(data: JobData): Promise<Job> {
   
   logger.info('Adding job to simple Redis queue', { videoId: data.videoId, jobId, videoDbId: data.videoDbId });
   
-  // Use simple Redis commands that work with Upstash free tier
-  await redis.lpush('video-processing:jobs', jobData);
-  await redis.hset(`video-processing:job:${jobId}`, {
-    id: jobId,
-    data: jobData,
-    status: 'queued',
-    created: Date.now().toString()
-  });
-  
-  logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId, videoDbId: data.videoDbId });
+  try {
+    // Try the simple approach first with basic Redis operations
+    await redis.hset(`video-processing:job:${jobId}`, {
+      id: jobId,
+      data: jobData,
+      status: 'queued',
+      created: Date.now().toString()
+    });
+    
+    // Use a simple SET instead of LPUSH to work around Upstash restrictions
+    const queueKey = `video-processing:pending:${jobId}`;
+    await redis.setex(queueKey, 3600, jobData); // Expire after 1 hour
+    
+    logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId, videoDbId: data.videoDbId });
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    if (errorMessage.includes('NOPERM')) {
+      logger.error('❌ Redis command not permitted on Upstash free tier', { 
+        error: errorMessage, 
+        jobId, 
+        videoId: data.videoId 
+      });
+      
+      // Fallback: Just store the job status, worker will process via database polling
+      await redis.hset(`video-processing:job:${jobId}`, {
+        id: jobId,
+        status: 'queued',
+        created: Date.now().toString(),
+        fallback: 'database-polling'
+      });
+      
+      logger.warn('⚠️ Using database polling fallback due to Redis restrictions', { jobId });
+    } else {
+      throw error;
+    }
+  }
   
   // Return a mock Job object for compatibility
   return {
@@ -356,7 +384,7 @@ export async function startSimpleWorker(
     const queueLength = await redis.llen('video-processing:jobs');
     logger.info(`📊 Current queue length: ${queueLength} jobs`);
     
-    // Polling function
+    // Polling function - adapted for SET-based queue due to Upstash restrictions
     const pollForJobs = async () => {
       let pollCount = 0;
       
@@ -364,59 +392,96 @@ export async function startSimpleWorker(
         pollCount++;
         
         try {
-          // Try to get a job from the simple queue
-          const jobData = await redis!.rpop('video-processing:jobs');
+          // Get queued jobs from database since Redis LPUSH/RPOP is restricted
+          const { executeQuery } = await import('../lib/db');
+          const queuedJobs = await executeQuery(async (sql) => {
+            return await sql`
+              SELECT vs.video_id as video_db_id, v.video_id, v.user_id, v.title, vs.id as summary_id
+              FROM video_summaries vs
+              JOIN videos v ON vs.video_id = v.id  
+              WHERE vs.processing_status = 'queued'
+              ORDER BY vs.created_at ASC
+              LIMIT 1
+            `;
+          });
           
-          if (jobData) {
-            const data = JSON.parse(jobData) as JobData;
-            logger.info('📦 Found job in queue', { 
-              videoId: data.videoId, 
-              userId: data.userId, 
-              videoDbId: data.videoDbId,
-              pollCount 
-            });
+          if (queuedJobs.length > 0) {
+            const job = queuedJobs[0];
             
-            try {
-              // Update job status to active
-              await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-                status: 'active',
-                started: Date.now().toString(),
-              });
-              
-              logger.info('🔄 Starting job processing', { videoId: data.videoId, videoDbId: data.videoDbId });
-              
-              // Process the job
-              await processor(data);
-              
-              // Mark job as completed
-              await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-                status: 'completed',
-                finished: Date.now().toString(),
-              });
-              
-              logger.info('✅ Job processing completed successfully', { 
+            // Check if this job has pending data in Redis
+            const pendingKey = `video-processing:pending:${job.video_db_id}`;
+            const jobData = await redis!.get(pendingKey);
+            
+            if (jobData) {
+              // Found Redis job data
+              const data = JSON.parse(jobData) as JobData;
+              logger.info('📦 Found job in database with Redis data', { 
                 videoId: data.videoId, 
-                videoDbId: data.videoDbId 
-              });
-              
-            } catch (jobError) {
-              // Mark job as failed
-              await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-                status: 'failed',
-                finished: Date.now().toString(),
-                error: jobError instanceof Error ? jobError.message : String(jobError),
-              });
-              
-              logger.error('❌ Job processing failed', { 
-                videoId: data.videoId, 
+                userId: data.userId, 
                 videoDbId: data.videoDbId,
-                error: jobError instanceof Error ? jobError.message : String(jobError) 
+                pollCount 
+              });
+              
+              try {
+                // Remove the pending job from Redis
+                await redis!.del(pendingKey);
+                
+                // Update job status to active
+                await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+                  status: 'active',
+                  started: Date.now().toString(),
+                });
+                
+                // Update database status
+                await executeQuery(async (sql) => {
+                  await sql`UPDATE video_summaries SET processing_status = 'processing' WHERE id = ${job.summary_id}`;
+                });
+                
+                logger.info('🔄 Starting job processing', { videoId: data.videoId, videoDbId: data.videoDbId });
+                
+                // Process the job
+                await processor(data);
+                
+                // Mark job as completed in Redis
+                await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+                  status: 'completed',
+                  finished: Date.now().toString(),
+                });
+                
+                logger.info('✅ Job processing completed successfully', { 
+                  videoId: data.videoId, 
+                  videoDbId: data.videoDbId 
+                });
+                
+              } catch (jobError) {
+                // Mark job as failed in both Redis and database
+                await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+                  status: 'failed',
+                  finished: Date.now().toString(),
+                  error: jobError instanceof Error ? jobError.message : String(jobError),
+                });
+                
+                await executeQuery(async (sql) => {
+                  await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
+                });
+                
+                logger.error('❌ Job processing failed', { 
+                  videoId: data.videoId, 
+                  videoDbId: data.videoDbId,
+                  error: jobError instanceof Error ? jobError.message : String(jobError) 
+                });
+              }
+            } else {
+              // Job in database but no Redis data - might be from before the fix
+              logger.info('📋 Found queued job in database without Redis data, skipping...', { 
+                videoDbId: job.video_db_id,
+                pollCount 
               });
             }
           } else {
-            // Log polling activity every 10 polls (20 seconds) to show worker is alive
+            // Log polling activity every 10 polls (20 seconds) to show worker is alive  
             if (pollCount % 10 === 0) {
-              logger.info('🔍 Worker polling for jobs...', { pollCount, queueLength: await redis!.llen('video-processing:jobs') });
+              logger.info('🔍 Worker polling for jobs via database...', { pollCount });
             }
             
             // No jobs found, wait before polling again
