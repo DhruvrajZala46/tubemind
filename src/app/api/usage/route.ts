@@ -8,11 +8,17 @@ const logger = createLogger('api:usage');
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  let userId: string | undefined;
+  let userEmail: string | undefined;
+
   try {
     const user = await currentUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+    
+    userId = user.id;
+    userEmail = user.emailAddresses?.[0]?.emailAddress;
     
     let subscription = await getUserSubscription(user.id);
 
@@ -52,7 +58,12 @@ export async function GET() {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('Usage API error', { error: errorMessage });
+    logger.error('Usage API error', { 
+      error: errorMessage, 
+      userId, 
+      email: userEmail,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     
     // If a truly unexpected error occurs, send a generic 500 response.
     return NextResponse.json(

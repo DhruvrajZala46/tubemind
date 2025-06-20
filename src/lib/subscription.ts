@@ -35,7 +35,7 @@ export async function getUserSubscription(userId: string): Promise<any> {
   }
   logger.info('User subscription cache MISS', { userId });
 
-  // Use the user_subscription_summary view which has all the computed fields
+  // Query the users table directly - this is guaranteed to exist
   const result = await executeQuery(async (sql) => {
     return await sql`
       SELECT 
@@ -47,53 +47,66 @@ export async function getUserSubscription(userId: string): Promise<any> {
         subscription_end_date,
         subscription_id,
         credits_used,
-        credits_limit,
         credits_reserved,
         last_credit_reset,
-        remaining_credits,
-        usage_percentage,
-        is_over_limit
-      FROM user_subscription_summary
+        created_at,
+        updated_at
+      FROM users
       WHERE id = ${userId}
     `;
   });
 
   if (result.length === 0) {
-    // If user doesn't exist in the summary view, check if they exist in users table
-    const userExists = await executeQuery(async (sql) => {
-      return await sql`SELECT id FROM users WHERE id = ${userId}`;
-    });
-    
-    if (userExists.length === 0) {
-      // User doesn't exist at all
-      return null;
-    }
-    
-    // User exists but no summary - return default free tier
-    logger.info('User exists but no subscription summary found, returning default free tier', { userId });
-    return {
-      id: userId,
-      subscription_tier: 'free',
-      subscription_status: 'active',
-      credits_used: 0,
-      credits_limit: 60,
-      credits_reserved: 0,
-      remaining_credits: 60,
-      usage_percentage: 0,
-      is_over_limit: false
-    };
+    // User doesn't exist at all
+    return null;
   }
 
-  const subscription = result[0];
+  const user = result[0];
 
-  // Normalize the field names for backward compatibility
+  // Calculate credits_limit based on subscription_tier
+  let creditsLimit = 60; // Default free tier limit
+  switch (user.subscription_tier) {
+    case 'basic':
+      creditsLimit = 300; // 5 hours
+      break;
+    case 'pro':
+      creditsLimit = 900; // 15 hours  
+      break;
+    case 'enterprise':
+      creditsLimit = -1; // Unlimited
+      break;
+    default:
+      creditsLimit = 60; // Free tier
+  }
+
+  const creditsUsed = user.credits_used || 0;
+  const creditsReserved = user.credits_reserved || 0;
+  const remainingCredits = creditsLimit === -1 ? 999999 : Math.max(0, creditsLimit - creditsUsed);
+  const usagePercentage = creditsLimit === -1 ? 0 : Math.round((creditsUsed / creditsLimit) * 100);
+
+  // Normalize the subscription object with computed fields
   const normalizedSubscription = {
-    ...subscription,
-    tier: subscription.subscription_tier || 'free',
-    status: subscription.subscription_status || 'active',
-    creditsUsed: subscription.credits_used || 0,
-    creditsLimit: subscription.credits_limit || 60,
-    creditsReserved: subscription.credits_reserved || 0
+    id: user.id,
+    email: user.email,
+    full_name: user.full_name,
+    subscription_tier: user.subscription_tier || 'free',
+    subscription_status: user.subscription_status || 'active',
+    subscription_end_date: user.subscription_end_date,
+    subscription_id: user.subscription_id,
+    credits_used: creditsUsed,
+    credits_limit: creditsLimit,
+    credits_reserved: creditsReserved,
+    last_credit_reset: user.last_credit_reset,
+    remaining_credits: remainingCredits,
+    usage_percentage: usagePercentage,
+    is_over_limit: creditsLimit !== -1 && creditsUsed > creditsLimit,
+    
+    // Backward compatibility fields
+    tier: user.subscription_tier || 'free',
+    status: user.subscription_status || 'active',
+    creditsUsed: creditsUsed,
+    creditsLimit: creditsLimit,
+    creditsReserved: creditsReserved
   };
 
   cache.set(cacheKey, normalizedSubscription, 300); // Cache for 5 minutes
