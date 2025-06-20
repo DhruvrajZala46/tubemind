@@ -2,6 +2,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { NextRequest, NextResponse } from "next/server";
 import { createLogger } from './logger';
+import { PLANS } from '@/config/plans';
 
 const logger = createLogger('rate-limit');
 
@@ -53,7 +54,7 @@ class InMemoryRateLimiter {
   }
 }
 
-const IS_RATE_LIMITING_ENABLED = false; // Set to false to disable all rate-limiting
+const IS_RATE_LIMITING_ENABLED = true; // Set to false to disable all rate-limiting
 
 let redis: Redis | null = null;
 
@@ -81,25 +82,35 @@ if (IS_RATE_LIMITING_ENABLED) {
   logger.warn('Rate limiting is globally disabled.');
 }
 
-const createLimiter = (limiter: any) => {
-  if (IS_RATE_LIMITING_ENABLED && redis) {
-    return new Ratelimit({ redis, limiter });
+// Upstash free tier doesn't support `EVAL` scripts, so we use the `fixedWindow` algorithm
+// which does not use scripts. This is a necessary workaround.
+const getRateLimiter = (limit: number, duration: `${number}${'s' | 'm' | 'h' | 'd'}`) => {
+  if (!redis) {
+    logger.warn('Redis client not available for rate limiting. A dummy limiter that allows all requests is being used.');
+    return {
+      limit: async (_identifier: string) => ({
+        success: true,
+        pending: Promise.resolve(),
+        limit: limit,
+        reset: 0,
+        remaining: limit,
+      }),
+    };
   }
-  // If disabled, return a dummy object that always allows requests.
-  return {
-    limit: async (_identifier: string) => ({
-      success: true,
-      pending: Promise.resolve(),
-      limit: 0,
-      reset: 0,
-      remaining: 0,
-    }),
-  };
+
+  logger.info(`Using Fixed Window rate limiting due to Upstash Free Tier script limitations: ${limit} reqs / ${duration}`);
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.fixedWindow(limit, duration),
+    analytics: true,
+    prefix: '@upstash/ratelimit',
+  });
 };
 
-export const generalApiLimiter = createLimiter(Ratelimit.slidingWindow(20, '10s'));
-export const videoProcessingLimiter = createLimiter(Ratelimit.slidingWindow(10, '1h'));
-export const authLimiter = createLimiter(Ratelimit.slidingWindow(5, '1m'));
+export const generalApiLimiter = getRateLimiter(20, '10s');
+export const videoProcessingLimiter = getRateLimiter(10, '1h');
+export const authLimiter = getRateLimiter(5, '1m');
 
 export async function rateLimiter(request: NextRequest): Promise<NextResponse> {
   try {
