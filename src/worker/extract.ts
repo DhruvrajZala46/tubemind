@@ -70,43 +70,48 @@ const shutdown = (signal: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-try {
-  // 1. Start the health check server
-  // This is crucial for production monitoring services to know the worker is alive.
-  logger.info('🏥 Starting health check server...');
-  startHealthCheckServer();
-  logger.info('✅ Health check server started.');
+async function startWorker() {
+  try {
+    // 1. Start the health check server
+    // This is crucial for production monitoring services to know the worker is alive.
+    logger.info('🏥 Starting health check server...');
+    startHealthCheckServer();
+    logger.info('✅ Health check server started.');
 
-  // 2. Define the job processing function
-  // This is the core logic that the worker will execute for each job.
-  const handleJob = async (jobData: JobData) => {
-    const jobId = `${jobData.videoDbId}-${Date.now()}`;
-    logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
-    try {
-      await processVideoJob(jobData);
-      logger.info(`✅ Job ${jobId} completed successfully.`);
-    } catch (error) {
-      logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
-      // Re-throwing the error is important for proper error handling
-      throw error;
-    }
-  };
+    // 2. Define the job processing function
+    // This is the core logic that the worker will execute for each job.
+    const handleJob = async (jobData: JobData) => {
+      const jobId = `${jobData.videoDbId}-${Date.now()}`;
+      logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
+      try {
+        await processVideoJob(jobData);
+        logger.info(`✅ Job ${jobId} completed successfully.`);
+      } catch (error) {
+        logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
+        // Re-throwing the error is important for proper error handling
+        throw error;
+      }
+    };
 
-  // 3. Start the simple Redis worker
-  // This polls Redis directly without BullMQ to avoid script permission issues
-  logger.info('👷‍♂️ Starting simple Redis worker...');
-  startSimpleWorker(handleJob, () => isShuttingDown);
-  logger.info('✅ Worker created and listening for jobs.');
+    // 3. Start the simple Redis worker
+    // This polls Redis directly without BullMQ to avoid script permission issues
+    logger.info('👷‍♂️ Starting simple Redis worker...');
+    await startSimpleWorker(handleJob, () => isShuttingDown);
+    logger.info('✅ Worker created and listening for jobs.');
 
-  // Keep the process alive. In a containerized environment, the process
-  // is expected to run indefinitely.
-  console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
+    // Keep the process alive. In a containerized environment, the process
+    // is expected to run indefinitely.
+    console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
 
-} catch (error) {
-  logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
-  // If the worker can't even start, something is seriously wrong. Exit the process.
-  process.exit(1);
+  } catch (error) {
+    logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
+    // If the worker can't even start, something is seriously wrong. Exit the process.
+    process.exit(1);
+  }
 }
+
+// Start the worker
+startWorker();
 
 /**
  * Direct video processing function for backup when job queue fails
