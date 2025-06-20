@@ -388,10 +388,22 @@ export async function startSimpleWorker(
     
     logger.info('✅ Redis connection verified, starting job polling...');
     
-    // Test Redis connection before starting
-    logger.info('🏓 About to ping Redis...');
-    const pingResult = await redis.ping();
-    logger.info('🏓 Redis ping test successful', { result: pingResult });
+    // Test Redis connection before starting with aggressive timeout and fallback
+    logger.info('🏓 Testing Redis connection with 3-second timeout...');
+    try {
+      const pingPromise = redis.ping();
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Redis ping timeout after 3 seconds')), 3000)
+      );
+      
+      const pingResult = await Promise.race([pingPromise, timeoutPromise]);
+      logger.info('🏓 Redis ping successful, proceeding to polling!', { result: pingResult });
+    } catch (pingError) {
+      logger.warn('⚠️ Redis ping failed/timed out, skipping and going to polling anyway!', { error: pingError instanceof Error ? pingError.message : String(pingError) });
+      // Don't let ping failure block the worker - continue to polling
+    }
+    
+    logger.info('🚀 CRITICAL: Redis ping section completed, proceeding to job polling!');
     
     // Force simple queue mode for worker
     logger.info('🔧 Setting simple queue mode...');
@@ -403,6 +415,8 @@ export async function startSimpleWorker(
       let pollCount = 0;
       
       logger.info('🎯 POLLING LOOP STARTED - this should appear in logs!');
+      logger.info('💥 CRITICAL DEBUG: Inside pollForJobs function!');
+      logger.info('💥 CRITICAL DEBUG: About to enter while loop!!');
       
       while (!shouldStop()) {
         pollCount++;
