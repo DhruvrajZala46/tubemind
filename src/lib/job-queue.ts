@@ -510,11 +510,111 @@ export async function startSimpleWorker(
                 });
               }
             } else {
-              // Job in database but no Redis data - might be from before the fix
-              logger.info('📋 Found queued job in database without Redis data, skipping...', { 
+              // Job in database but no Redis data - reconstruct job data from database
+              logger.info('📋 Found queued job in database without Redis data, reconstructing...', { 
                 videoDbId: job.video_db_id,
+                videoId: job.video_id,
+                userId: job.user_id,
                 pollCount 
               });
+              
+              // Get additional job data from database
+              const jobDetails = await executeQuery(async (sql) => {
+                return await sql`
+                  SELECT v.*, vs.*, u.email, u.full_name
+                  FROM videos v
+                  JOIN video_summaries vs ON v.id = vs.video_id
+                  LEFT JOIN users u ON v.user_id = u.id
+                  WHERE v.id = ${job.video_db_id}
+                `;
+              });
+              
+              if (jobDetails.length > 0) {
+                const details = jobDetails[0];
+                
+                // Reconstruct JobData from database
+                const reconstructedJobData: JobData = {
+                  videoId: details.video_id,
+                  videoDbId: details.id,
+                  summaryDbId: details.id, // video_summaries.id
+                  userId: details.user_id,
+                  userEmail: details.email || 'unknown@example.com',
+                  user: { id: details.user_id, email: details.email, name: details.full_name },
+                  metadata: {
+                    title: details.title,
+                    duration: details.duration,
+                    channelTitle: details.channel_title,
+                    thumbnailUrl: details.thumbnail_url
+                  },
+                  totalDurationSeconds: details.duration || 0,
+                  creditsNeeded: 1 // Default credit cost
+                };
+                
+                logger.info('🔧 Reconstructed job data from database', { 
+                  videoId: reconstructedJobData.videoId,
+                  videoDbId: reconstructedJobData.videoDbId 
+                });
+                
+                try {
+                  // Update database status to processing
+                  await executeQuery(async (sql) => {
+                    await sql`UPDATE video_summaries SET processing_status = 'processing' WHERE id = ${job.summary_id}`;
+                  });
+                  
+                  // Update Redis status if possible
+                  if (redis) {
+                    await redis.hset(`video-processing:job:${job.video_db_id}`, {
+                      status: 'active',
+                      started: Date.now().toString(),
+                    });
+                  }
+                  
+                  logger.info('🔄 Starting reconstructed job processing', { 
+                    videoId: reconstructedJobData.videoId, 
+                    videoDbId: reconstructedJobData.videoDbId 
+                  });
+                  
+                  // Process the reconstructed job
+                  await processor(reconstructedJobData);
+                  
+                  // Mark job as completed
+                  if (redis) {
+                    await redis.hset(`video-processing:job:${job.video_db_id}`, {
+                      status: 'completed',
+                      finished: Date.now().toString(),
+                    });
+                  }
+                  
+                  logger.info('✅ Reconstructed job processing completed successfully', { 
+                    videoId: reconstructedJobData.videoId, 
+                    videoDbId: reconstructedJobData.videoDbId 
+                  });
+                  
+                } catch (jobError) {
+                  // Mark job as failed
+                  if (redis) {
+                    await redis.hset(`video-processing:job:${job.video_db_id}`, {
+                      status: 'failed',
+                      finished: Date.now().toString(),
+                      error: jobError instanceof Error ? jobError.message : String(jobError),
+                    });
+                  }
+                  
+                  await executeQuery(async (sql) => {
+                    await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
+                  });
+                  
+                  logger.error('❌ Reconstructed job processing failed', { 
+                    videoId: reconstructedJobData.videoId, 
+                    videoDbId: reconstructedJobData.videoDbId,
+                    error: jobError instanceof Error ? jobError.message : String(jobError) 
+                  });
+                }
+              } else {
+                logger.error('🔴 Could not reconstruct job data - database details not found', { 
+                  videoDbId: job.video_db_id 
+                });
+              }
             }
           } else {
             // Log polling activity every 10 polls (20 seconds) to show worker is alive  
