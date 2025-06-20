@@ -35,27 +35,25 @@ export async function getUserSubscription(userId: string): Promise<UserSubscript
   }
   logger.info('User subscription cache MISS', { userId });
 
-  const query = `
-    SELECT 
-      u.id, 
-      u.email, 
-      u.full_name,
-      s.stripe_price_id as subscription_tier, 
-      s.status as subscription_status,
-      s.current_period_end as subscription_end_date,
-      s.id as subscription_id,
-      u.credits_used,
-      p.credits as credits_limit,
-      u.credits_reserved,
-      u.last_credit_reset
-    FROM users u
-    LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
-    LEFT JOIN plans p ON s.stripe_price_id = p.stripe_price_id
-    WHERE u.id = $1
-  `;
-  
   const result = await executeQuery(async (sql) => {
-    return await sql.unsafe(query, [userId]);
+    return await sql`
+      SELECT 
+        u.id, 
+        u.email, 
+        u.full_name,
+        s.stripe_price_id as subscription_tier, 
+        s.status as subscription_status,
+        s.current_period_end as subscription_end_date,
+        s.id as subscription_id,
+        u.credits_used,
+        p.credits as credits_limit,
+        u.credits_reserved,
+        u.last_credit_reset
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
+      LEFT JOIN plans p ON s.stripe_price_id = p.stripe_price_id
+      WHERE u.id = ${userId}
+    `;
   });
 
   if (result.length === 0) return null;
@@ -165,19 +163,23 @@ export async function consumeCredits(userId: string, credits: number): Promise<b
  */
 export async function resetMonthlyCredits(): Promise<void> {
   try {
-    await sql`
-      UPDATE users 
-      SET credits_used = 0
-      WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-      OR last_credit_reset IS NULL
-    `;
+    await executeQuery(async (sql) => {
+      return await sql`
+        UPDATE users 
+        SET credits_used = 0
+        WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+        OR last_credit_reset IS NULL
+      `;
+    });
 
-    await sql`
-      UPDATE users 
-      SET last_credit_reset = NOW()
-      WHERE last_credit_reset IS NULL
-      OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-    `;
+    await executeQuery(async (sql) => {
+      return await sql`
+        UPDATE users 
+        SET last_credit_reset = NOW()
+        WHERE last_credit_reset IS NULL
+        OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+      `;
+    });
 
     console.log('Monthly credits reset completed');
   } catch (error) {

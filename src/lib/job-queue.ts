@@ -46,7 +46,7 @@ export async function initializeJobQueue(): Promise<void> {
     logger.error('🔴 Redis connection not configured. Cannot initialize job queue.');
     throw new Error('Job queue could not be initialized due to missing Redis configuration.');
   }
-
+  
   try {
     // Ensure the shared Redis client is ready first.
     await initializeRedis();
