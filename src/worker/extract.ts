@@ -41,83 +41,67 @@ console.log(`   UPSTASH_REDIS_REST_TOKEN: ${process.env.UPSTASH_REDIS_REST_TOKEN
 console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
 
 // NOW import modules after environment is properly set
-import { startWorker } from '../lib/job-queue';
+import 'dotenv/config'; // Load environment variables from .env files
+import { createWorker, JobData } from '../lib/job-queue';
+import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
-import { processVideo } from './extract-core';
 import { createLogger } from '../lib/logger';
+import { Job } from 'bullmq';
 
-// Initialize logger
 const logger = createLogger('worker:extract');
 
-// Flag to prevent multiple initializations
-let workerStarted = false;
+logger.info('🚀 Worker process starting...');
+logger.info(`✅ Node.js version: ${process.version}`);
+logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
 
-// Start health check server for monitoring
-logger.info('Starting health check server...');
-startHealthCheckServer();
+// Graceful shutdown handler
+const shutdown = (signal: string) => {
+  logger.info(`👋 Received ${signal}. Shutting down worker...`);
+  // The worker process will be managed by the platform (e.g., Leapcell),
+  // which will handle graceful shutdowns. BullMQ's worker will close its connections.
+  process.exit(0);
+};
 
-// Start the worker process
-async function initializeWorker() {
-  if (workerStarted) {
-    logger.info('Worker already started, skipping initialization');
-    return;
-  }
-  
-  workerStarted = true;
-  logger.info('Starting worker process...');
-  
-  try {
-    // Start the worker to process jobs
-    await startWorker();
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`Failed to start worker: ${errorMessage}`);
-    
-    // Even if the worker fails to start, we can still process videos directly
-    // This ensures that the application continues to work even if Redis is unavailable
-    logger.info('Worker will process videos directly without Redis queue');
-  }
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+try {
+  // 1. Start the health check server
+  // This is crucial for production monitoring services to know the worker is alive.
+  logger.info('🏥 Starting health check server...');
+  startHealthCheckServer();
+  logger.info('✅ Health check server started.');
+
+  // 2. Define the job processing function
+  // This is the core logic that the worker will execute for each job.
+  const handleJob = async (job: Job<JobData>) => {
+    logger.info(`🔄 Processing job ${job.id} for video ${job.data.videoId}`);
+    try {
+      await processVideoJob(job.data);
+      logger.info(`✅ Job ${job.id} completed successfully.`);
+      // The return value is stored separately by BullMQ, so we don't need to return it here.
+    } catch (error) {
+      logger.error(`❌ Job ${job.id} failed.`, { error: error instanceof Error ? error.message : String(error) });
+      // Re-throwing the error is important so BullMQ knows the job failed and can handle retries.
+      throw error;
+    }
+  };
+
+  // 3. Create and start the BullMQ worker
+  // The createWorker function encapsulates the connection and configuration.
+  logger.info('👷‍♂️ Creating BullMQ worker...');
+  const worker = createWorker(handleJob);
+  logger.info('✅ Worker created and listening for jobs.');
+
+  // Keep the process alive. In a containerized environment, the process
+  // is expected to run indefinitely.
+  console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
+
+} catch (error) {
+  logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
+  // If the worker can't even start, something is seriously wrong. Exit the process.
+  process.exit(1);
 }
-
-// Initialize the worker immediately
-initializeWorker().catch(error => {
-  logger.error(`Error during worker initialization: ${error.message}`);
-});
-
-// Keep the process alive
-console.log('⏳ Worker process started. Keeping alive...');
-
-// Add a simple heartbeat to keep the process running
-setInterval(() => {
-  logger.info('💓 Worker heartbeat - process is alive');
-}, 30000); // Every 30 seconds
-
-// Handle process signals gracefully
-process.on('SIGTERM', () => {
-  logger.info('👋 Received SIGTERM, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  logger.info('👋 Received SIGINT, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('uncaughtException', (error) => {
-  logger.error(`Uncaught exception: ${error.message}`);
-  if (error.stack) {
-    logger.error(error.stack);
-  }
-  // Don't exit immediately, log and continue
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error(`Unhandled rejection at ${promise}: ${reason}`);
-  // Don't exit immediately, log and continue
-});
-
-// Export the processVideo function for direct use
-export { processVideo };
 
 /**
  * Direct video processing function for backup when job queue fails
