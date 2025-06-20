@@ -1,0 +1,69 @@
+/* MainContent specific styles - avoiding global CSS modifications */
+
+.asteriskIcon {
+  display: inline-block;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+  cursor: default;
+}
+
+.asteriskIcon:hover {
+  transform: scale(1.1) rotate(12deg);
+}
+
+.inputField {
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: all 0.2s ease;
+}
+
+.inputField:focus {
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.actionButton {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.actionButton:hover {
+  transform: scale(1.02);
+}
+
+.actionButton:active {
+  transform: scale(0.98);
+}
+
+.errorTooltip {
+  backdrop-filter: blur(8px);
+}
+
+/* Completely hide all scrollbars */
+.hideScrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.hideScrollbar::-webkit-scrollbar {
+  display: none; /* WebKit */
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .asteriskIcon {
+    font-size: 0.9em;
+  }
+  
+  .inputField {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
+
+/* Focus visible for accessibility */
+.inputField:focus-visible {
+  outline: 2px solid #58A6FF;
+  outline-offset: 2px;
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid #58A6FF;
+  outline-offset: 2px;
+} 

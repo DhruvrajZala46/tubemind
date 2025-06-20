@@ -1,0 +1,35 @@
+[33maabfb81[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m \FINAL UI POLISH + WORKER DEPLOYMENT READY: 1) Fixed input field - removed placeholder text, added Claude-style clean input with ArrowUp icon 2) Removed unwanted action buttons (Summarize, Download, Share) from under input 3) Updated ALL branding from TubeGPT to TubeMind across entire codebase 4) Made input field and components fully responsive for mobile devices 5) Updated support emails to tubemind.com domain 6) Build successful - READY FOR PRODUCTION DEPLOYMENT"
+[33mc9818ca[m pricing ids chnaged to production
+[33m194174a[m ready to production(after chnaging productids to production
+[33m4ddad4a[m PRODUCTION READY: Complete deployment guide and worker setup - Payment system 100% functional - Credit processing verified - Webhook handling robust - Build successful - Ready for Polar production deployment
+[33m3f2eed5[m PRODUCTION-READY: Fix payment system issues and implement robust webhook processing - All tests pass, payment processing working, credit updates confirmed, user upgrades verified, webhook idempotency working - PAYMENT SYSTEM IS NOW PRODUCTION-READY WITH 0% ERROR TOLERANCE
+[33m7bb9ca9[m Fix payment integration issues: 1) Update webhook handler with better error handling and idempotency, 2) Add retry logic for 502 errors in checkout, 3) Update success/failure pages with auto-redirect to /dashboard/new
+[33mb03cb36[m fix: move TypeScript and types to dependencies
+[33m3f80a14[m Fix: regenerate lock file with correct devDependencies
+[33m5a1eb94[m fix: clean install for Vercel
+[33m71834ca[m fix: add typescript and react types for Vercel build
+[33m5d88d27[m fix: add typescript and react types for Vercel build
+[33mc50b1af[m fixed linter erros6
+[33m13d2a76[m fixed linter erros5
+[33m5c7a45e[m fixed linter erros4
+[33m7a486f0[m fixed linter erros2
+[33mbe1d0ec[m fixed linter erros2
+[33mffca817[m fix deploy errors
+[33m15fac73[m payment processing testing
+[33m0433342[m pricing setup attemp2
+[33m433746f[m jobs and evertyhing summari geneartion is working
+[33m655ac62[m fix changes
+[33m6803054[m fix previous bug
+[33mea19fb3[m updated build and start command for worker
+[33mc31968b[m update envs
+[33m7089057[m fix status showing in loader
+[33m0974b00[m ENHANCED LOGGIND IN WORKER LOGGER
+[33m36adce5[m final worker error fixed
+[33m2007364[m fix DB CONNECTIO ERr
+[33m9f2000f[m fix getvideoqueue function error
+[33m069d53f[m worker logger fix attempt
+[33m05e30d3[m health check error fixed for logs in worker leapcell terminal
+[33me03cde8[m apply lazzyloading in cache and openai
+[33m940eb86[m INCREASE READIBLITY LOGS FOR WORKER IN PROUDCTION
+[33m63e0d25[m fix bg worker production issue
+[33m6f3c5a0[m transcript service changed to supapdata.ai service

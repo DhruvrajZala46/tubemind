@@ -1,0 +1,204 @@
+// 📊 PHASE 2: SYSTEM MONITORING ENDPOINT
+// Provides real-time status of all infrastructure systems
+
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { executeQuery } from '@/lib/db';
+import { getCacheMetrics, getCacheStats } from '@/lib/cache';
+import { getErrorRecoveryMetrics } from '@/lib/error-recovery';
+import { getQueueMetrics, getQueueStats } from '@/lib/queue';
+
+export async function GET() {
+  try {
+    // 🔒 ADMIN-ONLY ACCESS
+    const { userId } = await auth();
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // 🛡️ ADMIN CHECK (you can implement your admin logic here)
+    // For now, we'll use a simple env variable check
+    const isAdmin = process.env.ADMIN_USER_IDS?.split(',').includes(userId) || 
+                    process.env.NODE_ENV === 'development';
+
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'Admin access required' },
+        { status: 403 }
+      );
+    }
+
+    // 📊 GATHER SYSTEM METRICS
+    const dbHealthCheck = await executeQuery(async (sql) => sql`SELECT 1`).then(() => ({ status: 'healthy' })).catch(e => ({ status: 'critical', error: e.message }));
+
+    const [
+      cacheMetrics,
+      cacheStats,
+      errorMetrics,
+      queueMetrics,
+      queueStats
+    ] = await Promise.all([
+      getCacheMetrics(),
+      getCacheStats(),
+      getErrorRecoveryMetrics(),
+      getQueueMetrics(),
+      getQueueStats()
+    ]);
+
+    // 🎯 SYSTEM HEALTH ASSESSMENT
+    const systemHealth = {
+      overall: 'healthy' as 'healthy' | 'warning' | 'critical',
+      components: {
+        database: 'healthy' as 'healthy' | 'warning' | 'critical',
+        cache: 'healthy' as 'healthy' | 'warning' | 'critical',
+        errorRecovery: 'healthy' as 'healthy' | 'warning' | 'critical',
+        queue: 'healthy' as 'healthy' | 'warning' | 'critical'
+      },
+      alerts: [] as string[]
+    };
+
+    // Database health check
+    if (dbHealthCheck.status === 'critical') {
+      systemHealth.components.database = 'critical';
+      systemHealth.alerts.push('Database connection issues detected');
+    }
+
+    // Cache health check
+    if (cacheMetrics.hitRate < 50) {
+      systemHealth.components.cache = 'warning';
+      systemHealth.alerts.push('Cache hit rate below 50%');
+    }
+
+    // Error recovery health check
+    if (errorMetrics.recoveryRate < 80) {
+      systemHealth.components.errorRecovery = 'warning';
+      systemHealth.alerts.push('Error recovery rate below 80%');
+    }
+
+    // Queue health check
+    if (queueMetrics.failed > queueMetrics.completed * 0.1) {
+      systemHealth.components.queue = 'warning';
+      systemHealth.alerts.push('High queue failure rate');
+    }
+
+    // Overall health assessment
+    const componentStates = Object.values(systemHealth.components);
+    if (componentStates.includes('critical')) {
+      systemHealth.overall = 'critical';
+    } else if (componentStates.includes('warning')) {
+      systemHealth.overall = 'warning';
+    }
+
+    // 📈 PERFORMANCE INDICATORS
+    const performanceIndicators = {
+      // Database performance
+      database: {
+        status: dbHealthCheck.status,
+      },
+      
+      // Cache performance
+      cache: {
+        hitRate: cacheMetrics.hitRate.toFixed(1) + '%',
+        totalHits: cacheMetrics.hits,
+        totalMisses: cacheMetrics.misses,
+        cacheSize: cacheMetrics.size,
+        memoryUtilization: ((cacheMetrics.size / 1000) * 100).toFixed(1) + '%' // Assuming 1000 max items
+      },
+      
+      // Error recovery performance
+      errorRecovery: {
+        recoveryRate: errorMetrics.recoveryRate.toFixed(1) + '%',
+        totalOperations: errorMetrics.totalOperations,
+        successfulRecoveries: errorMetrics.successfulRecoveries,
+        failedRecoveries: errorMetrics.failedRecoveries
+      },
+      
+      // Queue performance
+      queue: {
+        throughput: queueMetrics.throughput.toFixed(2) + ' jobs/min',
+        pendingJobs: queueMetrics.pending,
+        processingJobs: queueMetrics.processing,
+        completedJobs: queueMetrics.completed,
+        failedJobs: queueMetrics.failed,
+        totalJobs: queueMetrics.total
+      }
+    };
+
+    // 🔍 DETAILED SYSTEM STATUS
+    const systemStatus = {
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      nodeVersion: process.version,
+      environment: process.env.NODE_ENV,
+      
+      health: systemHealth,
+      performance: performanceIndicators,
+      
+      // Raw metrics for debugging
+      rawMetrics: {
+        database: dbHealthCheck,
+        cache: {
+          metrics: cacheMetrics,
+          stats: cacheStats
+        },
+        errorRecovery: errorMetrics,
+        queue: {
+          metrics: queueMetrics,
+          stats: queueStats
+        }
+      },
+      
+      // System resources
+      memory: {
+        used: process.memoryUsage().heapUsed,
+        total: process.memoryUsage().heapTotal,
+        external: process.memoryUsage().external,
+        rss: process.memoryUsage().rss
+      },
+      
+      // Rate limiting status (from middleware)
+      rateLimiting: {
+        status: 'active',
+        limits: {
+          authenticated: '100 req/min',
+          anonymous: '20 req/min',
+          extract: '10 req/min'
+        }
+      }
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: systemStatus
+    });
+
+  } catch (error: unknown) {
+    console.error('❌ System status check failed:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to get system status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+// 🔄 HEALTH CHECK ENDPOINT (lightweight)
+export async function HEAD() {
+  try {
+    // Simple health check that doesn't require auth
+    const isHealthy = true; // Add basic health checks here
+    
+    if (isHealthy) {
+      return new NextResponse(null, { status: 200 });
+    } else {
+      return new NextResponse(null, { status: 503 });
+    }
+  } catch {
+    return new NextResponse(null, { status: 503 });
+  }
+} 

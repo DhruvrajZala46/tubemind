@@ -1,0 +1,588 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+@import "tailwindcss";
+
+:root {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --yt-red: #FF0033;
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-tertiary: #21262D;
+  --border-color: #30363D;
+  --text-primary: #F0F6FC;
+  --text-secondary: #8B949E;
+  
+  /* ChatGPT-like colors */
+  --chatgpt-bg: #1e1e2e;
+  --chatgpt-border: #30363D;
+  --chatgpt-text: #f5f6fa;
+  --chatgpt-highlight: #ff9580;
+  --chatgpt-code: #e4637c;
+  --chatgpt-link: #58A6FF;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Custom dark theme scrollbar for the entire app */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #1a1a1a;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #404040;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #525252;
+}
+
+*::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}
+
+.glass-card {
+  background: rgba(30, 30, 40, 0.85);
+  box-shadow: 0 8px 40px 0 rgba(80, 80, 180, 0.16), 0 3px 12px 0 rgba(16, 185, 129, 0.12);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+}
+
+.header-overlay {
+  background: linear-gradient(to bottom, rgba(10,10,20,0.95) 60%, transparent 100%);
+  backdrop-filter: blur(8px);
+}
+
+.text-white-important {
+  color: #fff !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 900;
+  color: inherit;
+  letter-spacing: -0.01em;
+}
+
+.pill-btn {
+  border-radius: 9999px;
+  background: #18181b;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+  transition: background 0.2s;
+}
+.pill-btn:hover {
+  background: #27272a;
+}
+
+/* Asterisk animation for homepage logo */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2.2rem;
+  }
+  .glass-card {
+    padding: 1.25rem;
+  }
+}
+
+.light .glass-card {
+  background: rgba(255,255,255,0.85);
+  color: var(--yt-light-text);
+  border: 1px solid #e5e5e5;
+}
+.dark .glass-card {
+  background: rgba(30, 30, 40, 0.85);
+  color: var(--yt-dark-text);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+@keyframes morph {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(180deg);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideInUp {
+  0% {
+    transform: translateY(10px) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutDown {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(10px) scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-morph {
+  animation: morph 3s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 4s linear infinite;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.3s ease-out forwards;
+}
+
+.animate-slide-out-down {
+  animation: slideOutDown 0.2s ease-in forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.2s ease-in forwards;
+}
+
+/* Hide scrollbars only for specific components like sidebar */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* WebKit */
+}
+
+/* Dashboard/new page should have no scrollbar */
+.no-scroll {
+  overflow: hidden;
+}
+
+/* 🚀 INSTANT LOADING STATES - Zero Perceived Delay */
+.instant-transition {
+  transition: all 100ms ease-out !important;
+}
+
+.instant-hover:hover {
+  transform: translateY(-1px);
+  transition: transform 100ms ease-out;
+}
+
+.instant-click:active {
+  transform: translateY(0px);
+  transition: transform 50ms ease-out;
+}
+
+.instant-feedback {
+  transition: all 100ms ease-out;
+}
+
+.instant-feedback:hover {
+  opacity: 0.9;
+  transform: scale(1.01);
+}
+
+.instant-feedback:active {
+  opacity: 0.8;
+  transform: scale(0.99);
+}
+
+/* Instant loading button states */
+.btn-instant {
+  transition: all 100ms ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-instant:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-instant:active {
+  transform: translateY(0px);
+  transition: transform 50ms ease-out;
+}
+
+.btn-instant.loading {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.btn-instant.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: shimmer 1s infinite;
+}
+
+/* 🎯 GLOBAL CURSOR POINTER STYLES */
+button,
+.cursor-pointer,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+.clickable,
+a[href],
+.link,
+[onclick],
+.hover\:bg-\[,
+.hover\:opacity-,
+.hover\:scale-,
+.hover\:text-,
+.hover\:border-,
+.transition,
+.btn-instant,
+.instant-feedback {
+  cursor: pointer !important;
+}
+
+/* Disabled states should not have pointer cursor */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled] {
+  cursor: not-allowed !important;
+}
+
+/* Text inputs should have text cursor */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="search"],
+textarea,
+[contenteditable] {
+  cursor: text !important;
+}
+
+/* Loading states */
+.loading,
+.cursor-wait {
+  cursor: wait !important;
+}
+
+/* 🚀 INSTANT NAVIGATION IMPROVEMENTS */
+.page-transition {
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Instant link hover effects */
+a[href]:hover {
+  transition: all 100ms ease-out;
+  opacity: 0.9;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Mobile-first responsive improvements - Claude-style */
+@media (max-width: 1023px) {
+  /* Force full-width mobile layout - no white space */
+  body, html {
+    overflow-x: hidden;
+  }
+  
+  main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+  
+  /* Mobile safe areas for iOS */
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Mobile typography optimizations */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Improved touch targets for mobile */
+  button, 
+  a, 
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Mobile scrolling optimizations */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Mobile-optimized sidebar overlay */
+  .mobile-sidebar-overlay {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+}
+
+/* Mobile-specific text sizing (Claude-style) */
+@media (max-width: 767px) {
+  /* Optimize text for mobile readability */
+  .mobile-text-optimize {
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+  
+  .mobile-text-optimize h1 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+    margin-bottom: 0.75rem;
+  }
+  
+  .mobile-text-optimize h2 {
+    font-size: 1.25rem;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+  }
+  
+  .mobile-text-optimize p {
+    margin-bottom: 0.875rem;
+  }
+  
+  /* Mobile card optimizations */
+  .mobile-card {
+    padding: 1rem;
+    margin: 0.5rem;
+    border-radius: 12px;
+  }
+  
+  /* Mobile input optimizations */
+  input[type="text"], 
+  input[type="url"], 
+  textarea {
+    font-size: 16px; /* Prevent zoom on iOS */
+    -webkit-appearance: none;
+    border-radius: 8px;
+  }
+}
+
+/* Tablet responsive breakpoint */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-optimize {
+    padding: 1.5rem;
+  }
+}
+
+/* Enhanced animations for mobile */
+@media (prefers-reduced-motion: no-preference) {
+  .smooth-mobile-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .mobile-hover:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Claude-style mobile sidebar animation */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft 0.3s ease-out forwards;
+}
+
+.animate-slide-out-left {
+  animation: slideOutToLeft 0.2s ease-in forwards;
+}
+
+/* Mobile navigation improvements */
+@media (max-width: 1023px) {
+  .mobile-nav-button {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 40;
+    background: rgba(22, 27, 34, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(48, 54, 61, 0.8);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+  }
+  
+  .mobile-nav-button:hover {
+    background: rgba(33, 38, 45, 0.95);
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .mobile-nav-button:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Improved mobile spacing */
+@media (max-width: 767px) {
+  .mobile-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .mobile-section {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+  
+  .mobile-grid {
+    gap: 1rem;
+  }
+}
