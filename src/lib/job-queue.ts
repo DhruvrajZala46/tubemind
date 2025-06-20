@@ -106,41 +106,10 @@ async function initializeSimpleQueue(): Promise<void> {
 }
 
 export async function addJobToQueue(data: JobData): Promise<Job> {
-  // Check if we're in simple queue mode
-  if ((global as any).__SIMPLE_QUEUE_MODE) {
-    return addJobToSimpleQueue(data);
-  }
-
-  if (!queue) {
-    logger.info('Queue not initialized, initializing now...');
-    await initializeJobQueue();
-    if (!queue && !(global as any).__SIMPLE_QUEUE_MODE) {
-      logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot add job.');
-      throw new Error('Failed to initialize job queue. Cannot add job.');
-    }
-    
-    // If we fell back to simple mode during init, use that
-    if ((global as any).__SIMPLE_QUEUE_MODE) {
-      return addJobToSimpleQueue(data);
-    }
-  }
-
-  try {
-    logger.info('Adding job to BullMQ queue', { videoId: data.videoId });
-    const job = await queue!.add(QUEUE_NAME, data);
-    logger.info('✅ Job added to BullMQ queue successfully', { jobId: job.id, videoId: data.videoId });
-    return job;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
-      logger.warn('⚠️ BullMQ failed due to script permissions. Falling back to simple queue.', { error: errorMessage });
-      (global as any).__SIMPLE_QUEUE_MODE = true;
-      return addJobToSimpleQueue(data);
-    }
-    
-    throw error;
-  }
+  // CRITICAL FIX: Force simple queue mode for Upstash compatibility
+  // Always use simple queue to avoid any script permission issues
+  logger.info('🚀 Using simple queue mode for Upstash compatibility', { videoId: data.videoId });
+  return addJobToSimpleQueue(data);
 }
 
 // Simple job queue implementation that doesn't use Redis scripts
@@ -149,21 +118,22 @@ async function addJobToSimpleQueue(data: JobData): Promise<Job> {
     throw new Error("Redis client not available for simple queue");
   }
   
-  const jobId = `job:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
+  // CRITICAL FIX: Use videoDbId as jobId for consistent tracking
+  const jobId = data.videoDbId;
   const jobData = JSON.stringify(data);
   
-  logger.info('Adding job to simple Redis queue', { videoId: data.videoId, jobId });
+  logger.info('Adding job to simple Redis queue', { videoId: data.videoId, jobId, videoDbId: data.videoDbId });
   
   // Use simple Redis commands that work with Upstash free tier
   await redis.lpush('video-processing:jobs', jobData);
   await redis.hset(`video-processing:job:${jobId}`, {
     id: jobId,
     data: jobData,
-    status: 'waiting',
-    created: Date.now()
+    status: 'queued',
+    created: Date.now().toString()
   });
   
-  logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId });
+  logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId, videoDbId: data.videoDbId });
   
   // Return a mock Job object for compatibility
   return {
@@ -375,51 +345,61 @@ export async function startSimpleWorker(
     throw new Error('Redis connection required for worker');
   }
   
-  // Polling function
+    // Polling function
   const pollForJobs = async () => {
     while (!shouldStop()) {
       try {
-                 // Try to get a job from the simple queue
-         const jobData = await redis!.rpop('video-processing:jobs');
-         
-         if (jobData) {
-           const data = JSON.parse(jobData) as JobData;
-           logger.info('📦 Found job in queue', { videoId: data.videoId, userId: data.userId });
-           
-           try {
-             // Update job status to active
-             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-               status: 'active',
-               started: Date.now().toString(),
-             });
-             
-             // Process the job
-             await processor(data);
-             
-             // Mark job as completed
-             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-               status: 'completed',
-               finished: Date.now().toString(),
-             });
-             
-             logger.info('✅ Job processing completed successfully', { videoId: data.videoId });
-             
-           } catch (jobError) {
-             // Mark job as failed
-             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
-               status: 'failed',
-               finished: Date.now().toString(),
-               error: jobError instanceof Error ? jobError.message : String(jobError),
-             });
+        // Try to get a job from the simple queue
+        const jobData = await redis!.rpop('video-processing:jobs');
+        
+        if (jobData) {
+          const data = JSON.parse(jobData) as JobData;
+          logger.info('📦 Found job in queue', { 
+            videoId: data.videoId, 
+            userId: data.userId, 
+            videoDbId: data.videoDbId 
+          });
+          
+          try {
+            // Update job status to active
+            await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+              status: 'active',
+              started: Date.now().toString(),
+            });
+            
+            logger.info('🔄 Starting job processing', { videoId: data.videoId, videoDbId: data.videoDbId });
+            
+            // Process the job
+            await processor(data);
+            
+            // Mark job as completed
+            await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+              status: 'completed',
+              finished: Date.now().toString(),
+            });
+            
+            logger.info('✅ Job processing completed successfully', { 
+              videoId: data.videoId, 
+              videoDbId: data.videoDbId 
+            });
+            
+          } catch (jobError) {
+            // Mark job as failed
+            await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+              status: 'failed',
+              finished: Date.now().toString(),
+              error: jobError instanceof Error ? jobError.message : String(jobError),
+            });
             
             logger.error('❌ Job processing failed', { 
               videoId: data.videoId, 
+              videoDbId: data.videoDbId,
               error: jobError instanceof Error ? jobError.message : String(jobError) 
             });
           }
         } else {
-          // No jobs found, wait before polling again
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          // No jobs found, wait before polling again (shorter interval for responsiveness)
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
       } catch (pollError) {
