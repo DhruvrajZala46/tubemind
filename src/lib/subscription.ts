@@ -25,50 +25,79 @@ export interface UserSubscription {
 const USER_SUBSCRIPTION_CACHE_KEY = (userId: string) => `user:subscription:${userId}`;
 
 // Get user subscription data with caching
-export async function getUserSubscription(userId: string): Promise<UserSubscription | null> {
+export async function getUserSubscription(userId: string): Promise<any> {
   const cache = getCacheManager();
   const cacheKey = `user-sub:${userId}`;
-  const cachedSub = cache.get<UserSubscription>(cacheKey);
+  const cachedSub = cache.get<any>(cacheKey);
   if (cachedSub) {
     logger.info('User subscription cache HIT', { userId });
     return cachedSub;
   }
   logger.info('User subscription cache MISS', { userId });
 
+  // Use the user_subscription_summary view which has all the computed fields
   const result = await executeQuery(async (sql) => {
     return await sql`
       SELECT 
-        u.id, 
-        u.email, 
-        u.full_name,
-        s.stripe_price_id as subscription_tier, 
-        s.status as subscription_status,
-        s.current_period_end as subscription_end_date,
-        s.id as subscription_id,
-        u.credits_used,
-        p.credits as credits_limit,
-        u.credits_reserved,
-        u.last_credit_reset
-      FROM users u
-      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active'
-      LEFT JOIN plans p ON s.stripe_price_id = p.stripe_price_id
-      WHERE u.id = ${userId}
+        id,
+        email,
+        full_name,
+        subscription_tier,
+        subscription_status,
+        subscription_end_date,
+        subscription_id,
+        credits_used,
+        credits_limit,
+        credits_reserved,
+        last_credit_reset,
+        remaining_credits,
+        usage_percentage,
+        is_over_limit
+      FROM user_subscription_summary
+      WHERE id = ${userId}
     `;
   });
 
-  if (result.length === 0) return null;
+  if (result.length === 0) {
+    // If user doesn't exist in the summary view, check if they exist in users table
+    const userExists = await executeQuery(async (sql) => {
+      return await sql`SELECT id FROM users WHERE id = ${userId}`;
+    });
+    
+    if (userExists.length === 0) {
+      // User doesn't exist at all
+      return null;
+    }
+    
+    // User exists but no summary - return default free tier
+    logger.info('User exists but no subscription summary found, returning default free tier', { userId });
+    return {
+      id: userId,
+      subscription_tier: 'free',
+      subscription_status: 'active',
+      credits_used: 0,
+      credits_limit: 60,
+      credits_reserved: 0,
+      remaining_credits: 60,
+      usage_percentage: 0,
+      is_over_limit: false
+    };
+  }
 
   const subscription = result[0];
 
-  // For free users without a subscription record
-  if (!subscription.subscription_tier) {
-    subscription.subscription_tier = 'free';
-    subscription.credits_limit = 60; // Default free limit
-    subscription.subscription_status = 'active';
-  }
+  // Normalize the field names for backward compatibility
+  const normalizedSubscription = {
+    ...subscription,
+    tier: subscription.subscription_tier || 'free',
+    status: subscription.subscription_status || 'active',
+    creditsUsed: subscription.credits_used || 0,
+    creditsLimit: subscription.credits_limit || 60,
+    creditsReserved: subscription.credits_reserved || 0
+  };
 
-  cache.set(cacheKey, subscription, 300); // Cache for 5 minutes
-  return subscription;
+  cache.set(cacheKey, normalizedSubscription, 300); // Cache for 5 minutes
+  return normalizedSubscription;
 }
 
 /**
@@ -224,7 +253,7 @@ export async function requireSubscription(minTier: 'free' | 'basic' | 'pro' = 'f
     throw new Error('Subscription not found');
   }
 
-  const tierLevel = { free: 0, basic: 1, pro: 2 };
+  const tierLevel: { [key: string]: number } = { free: 0, basic: 1, pro: 2 };
   const userTierLevel = tierLevel[subscription.tier] || 0;
   const requiredTierLevel = tierLevel[minTier] || 0;
 
