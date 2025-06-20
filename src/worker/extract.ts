@@ -42,11 +42,10 @@ console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
 
 // NOW import modules after environment is properly set
 import 'dotenv/config'; // Load environment variables from .env files
-import { createWorker, JobData } from '../lib/job-queue';
+import { startSimpleWorker, JobData } from '../lib/job-queue';
 import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
-import { Job } from 'bullmq';
 
 const logger = createLogger('worker:extract');
 
@@ -55,11 +54,17 @@ logger.info(`✅ Node.js version: ${process.version}`);
 logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
 
 // Graceful shutdown handler
+let isShuttingDown = false;
+
 const shutdown = (signal: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  
   logger.info(`👋 Received ${signal}. Shutting down worker...`);
-  // The worker process will be managed by the platform (e.g., Leapcell),
-  // which will handle graceful shutdowns. BullMQ's worker will close its connections.
-  process.exit(0);
+  // Allow current jobs to finish before shutting down
+  setTimeout(() => {
+    process.exit(0);
+  }, 5000); // 5 second graceful shutdown
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -74,23 +79,23 @@ try {
 
   // 2. Define the job processing function
   // This is the core logic that the worker will execute for each job.
-  const handleJob = async (job: Job<JobData>) => {
-    logger.info(`🔄 Processing job ${job.id} for video ${job.data.videoId}`);
+  const handleJob = async (jobData: JobData) => {
+    const jobId = `${jobData.videoDbId}-${Date.now()}`;
+    logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
     try {
-      await processVideoJob(job.data);
-      logger.info(`✅ Job ${job.id} completed successfully.`);
-      // The return value is stored separately by BullMQ, so we don't need to return it here.
+      await processVideoJob(jobData);
+      logger.info(`✅ Job ${jobId} completed successfully.`);
     } catch (error) {
-      logger.error(`❌ Job ${job.id} failed.`, { error: error instanceof Error ? error.message : String(error) });
-      // Re-throwing the error is important so BullMQ knows the job failed and can handle retries.
+      logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
+      // Re-throwing the error is important for proper error handling
       throw error;
     }
   };
 
-  // 3. Create and start the BullMQ worker
-  // The createWorker function encapsulates the connection and configuration.
-  logger.info('👷‍♂️ Creating BullMQ worker...');
-  const worker = createWorker(handleJob);
+  // 3. Start the simple Redis worker
+  // This polls Redis directly without BullMQ to avoid script permission issues
+  logger.info('👷‍♂️ Starting simple Redis worker...');
+  startSimpleWorker(handleJob, () => isShuttingDown);
   logger.info('✅ Worker created and listening for jobs.');
 
   // Keep the process alive. In a containerized environment, the process

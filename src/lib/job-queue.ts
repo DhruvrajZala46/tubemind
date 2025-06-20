@@ -358,6 +358,91 @@ function createSimpleWorker(processor: (job: Job<JobData>) => Promise<void>) {
   return worker;
 }
 
+/**
+ * Starts a simple Redis worker that polls for jobs without using scripts
+ * This is compatible with Upstash free tier restrictions
+ */
+export async function startSimpleWorker(
+  processor: (jobData: JobData) => Promise<void>,
+  shouldStop: () => boolean = () => false
+): Promise<void> {
+  logger.info('🚀 Starting simple Redis worker (script-free)...');
+  
+  await initializeJobQueue();
+  
+  if (!redis) {
+    logger.error('❌ Redis not available, cannot start worker');
+    throw new Error('Redis connection required for worker');
+  }
+  
+  // Polling function
+  const pollForJobs = async () => {
+    while (!shouldStop()) {
+      try {
+                 // Try to get a job from the simple queue
+         const jobData = await redis!.rpop('video-processing:jobs');
+         
+         if (jobData) {
+           const data = JSON.parse(jobData) as JobData;
+           logger.info('📦 Found job in queue', { videoId: data.videoId, userId: data.userId });
+           
+           try {
+             // Update job status to active
+             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+               status: 'active',
+               started: Date.now().toString(),
+             });
+             
+             // Process the job
+             await processor(data);
+             
+             // Mark job as completed
+             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+               status: 'completed',
+               finished: Date.now().toString(),
+             });
+             
+             logger.info('✅ Job processing completed successfully', { videoId: data.videoId });
+             
+           } catch (jobError) {
+             // Mark job as failed
+             await redis!.hset(`video-processing:job:${data.videoDbId}`, {
+               status: 'failed',
+               finished: Date.now().toString(),
+               error: jobError instanceof Error ? jobError.message : String(jobError),
+             });
+            
+            logger.error('❌ Job processing failed', { 
+              videoId: data.videoId, 
+              error: jobError instanceof Error ? jobError.message : String(jobError) 
+            });
+          }
+        } else {
+          // No jobs found, wait before polling again
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        
+      } catch (pollError) {
+        logger.error('Error polling for jobs', { 
+          error: pollError instanceof Error ? pollError.message : String(pollError) 
+        });
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
+    }
+    
+    logger.info('🛑 Worker stopped polling (shutdown requested)');
+  };
+  
+  logger.info('✅ Simple worker started, polling for jobs...');
+  
+  // Start polling (non-blocking)
+  pollForJobs().catch(error => {
+    logger.error('Critical error in worker polling', { error });
+  });
+}
+
 // Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Shutting down job queue and worker...');
