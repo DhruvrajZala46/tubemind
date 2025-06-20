@@ -109,6 +109,16 @@ export async function addJobToQueue(data: JobData): Promise<Job> {
   // CRITICAL FIX: Force simple queue mode for Upstash compatibility
   // Always use simple queue to avoid any script permission issues
   logger.info('🚀 Using simple queue mode for Upstash compatibility', { videoId: data.videoId });
+  
+  // Ensure Redis is initialized before adding job
+  if (!redis) {
+    logger.info('🔄 Redis client not available, initializing...');
+    await initializeRedis();
+    if (!redis) {
+      throw new Error("Could not initialize Redis client for job queue");
+    }
+  }
+  
   return addJobToSimpleQueue(data);
 }
 
@@ -367,7 +377,9 @@ export async function startSimpleWorker(
   logger.info('🚀 Starting simple Redis worker (script-free)...');
   
   try {
-    await initializeJobQueue();
+    // CRITICAL FIX: Initialize Redis directly, bypass BullMQ completely for worker
+    logger.info('🔄 Initializing Redis client directly for worker...');
+    await initializeRedis();
     
     if (!redis) {
       logger.error('❌ Redis not available, cannot start worker');
@@ -380,9 +392,9 @@ export async function startSimpleWorker(
     const pingResult = await redis.ping();
     logger.info('🏓 Redis ping test successful', { result: pingResult });
     
-    // Check if there are existing jobs in the queue
-    const queueLength = await redis.llen('video-processing:jobs');
-    logger.info(`📊 Current queue length: ${queueLength} jobs`);
+    // Force simple queue mode for worker
+    (global as any).__SIMPLE_QUEUE_MODE = true;
+    logger.info('✅ Simple queue mode enabled for worker');
     
     // Polling function - adapted for SET-based queue due to Upstash restrictions
     const pollForJobs = async () => {
@@ -393,6 +405,8 @@ export async function startSimpleWorker(
         
         try {
           // Get queued jobs from database since Redis LPUSH/RPOP is restricted
+          logger.info('🔍 Polling database for queued jobs...', { pollCount });
+          
           const { executeQuery } = await import('../lib/db');
           const queuedJobs = await executeQuery(async (sql) => {
             return await sql`
@@ -404,6 +418,8 @@ export async function startSimpleWorker(
               LIMIT 1
             `;
           });
+          
+          logger.info(`📊 Database query completed, found ${queuedJobs.length} queued jobs`, { pollCount });
           
           if (queuedJobs.length > 0) {
             const job = queuedJobs[0];
