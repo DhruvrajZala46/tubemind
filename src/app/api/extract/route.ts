@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
 
     const subscription = await getUserSubscription(userId);
     if (!subscription) {
-      logger.error('User subscription not found', { userId });
-      return NextResponse.json({ error: 'User subscription not found. Please contact support.' }, { status: 500 });
+      logger.error('User subscription not found. This should not happen after authentication.', { userId });
+      return NextResponse.json({ error: 'Could not retrieve your subscription details. Please try signing out and back in.' }, { status: 500 });
     }
 
     logger.info('User subscription status', { 
