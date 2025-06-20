@@ -430,7 +430,8 @@ export async function startSimpleWorker(
           const { executeQuery } = await import('../lib/db');
           
           logger.info('📊 Executing database query for queued jobs...');
-          const queuedJobs = await executeQuery(async (sql) => {
+
+          const queryPromise = executeQuery(async (sql) => {
             return await sql`
               SELECT vs.video_id as video_db_id, v.video_id, v.user_id, v.title, vs.id as summary_id
               FROM video_summaries vs
@@ -440,6 +441,12 @@ export async function startSimpleWorker(
               LIMIT 1
             `;
           });
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Database query timed out after 5 seconds')), 5000)
+          );
+
+          const queuedJobs = await Promise.race([queryPromise, timeoutPromise]);
           
           logger.info(`📊 Database query completed, found ${queuedJobs.length} queued jobs`, { pollCount });
           
