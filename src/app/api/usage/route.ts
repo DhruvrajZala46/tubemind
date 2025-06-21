@@ -15,13 +15,13 @@ export async function GET() {
     const user = await currentUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-    
+  }
+
     userId = user.id;
     userEmail = user.emailAddresses?.[0]?.emailAddress;
     
     let subscription = await getUserSubscription(user.id);
-
+    
     // If a user record doesn't exist yet (e.g., right after sign-up),
     // create a default free plan object. This makes the API resilient.
     if (!subscription) {

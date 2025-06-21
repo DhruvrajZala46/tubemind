@@ -75,7 +75,7 @@ async function startWorker() {
     // 1. Start the health check server
     // This is crucial for production monitoring services to know the worker is alive.
     logger.info('🏥 Starting health check server...');
-    startHealthCheckServer();
+startHealthCheckServer();
     logger.info('✅ Health check server started.');
 
     // 2. Define the job processing function

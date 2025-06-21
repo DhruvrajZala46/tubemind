@@ -215,8 +215,8 @@ try {
     env = WorkerEnvSchema.parse(process.env) as EnvType;
     console.log('✅ Worker environment variables validated successfully');
   } else {
-    env = EnvSchema.parse(process.env) as EnvType;
-    console.log('✅ Environment variables validated successfully');
+  env = EnvSchema.parse(process.env) as EnvType;
+  console.log('✅ Environment variables validated successfully');
   }
 } catch (error) {
   console.error('❌ Environment validation failed:', error);
@@ -231,19 +231,19 @@ if (!env.DATABASE_URL) {
 
 // Only validate API-specific variables if not in worker mode
 if (!isWorkerProcess) {
-  if (!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !env.CLERK_SECRET_KEY) {
-    console.error('❌ Missing required Clerk authentication keys');
-    throw new Error('Missing required Clerk authentication keys');
-  }
+if (!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !env.CLERK_SECRET_KEY) {
+  console.error('❌ Missing required Clerk authentication keys');
+  throw new Error('Missing required Clerk authentication keys');
+}
 
-  if (!env.YOUTUBE_API_KEY) {
-    console.error('❌ Missing required YouTube API key');
-    throw new Error('Missing required YouTube API key');
-  }
+if (!env.YOUTUBE_API_KEY) {
+  console.error('❌ Missing required YouTube API key');
+  throw new Error('Missing required YouTube API key');
+}
 
-  if (!env.POLAR_WEBHOOK_SECRET || !env.POLAR_ACCESS_TOKEN) {
-    console.error('❌ Missing required Polar payment credentials');
-    throw new Error('Missing required Polar payment credentials');
+if (!env.POLAR_WEBHOOK_SECRET || !env.POLAR_ACCESS_TOKEN) {
+  console.error('❌ Missing required Polar payment credentials');
+  throw new Error('Missing required Polar payment credentials');
   }
 }
 

@@ -39,18 +39,18 @@ export async function getUserSubscription(userId: string): Promise<any> {
   const result = await executeQuery(async (sql) => {
     return await sql`
       SELECT 
-        id,
-        email,
+            id, 
+            email,
         full_name,
-        subscription_tier,
-        subscription_status,
+            subscription_tier, 
+            subscription_status, 
         subscription_end_date,
         subscription_id,
-        credits_used,
-        credits_reserved,
-        last_credit_reset,
-        created_at,
-        updated_at
+            credits_used,
+            credits_reserved,
+            last_credit_reset,
+            created_at,
+            updated_at
       FROM users
       WHERE id = ${userId}
     `;
@@ -58,11 +58,11 @@ export async function getUserSubscription(userId: string): Promise<any> {
 
   if (result.length === 0) {
     // User doesn't exist at all
-    return null;
-  }
+      return null;
+    }
 
   const user = result[0];
-
+    
   // Calculate credits_limit based on subscription_tier
   let creditsLimit = 60; // Default free tier limit
   switch (user.subscription_tier) {
@@ -186,7 +186,7 @@ export async function consumeCredits(userId: string, credits: number): Promise<b
 
   await executeQuery(async (sql) => {
     return await sql`
-      UPDATE users
+      UPDATE users 
       SET 
         credits_used = COALESCE(credits_used, 0) + ${credits},
         credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
@@ -194,8 +194,8 @@ export async function consumeCredits(userId: string, credits: number): Promise<b
     `;
   });
 
-  // Invalidate the user subscription cache to ensure real-time updates
-  getCacheManager().invalidateUserSubscription(userId);
+    // Invalidate the user subscription cache to ensure real-time updates
+    getCacheManager().invalidateUserSubscription(userId);
 
   return true;
 }
@@ -207,20 +207,20 @@ export async function resetMonthlyCredits(): Promise<void> {
   try {
     await executeQuery(async (sql) => {
       return await sql`
-        UPDATE users 
-        SET credits_used = 0
-        WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-        OR last_credit_reset IS NULL
-      `;
+      UPDATE users 
+      SET credits_used = 0
+      WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+      OR last_credit_reset IS NULL
+    `;
     });
 
     await executeQuery(async (sql) => {
       return await sql`
-        UPDATE users 
-        SET last_credit_reset = NOW()
-        WHERE last_credit_reset IS NULL
-        OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-      `;
+      UPDATE users 
+      SET last_credit_reset = NOW()
+      WHERE last_credit_reset IS NULL
+      OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+    `;
     });
 
     console.log('Monthly credits reset completed');
@@ -236,10 +236,10 @@ export async function reserveCredits(userId: string, creditsToReserve: number): 
   try {
     await executeQuery(async (sql) => {
       return await sql`
-        UPDATE users
+      UPDATE users
         SET credits_reserved = COALESCE(credits_reserved, 0) + ${creditsToReserve}
-        WHERE id = ${userId}
-      `;
+      WHERE id = ${userId}
+    `;
     });
     getCacheManager().invalidateUserSubscription(userId);
   } catch (error) {
@@ -278,7 +278,7 @@ export async function requireSubscription(minTier: 'free' | 'basic' | 'pro' = 'f
 }
 
 // Re-export for backward compatibility
-export { SUBSCRIPTION_LIMITS };
+export { SUBSCRIPTION_LIMITS }; 
 
 export async function releaseCredits(userId: string, credits: number) {
   logger.info('Releasing credits', { userId, data: { credits } });

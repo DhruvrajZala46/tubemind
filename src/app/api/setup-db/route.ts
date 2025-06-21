@@ -37,7 +37,7 @@ export async function POST() {
     });
 
     await executeQuery(async (sql) => {
-      await sql`
+    await sql`
         CREATE OR REPLACE VIEW user_subscription_summary AS
         SELECT
           u.id,
@@ -83,7 +83,7 @@ export async function POST() {
 
     // 3. Set default values for existing users who might have NULL credits_used or credits_reserved
     await executeQuery(async (sql) => {
-      await sql`
+    await sql`
         UPDATE users 
         SET 
           credits_used = COALESCE(credits_used, 0),
@@ -110,7 +110,7 @@ export async function POST() {
     const verificationResult = await executeQuery(async (sql) => {
       return await sql`
         SELECT COUNT(*) as column_count
-        FROM information_schema.columns 
+      FROM information_schema.columns 
         WHERE table_name = 'users' 
         AND column_name IN ('id', 'email', 'credits_used', 'credits_reserved', 'subscription_tier', 'subscription_status')
       `;
@@ -128,7 +128,7 @@ export async function POST() {
       requiredColumns: verificationResult[0]?.column_count,
       viewExists: viewExists[0]?.view_count > 0
     });
-
+    
     return NextResponse.json({
       success: true,
       message: 'Database setup completed successfully',
@@ -146,8 +146,8 @@ export async function POST() {
     
     return NextResponse.json(
       { 
-        success: false, 
-        error: 'Database setup failed', 
+      success: false,
+      error: 'Database setup failed',
         details: errorMessage 
       },
       { status: 500 }

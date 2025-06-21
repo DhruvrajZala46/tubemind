@@ -432,10 +432,11 @@ export async function startSimpleWorker(
           logger.info('📊 Executing database query for queued jobs...');
 
           const queryPromise = executeQuery(async (sql) => {
+            // FIX: Ensure join is on v.id (UUID, primary key) as per schema
             return await sql`
               SELECT vs.video_id as video_db_id, v.video_id, v.user_id, v.title, vs.id as summary_id
               FROM video_summaries vs
-              JOIN videos v ON vs.video_id = v.id  
+              JOIN videos v ON vs.video_id = v.id
               WHERE vs.processing_status = 'queued'
               ORDER BY vs.created_at ASC
               LIMIT 1
@@ -447,7 +448,7 @@ export async function startSimpleWorker(
           );
 
           const queuedJobs = await Promise.race([queryPromise, timeoutPromise]);
-          
+          logger.info('RAW queuedJobs:', queuedJobs);
           logger.info(`📊 Database query completed, found ${queuedJobs.length} queued jobs`, { pollCount });
           
           if (queuedJobs.length > 0) {
@@ -527,6 +528,7 @@ export async function startSimpleWorker(
               
               // Get additional job data from database
               const jobDetails = await executeQuery(async (sql) => {
+                // FIX: Ensure join is on v.id (UUID, primary key) as per schema
                 return await sql`
                   SELECT v.*, vs.*, u.email, u.full_name
                   FROM videos v
@@ -535,7 +537,15 @@ export async function startSimpleWorker(
                   WHERE v.id = ${job.video_db_id}
                 `;
               });
-              
+              logger.info('RAW jobDetails:', jobDetails);
+              if (jobDetails.length === 0) {
+                logger.error('No job details found for video_db_id', { video_db_id: job.video_db_id });
+                // Log all videos and video_summaries for debugging
+                const allVideos = await executeQuery(async (sql) => sql`SELECT * FROM videos`);
+                const allSummaries = await executeQuery(async (sql) => sql`SELECT * FROM video_summaries`);
+                logger.error('ALL videos:', allVideos);
+                logger.error('ALL video_summaries:', allSummaries);
+              }
               if (jobDetails.length > 0) {
                 const details = jobDetails[0];
                 
