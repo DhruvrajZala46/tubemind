@@ -283,10 +283,29 @@ interface VideoSummaryProps {
     final_thought: string;
   };
   videoId?: string;
-  summaryId?: number;
+  summaryId?: string | number;
+}
+
+// Utility to unescape all escaped characters
+function unescapeString(str: string) {
+  // First, remove outer quotes if the string is wrapped in them
+  let cleanStr = str;
+  if (cleanStr.startsWith('"') && cleanStr.endsWith('"')) {
+    cleanStr = cleanStr.slice(1, -1);
+  }
+  
+  // Then unescape all escaped characters
+  return cleanStr
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, '\\');
 }
 
 export default function VideoSummary({ summary: initialSummary, videoId, summaryId }: VideoSummaryProps) {
+  console.log('VideoSummary summary prop:', initialSummary);
   const { showMainLoading, hideMainLoading } = useMainLoading();
   const [summary, setSummary] = useState(initialSummary);
   const [error, setError] = useState<string | null>(null);
@@ -297,7 +316,11 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
   const isProcessing = (status: string) => ['processing', 'queued', 'transcribing', 'summarizing'].includes(status);
   const isFailed = (status: string) => status === 'failed';
-  const isComplete = (status: string) => status === 'complete';
+  const isComplete = (status: string) => {
+    const result = status === 'completed';
+    console.log('🔍 DEBUG: isComplete function - status:', `"${status}"`, 'result:', result, 'status type:', typeof status);
+    return result;
+  };
 
   useEffect(() => {
     // Only show the main page loader on the initial load, not on navigation
@@ -385,7 +408,13 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
   } = summary;
 
   const renderContent = () => {
+    console.log('🔍 DEBUG: renderContent called');
+    console.log('🔍 DEBUG: processing_status:', summary.processing_status);
+    console.log('🔍 DEBUG: isComplete result:', isComplete(summary.processing_status));
+    console.log('🔍 DEBUG: raw_ai_output exists:', !!summary.raw_ai_output);
+    
     if (isProcessing(summary.processing_status)) {
+      console.log('🔍 DEBUG: Taking processing path');
       let message = "Your summary is being generated...";
       if (summary.processing_status === 'transcribing') {
         message = "Step 1/2: Transcribing audio from video...";
@@ -416,10 +445,31 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
     }
     
     if (isComplete(summary.processing_status)) {
-      if (!raw_ai_output) {
+      let cleanOutput = raw_ai_output;
+      
+      // Add detailed debugging
+      console.log('🔍 DEBUG: raw_ai_output type:', typeof raw_ai_output);
+      console.log('🔍 DEBUG: raw_ai_output first 100 chars:', raw_ai_output?.substring(0, 100));
+      console.log('🔍 DEBUG: starts with quote?', raw_ai_output?.startsWith('"'));
+      console.log('🔍 DEBUG: ends with quote?', raw_ai_output?.endsWith('"'));
+      
+      try {
+        if (typeof cleanOutput === 'string') {
+          cleanOutput = unescapeString(cleanOutput);
+          console.log('🔍 DEBUG: after unescaping first 100 chars:', cleanOutput?.substring(0, 100));
+        }
+      } catch (e) {
+        console.log('🔍 DEBUG: unescaping failed:', e);
+        cleanOutput = raw_ai_output;
+      }
+      
+      console.log('🔍 DEBUG: final cleanOutput first 100 chars:', cleanOutput?.substring(0, 100));
+      console.log('🔍 DEBUG: cleanOutput truthy?', !!cleanOutput);
+      
+      if (!cleanOutput) {
         return <div className="text-center text-gray-400">The summary is in an unknown state.</div>;
       }
-      return <ChatGPTMarkdown markdown={raw_ai_output || ''} summaryId={String(summaryId)} />;
+      return <ChatGPTMarkdown markdown={cleanOutput} summaryId={String(summaryId)} />;
     }
 
     // Default case for any other status
@@ -442,6 +492,8 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
       
       <div className="mt-8">
         {renderContent()}
+        {/* DEBUG: Show the summary object for troubleshooting */}
+        <pre style={{ background: '#222', color: '#fff', padding: '1em', marginTop: '2em', borderRadius: '8px', fontSize: '0.9em', overflowX: 'auto' }}>{JSON.stringify(summary, null, 2)}</pre>
       </div>
     </div>
   );

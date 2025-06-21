@@ -28,7 +28,7 @@ interface VideoSummaryData {
 
 async function getVideoSummary(id: string, userId: string): Promise<VideoSummaryData | null> {
   try {
-    let result: (VideoSummaryData & { id: string; video_id: string })[] = [];
+    let result: (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[] = [];
     
     // Check if the ID is a UUID format first
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -48,12 +48,14 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
           v.publish_date,
           vs.main_title,
           vs.overall_summary,
-          vs.raw_ai_output
+          vs.raw_ai_output,
+          vs.processing_status,
+          vs.id as summary_id
         FROM videos v
         LEFT JOIN video_summaries vs ON v.id = vs.video_id
         WHERE v.id = ${id}
         AND v.user_id = ${userId}
-      ` as unknown as (VideoSummaryData & { id: string; video_id: string })[];
+      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
     }
 
     // If not found by UUID or ID is not UUID format, try to find by YouTube video ID
@@ -71,12 +73,14 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
           v.publish_date,
           vs.main_title,
           vs.overall_summary,
-          vs.raw_ai_output
+          vs.raw_ai_output,
+          vs.processing_status,
+          vs.id as summary_id
         FROM videos v
         LEFT JOIN video_summaries vs ON v.id = vs.video_id
         WHERE v.video_id = ${id}
         AND v.user_id = ${userId}
-      ` as unknown as (VideoSummaryData & { id: string; video_id: string })[];
+      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
     }
 
     if (!result || result.length === 0) {

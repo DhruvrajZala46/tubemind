@@ -116,6 +116,17 @@ const fixTranscript = (items) => items.map((item, index) => {
         start: start
     };
 });
+// Helper to construct full YouTube URL from videoId
+function getYouTubeUrl(videoId) {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+}
+// Helper to check if error is an AxiosError
+function isAxiosError(error) {
+    return (typeof error === 'object' &&
+        error !== null &&
+        typeof error.message === 'string' &&
+        (error.response === undefined || typeof error.response === 'object'));
+}
 // Production-ready transcript fetching using SupaData.ai API
 async function getVideoTranscript(videoId) {
     logger.info(`[Transcript] Starting transcript fetch for video: ${videoId}`);
@@ -131,29 +142,58 @@ async function getVideoTranscript(videoId) {
         }
     }
     let lastError = null;
+    const youtubeUrl = getYouTubeUrl(videoId);
+    const params = {
+        url: youtubeUrl,
+        text: true
+    };
+    const headers = {
+        'x-api-key': transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey,
+        'User-Agent': 'TubeGPT/1.0',
+        'Accept': 'application/json',
+    };
+    const maskedKey = transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey ? transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey.slice(0, 2) + '***' + transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey.slice(-2) : undefined;
+    const url = `https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true`;
     for (let attempt = 0; attempt < transcript_config_1.TRANSCRIPT_CONFIG.maxRetries; attempt++) {
         try {
             logger.info(`[Transcript] SupaData.ai API attempt ${attempt + 1}/${transcript_config_1.TRANSCRIPT_CONFIG.maxRetries}`);
+            logger.info('[Transcript] SupaData.ai request details', {
+                endpoint: 'https://api.supadata.ai/v1/youtube/transcript',
+                params,
+                headers: { ...headers, 'x-api-key': maskedKey },
+                videoId,
+                youtubeUrl
+            });
+            logger.info('[Transcript] SupaData.ai full request URL', { url });
             const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), transcript_config_1.TRANSCRIPT_CONFIG.timeoutMs));
             const fetchPromise = axios_1.default.get('https://api.supadata.ai/v1/youtube/transcript', {
-                params: {
-                    videoId: videoId,
-                    text: false
-                },
-                headers: {
-                    'x-api-key': transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey,
-                    'User-Agent': 'TubeGPT/1.0',
-                    'Accept': 'application/json',
-                },
+                params,
+                headers,
                 timeout: transcript_config_1.TRANSCRIPT_CONFIG.timeoutMs,
             });
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-            if (response.data && response.data.content && response.data.content.length > 0) {
+            let response;
+            try {
+                response = await Promise.race([fetchPromise, timeoutPromise]);
+            }
+            catch (err) {
+                logger.error('[Transcript] SupaData.ai request error', {
+                    error: isAxiosError(err) ? err.message : String(err),
+                    data: isAxiosError(err) ? err.response?.data : undefined,
+                    request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl }
+                });
+                throw err;
+            }
+            logger.info('[Transcript] SupaData.ai response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+            if (response.data && typeof response.data.content === 'string' && response.data.content.length > 0) {
                 logger.info(`[Transcript] ✅ SUCCESS with SupaData.ai API on attempt ${attempt + 1}`);
-                const transcript = response.data.content.map((entry) => ({
-                    text: entry.text,
-                    start: entry.offset / 1000, // Convert ms to seconds
-                    duration: entry.duration / 1000 // Convert ms to seconds
+                // Split transcript into segments by line or sentence for downstream compatibility
+                const transcript = response.data.content
+                    .split(/(?<=[.!?])\s+/)
+                    .filter(Boolean)
+                    .map((text, idx) => ({
+                    text: text.trim(),
+                    start: idx * 3, // Estimate 3s per segment (no timing info in plain text)
+                    duration: 3
                 }));
                 // Cache the result using the central CacheManager
                 if (transcript_config_1.TRANSCRIPT_CONFIG.cacheEnabled) {
@@ -162,13 +202,22 @@ async function getVideoTranscript(videoId) {
                 return fixTranscript(transcript);
             }
             lastError = new Error(response.data?.error || 'No transcript returned from SupaData.ai service');
+            logger.error('[Transcript] SupaData.ai API error response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
         }
         catch (error) {
             lastError = error;
-            logger.warn(`[Transcript] SupaData.ai API failed (attempt ${attempt + 1}):`, error.message);
+            if (isAxiosError(error)) {
+                logger.warn(`[Transcript] SupaData.ai API failed (attempt ${attempt + 1}):`, { error: error.message, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+                if (error.response) {
+                    logger.error('[Transcript] SupaData.ai error response', { status: error.response.status, data: error.response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+                }
+            }
+            else {
+                logger.warn(`[Transcript] SupaData.ai API failed (attempt ${attempt + 1}):`, { error: String(error), request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+            }
             if (attempt < transcript_config_1.TRANSCRIPT_CONFIG.maxRetries - 1) {
                 const delay = getRetryDelay(attempt);
-                logger.info(`[Transcript] Retrying in ${delay}ms...`);
+                logger.info(`[Transcript] Retrying in ${delay}ms...`, { delay });
                 await sleep(delay);
             }
         }

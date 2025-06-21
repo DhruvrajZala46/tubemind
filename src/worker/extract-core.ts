@@ -87,6 +87,11 @@ export async function processVideo(
     const step1Time = Date.now();
     logStep('Transcript Fetch', 'START');
     await updateStatus('transcribing', 'Fetching transcript...');
+    // Assert videoId is not a UUID (DB ID)
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(videoId)) {
+      logger.error('❌ videoId is a UUID, not a YouTube ID! This will cause SupaData 404.', { videoId, summaryDbId, userId });
+      throw new Error('videoId is a UUID, not a YouTube ID!');
+    }
     const transcript = await getVideoTranscript(videoId);
     if (!transcript || transcript.length === 0) {
       throw new Error('Transcript is empty or could not be fetched.');
@@ -99,6 +104,11 @@ export async function processVideo(
     await updateStatus('summarizing', 'Generating insights with AI...');
     const aiResult = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
     logStep('AI Knowledge Extraction', 'SUCCESS', { duration: `${Date.now() - step2Time}ms`, mainTitle: aiResult.mainTitle });
+
+    if (!aiResult.mainTitle || !aiResult.overallSummary) {
+      await updateStatus('failed', 'Summary generation failed: missing main title or summary.');
+      throw new Error('Summary generation failed: missing main title or summary.');
+    }
 
     // === STEP 3: Update the summary with results ===
     const step3Time = Date.now();

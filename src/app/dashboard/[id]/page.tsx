@@ -28,7 +28,7 @@ interface VideoSummaryData {
   raw_ai_output: string;
   video_id: string;
   processing_status: string;
-  summary_id: number;
+  summary_id: string;
   segments: {
     title: string;
     timestamp: string;
@@ -40,7 +40,7 @@ interface VideoSummaryData {
 
 async function getVideoSummary(id: string, userId: string): Promise<VideoSummaryData | null> {
   try {
-    let result: (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: number })[] = [];
+    let result: (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[] = [];
     
     // Check if the ID is a UUID format first
     if (isUUID(id)) {
@@ -65,7 +65,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
         LEFT JOIN video_summaries vs ON v.id = vs.video_id
         WHERE v.id = ${id}
         AND v.user_id = ${userId}
-      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: number })[];
+      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
     }
 
     // If not found by UUID or ID is not UUID format, try to find by YouTube video ID
@@ -90,7 +90,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
         LEFT JOIN video_summaries vs ON v.id = vs.video_id
         WHERE v.video_id = ${id}
         AND v.user_id = ${userId}
-      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: number })[];
+      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
     }
 
     if (!result || result.length === 0) {
@@ -282,7 +282,7 @@ export default async function VideoSummaryPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-[#0D1117] text-white">
       <div className="container mx-auto px-4 py-8">
-        <VideoSummary summary={summary} videoId={pollingId} summaryId={summary.summary_id} />
+        <VideoSummary summary={summary} videoId={pollingId} summaryId={String(summary.summary_id)} />
       </div>
     </main>
   );

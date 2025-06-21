@@ -9,9 +9,10 @@ import { dbWithRetry } from '../../../lib/error-recovery';
 import { metrics } from '../../../lib/monitoring';
 import { trackVideoProcessing } from '../../../lib/api-middleware';
 import { calculateVideoCredits } from '../../../lib/credit-utils';
-import { addJobToQueue } from '../../../lib/job-queue';
+import { addJobToQueue, JobData } from '../../../lib/job-queue';
 import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
+import { getOrCreateUser } from '../../../lib/auth-utils';
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
@@ -32,7 +33,7 @@ function parseDurationToSeconds(durationStr: any) {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  logger.info('🎬 Video extraction API request received');
+  logger.info('🎬 Video extraction API request received', { userId: null, email: null });
   metrics.apiRequest('/extract', 'POST', 0, startTime);
 
   try {
@@ -48,9 +49,10 @@ export async function POST(request: NextRequest) {
 
     const user = await currentUser();
     if (!user) {
-      logger.warn('Authentication failed - no user found');
+      logger.warn('Authentication failed - no user found', { userId: null, email: null });
       return NextResponse.json({ error: 'Authentication required. Please sign in.' }, { status: 401 });
     }
+    await getOrCreateUser(user);
 
     const userId = user.id;
     const userEmail = user.emailAddresses[0]?.emailAddress || '';
@@ -192,67 +194,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create video entry.' }, { status: 500 });
     }
 
+    // After inserting the video and summary, add the job to the DB queue
     let summaryId: string;
     try {
       const summaryInsertResult = await dbWithRetry(async () => {
         return await executeQuery(async (sql) => {
           return await sql`
-            INSERT INTO video_summaries (video_id, processing_status, main_title, overall_summary, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds)
-            VALUES (${videoDbId}, 'queued', ${metadata.title}, 'Your video is in the queue and will be processed shortly.', '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds})
+            INSERT INTO video_summaries (video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds)
+            VALUES (${videoDbId}, ${metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds})
             RETURNING id
           `;
         });
       }, 'Create Summary Entry');
       summaryId = summaryInsertResult[0].id;
-
-      // Start processing the video by adding it to the queue
-      try {
-        const job = await addJobToQueue({
-          videoId,
-          videoDbId,
-          summaryDbId: summaryId,
-          userId,
-          userEmail,
-          user,
-          metadata,
-          totalDurationSeconds,
-          creditsNeeded
-        });
-
-        logger.info('Job added to queue successfully', {
-          userId,
-          data: { videoId, jobId: job.id, creditsNeeded }
-        });
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            videoId: videoDbId,
-            summaryId: summaryId,
-            message: "Video is now in the processing queue.",
-            redirectUrl: `/dashboard/${videoDbId}`
-          }
-        }, { status: 202 });
-
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error('Failed to add job to queue. Releasing reserved credits.', { userId, data: { videoId, error: errorMessage } });
-        
-        // IMPORTANT: If we can't add to the queue, we MUST release the credits
-        await releaseCredits(userId, creditsNeeded);
-        cache.invalidateUserSubscription(userId);
-
-        return NextResponse.json({ error: 'Failed to add video to processing queue. Your credits have been returned. Please try again in a moment.' }, { status: 500 });
-      }
     } catch (error: any) {
       logger.error('Failed to create summary entry', { userId, data: { videoId, error: error.message } });
-       
-      // If summary creation fails, we must also release credits
+      // Release reserved credits if summary creation fails
       await releaseCredits(userId, creditsNeeded);
-      cache.invalidateUserSubscription(userId);
-      
-      return NextResponse.json({ error: 'Failed to create summary entry. Your credits have been restored.' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create summary entry.' }, { status: 500 });
     }
+
+    // Add fail-fast check and deep logging before queuing job
+    if (!userId || !userEmail) {
+      logger.error('❌ userId or userEmail missing before queuing job', { user, userId, userEmail });
+      return NextResponse.json({ error: 'Internal error: user information missing. Please sign out and sign in again.' }, { status: 500 });
+    }
+    // Add job to DB-based queue
+    try {
+      const jobData: JobData = {
+        videoId,
+        videoDbId,
+        summaryDbId: summaryId,
+        userId,
+        userEmail,
+        user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
+        metadata,
+        totalDurationSeconds,
+        creditsNeeded
+      };
+      logger.info('JobData to be queued', { jobData });
+      await addJobToQueue(jobData);
+      logger.info('Job added to DB queue successfully', { userId, videoId, summaryId });
+    } catch (error: any) {
+      logger.error('Failed to add job to DB queue', { userId, data: { videoId, error: error.message } });
+      // Release reserved credits if job queueing fails
+      await releaseCredits(userId, creditsNeeded);
+      return NextResponse.json({ error: 'Failed to queue job.' }, { status: 500 });
+    }
+
+    // Respond with job info
+    return NextResponse.json({
+      success: true,
+      data: {
+        videoId,
+        summaryId,
+        jobId: summaryId,
+        creditsNeeded,
+        message: 'Job queued successfully',
+        redirectUrl: `/dashboard/${videoDbId}`
+      }
+    }, { status: 202 });
   } catch (error: any) {
     // This is a general catch-all for unexpected errors
     const e = error?.message || 'An unexpected error occurred.';

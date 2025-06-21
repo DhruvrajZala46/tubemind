@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { getUserSubscription } from '../../../lib/subscription';
 import { createLogger } from '../../../lib/logger';
+import { getOrCreateUser } from '../../../lib/auth-utils';
 
 const logger = createLogger('api:usage');
 
@@ -14,8 +15,10 @@ export async function GET() {
   try {
     const user = await currentUser();
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
+      logger.warn('Authentication failed - no user found');
+      return NextResponse.json({ error: 'Authentication required. Please sign in.' }, { status: 401 });
+    }
+    await getOrCreateUser(user);
 
     userId = user.id;
     userEmail = user.emailAddresses?.[0]?.emailAddress;

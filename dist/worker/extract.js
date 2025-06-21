@@ -40,6 +40,11 @@ process.env.FORCE_REDIS_ON_WINDOWS = 'true';
 console.log('🔧 INITIAL Redis Configuration BEFORE IMPORTS:');
 console.log(`   DISABLE_REDIS: ${process.env.DISABLE_REDIS}`);
 console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
+// Load .env.local only in development
+if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('dotenv').config();
+}
 // Universal Worker Process for TubeGPT
 // Works identically in both development and production environments
 // Check environment type
@@ -80,55 +85,48 @@ const logger = (0, logger_1.createLogger)('worker:extract');
 logger.info('🚀 Worker process starting...');
 logger.info(`✅ Node.js version: ${process.version}`);
 logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
-// Graceful shutdown handler
 let isShuttingDown = false;
 const shutdown = (signal) => {
     if (isShuttingDown)
         return;
     isShuttingDown = true;
     logger.info(`👋 Received ${signal}. Shutting down worker...`);
-    // Allow current jobs to finish before shutting down
     setTimeout(() => {
         process.exit(0);
-    }, 5000); // 5 second graceful shutdown
+    }, 5000);
 };
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-try {
-    // 1. Start the health check server
-    // This is crucial for production monitoring services to know the worker is alive.
-    logger.info('🏥 Starting health check server...');
-    (0, health_1.startHealthCheckServer)();
-    logger.info('✅ Health check server started.');
-    // 2. Define the job processing function
-    // This is the core logic that the worker will execute for each job.
-    const handleJob = async (jobData) => {
-        const jobId = `${jobData.videoDbId}-${Date.now()}`;
-        logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
-        try {
-            await (0, video_processor_1.processVideoJob)(jobData);
-            logger.info(`✅ Job ${jobId} completed successfully.`);
-        }
-        catch (error) {
-            logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
-            // Re-throwing the error is important for proper error handling
-            throw error;
-        }
-    };
-    // 3. Start the simple Redis worker
-    // This polls Redis directly without BullMQ to avoid script permission issues
-    logger.info('👷‍♂️ Starting simple Redis worker...');
-    (0, job_queue_1.startSimpleWorker)(handleJob, () => isShuttingDown);
-    logger.info('✅ Worker created and listening for jobs.');
-    // Keep the process alive. In a containerized environment, the process
-    // is expected to run indefinitely.
-    console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
+async function startWorker() {
+    try {
+        logger.info('🏥 Starting health check server...');
+        (0, health_1.startHealthCheckServer)();
+        logger.info('✅ Health check server started.');
+        const handleJob = async (jobData) => {
+            const jobId = `${jobData.videoDbId}-${Date.now()}`;
+            logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
+            try {
+                await (0, video_processor_1.processVideoJob)(jobData);
+                logger.info(`✅ Job ${jobId} completed successfully.`);
+            }
+            catch (error) {
+                logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
+                throw error;
+            }
+        };
+        // Start the new DB-polling worker
+        logger.info('🔥 About to call startSimpleWorker (DB polling mode) - this should start polling...');
+        await (0, job_queue_1.startSimpleWorker)(handleJob, () => isShuttingDown);
+        logger.info('🛑 startSimpleWorker returned unexpectedly!');
+        logger.info('✅ Worker created and listening for jobs.');
+        console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
+    }
+    catch (error) {
+        logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
+        process.exit(1);
+    }
 }
-catch (error) {
-    logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
-    // If the worker can't even start, something is seriously wrong. Exit the process.
-    process.exit(1);
-}
+startWorker();
 /**
  * Direct video processing function for backup when job queue fails
  * This ensures users always get their summaries even if Redis/worker issues occur

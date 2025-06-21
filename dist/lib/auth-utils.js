@@ -114,6 +114,25 @@ async function getOrCreateUser(user) {
         if (dbUser.email !== user.emailAddresses[0].emailAddress) {
             await sql `UPDATE users SET email = ${user.emailAddresses[0].emailAddress}, updated_at = NOW() WHERE id = ${user.id}`;
         }
+        // Ensure a default subscription exists for this user (permanent fix)
+        const existingSub = (await sql `SELECT id FROM subscriptions WHERE user_id = ${user.id}`)[0];
+        if (!existingSub) {
+            await sql `
+        INSERT INTO subscriptions (id, user_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, created_at, updated_at, provider)
+        VALUES (
+          gen_random_uuid(),
+          ${user.id},
+          '',
+          '',
+          'active',
+          NOW(),
+          NOW() + interval '30 days',
+          NOW(),
+          NOW(),
+          'manual'
+        )
+      `;
+        }
         return (await sql `SELECT * FROM users WHERE id = ${user.id}`)[0];
     }
     // 2. User not found by ID. Try to find by email to link a new login method to an existing account.
@@ -122,6 +141,25 @@ async function getOrCreateUser(user) {
     if (dbUser) {
         // User found by email. Update their record with the new Clerk ID.
         await sql `UPDATE users SET id = ${user.id}, updated_at = NOW() WHERE email = ${userEmail}`;
+        // Ensure a default subscription exists for this user (permanent fix)
+        const existingSub = (await sql `SELECT id FROM subscriptions WHERE user_id = ${user.id}`)[0];
+        if (!existingSub) {
+            await sql `
+        INSERT INTO subscriptions (id, user_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, created_at, updated_at, provider)
+        VALUES (
+          gen_random_uuid(),
+          ${user.id},
+          '',
+          '',
+          'active',
+          NOW(),
+          NOW() + interval '30 days',
+          NOW(),
+          NOW(),
+          'manual'
+        )
+      `;
+        }
         return (await sql `SELECT * FROM users WHERE id = ${user.id}`)[0];
     }
     // 3. User not found by ID or email. This is a genuinely new user.
@@ -129,5 +167,24 @@ async function getOrCreateUser(user) {
     INSERT INTO users (id, email, subscription_tier, subscription_status, credits_used, last_credit_reset)
     VALUES (${user.id}, ${userEmail}, 'free', 'inactive', 0, NOW())
   `;
+    // Ensure a default subscription exists for this user (permanent fix)
+    const existingSub = (await sql `SELECT id FROM subscriptions WHERE user_id = ${user.id}`)[0];
+    if (!existingSub) {
+        await sql `
+      INSERT INTO subscriptions (id, user_id, stripe_subscription_id, stripe_price_id, status, current_period_start, current_period_end, created_at, updated_at, provider)
+      VALUES (
+        gen_random_uuid(),
+        ${user.id},
+        '',
+        '',
+        'active',
+        NOW(),
+        NOW() + interval '30 days',
+        NOW(),
+        NOW(),
+        'manual'
+      )
+    `;
+    }
     return (await sql `SELECT * FROM users WHERE id = ${user.id}`)[0];
 }

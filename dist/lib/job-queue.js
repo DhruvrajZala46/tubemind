@@ -1,380 +1,212 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createWorker = void 0;
-exports.initializeJobQueue = initializeJobQueue;
 exports.addJobToQueue = addJobToQueue;
 exports.getJobById = getJobById;
 exports.startSimpleWorker = startSimpleWorker;
-const bullmq_1 = require("bullmq");
 const logger_1 = require("./logger");
-const redis_client_1 = require("./redis-client");
 const logger = (0, logger_1.createLogger)('job-queue');
-const QUEUE_NAME = 'video-processing';
-let queue = null;
-// BullMQ configuration for Upstash free tier compatibility
-const redisConnectionConfig = (0, redis_client_1.getRedisConfig)();
-const connection = redisConnectionConfig ? {
-    ...redisConnectionConfig,
-    // CRITICAL: Disable all script-based operations for Upstash free tier
-    enableReadyCheck: false,
-    maxRetriesPerRequest: null,
-    lazyConnect: true,
-    // Disable Redis command queue to prevent script usage
-    enableOfflineQueue: false,
-} : undefined;
-logger.info('Redis connection configuration for BullMQ (script-free mode).', { connectionDetails: connection });
-async function initializeJobQueue() {
-    if (queue) {
-        logger.info('Job queue already initialized.');
-        return;
-    }
-    logger.info('🚀 Starting Job Queue initialization (Upstash compatible mode)...');
-    if (!connection) {
-        logger.error('🔴 Redis connection not configured. Cannot initialize job queue.');
-        throw new Error('Job queue could not be initialized due to missing Redis configuration.');
-    }
-    try {
-        // Ensure the shared Redis client is ready first.
-        await (0, redis_client_1.initializeRedis)();
-        if (!redis_client_1.redis) {
-            throw new Error("Main redis client not available for BullMQ");
-        }
-        // CRITICAL FIX: Configure BullMQ to work without Lua scripts
-        queue = new bullmq_1.Queue(QUEUE_NAME, {
-            connection,
-            defaultJobOptions: {
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 5000,
-                },
-                removeOnComplete: 10, // Keep only 10 completed jobs
-                removeOnFail: 10, // Keep only 10 failed jobs
-            },
-            // Note: Some advanced settings removed for Upstash compatibility
-        });
-        logger.info('✅ BullMQ queue initialized successfully (script-free mode).');
-        queue.on('error', (error) => {
-            logger.error('BullMQ queue error', { error: error.message });
-        });
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error('🔴 Failed to initialize BullMQ queue', { error: errorMessage });
-        // If BullMQ fails due to script permissions, fall back to simple Redis operations
-        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
-            logger.warn('⚠️ Redis scripts are blocked. Using simple Redis fallback for job queue.');
-            return initializeSimpleQueue();
-        }
-        throw error;
-    }
-}
-// Simple Redis-based job queue fallback for Upstash free tier
-async function initializeSimpleQueue() {
-    logger.info('🔄 Initializing simple Redis job queue (no scripts)...');
-    if (!redis_client_1.redis) {
-        await (0, redis_client_1.initializeRedis)();
-        if (!redis_client_1.redis) {
-            throw new Error("Redis client not available for simple queue");
-        }
-    }
-    // Mark that we're using simple queue mode
-    global.__SIMPLE_QUEUE_MODE = true;
-    logger.info('✅ Simple Redis job queue initialized (Upstash free tier compatible).');
-}
+// DB-based addJobToQueue
 async function addJobToQueue(data) {
-    // Check if we're in simple queue mode
-    if (global.__SIMPLE_QUEUE_MODE) {
-        return addJobToSimpleQueue(data);
-    }
-    if (!queue) {
-        logger.info('Queue not initialized, initializing now...');
-        await initializeJobQueue();
-        if (!queue && !global.__SIMPLE_QUEUE_MODE) {
-            logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot add job.');
-            throw new Error('Failed to initialize job queue. Cannot add job.');
-        }
-        // If we fell back to simple mode during init, use that
-        if (global.__SIMPLE_QUEUE_MODE) {
-            return addJobToSimpleQueue(data);
-        }
-    }
-    try {
-        logger.info('Adding job to BullMQ queue', { videoId: data.videoId });
-        const job = await queue.add(QUEUE_NAME, data);
-        logger.info('✅ Job added to BullMQ queue successfully', { jobId: job.id, videoId: data.videoId });
-        return job;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
-            logger.warn('⚠️ BullMQ failed due to script permissions. Falling back to simple queue.', { error: errorMessage });
-            global.__SIMPLE_QUEUE_MODE = true;
-            return addJobToSimpleQueue(data);
-        }
-        throw error;
-    }
-}
-// Simple job queue implementation that doesn't use Redis scripts
-async function addJobToSimpleQueue(data) {
-    if (!redis_client_1.redis) {
-        throw new Error("Redis client not available for simple queue");
-    }
-    const jobId = `job:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`;
-    const jobData = JSON.stringify(data);
-    logger.info('Adding job to simple Redis queue', { videoId: data.videoId, jobId });
-    // Use simple Redis commands that work with Upstash free tier
-    await redis_client_1.redis.lpush('video-processing:jobs', jobData);
-    await redis_client_1.redis.hset(`video-processing:job:${jobId}`, {
-        id: jobId,
-        data: jobData,
-        status: 'waiting',
-        created: Date.now()
+    const { executeQuery } = await Promise.resolve().then(() => __importStar(require('./db')));
+    await executeQuery(async (sql) => {
+        await sql `
+      INSERT INTO video_summaries (id, video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
+      VALUES (${data.summaryDbId}, ${data.videoDbId}, ${data.metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${data.totalDurationSeconds}, ${JSON.stringify(data)})
+      ON CONFLICT (id) DO NOTHING
+    `;
     });
-    logger.info('✅ Job added to simple queue successfully', { jobId, videoId: data.videoId });
-    // Return a mock Job object for compatibility
-    return {
-        id: jobId,
-        data,
-        name: QUEUE_NAME,
-        opts: {},
-        attemptsMade: 0,
-        finishedOn: undefined,
-        processedOn: undefined,
-        timestamp: Date.now(),
-        delay: 0,
-        priority: 0
-    };
+    logger.info('✅ Job added to DB queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId, email: data.userEmail });
+    return { jobId: data.summaryDbId };
 }
+// DB-based getJobById
 async function getJobById(jobId) {
-    // Check if we're in simple queue mode
-    if (global.__SIMPLE_QUEUE_MODE) {
-        return getJobFromSimpleQueue(jobId);
-    }
-    if (!queue) {
-        logger.info('Queue not initialized, initializing now to get job status...');
-        await initializeJobQueue();
-        if (!queue && !global.__SIMPLE_QUEUE_MODE) {
-            logger.error('🔴 CRITICAL: Queue is null even after initialization attempt. Cannot get job.');
-            return null;
-        }
-        if (global.__SIMPLE_QUEUE_MODE) {
-            return getJobFromSimpleQueue(jobId);
-        }
-    }
-    try {
-        const job = await queue.getJob(jobId);
-        if (!job) {
-            logger.warn(`Job with ID ${jobId} not found.`);
-            return null;
-        }
-        return job;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
-            logger.warn('⚠️ BullMQ getJob failed due to script permissions. Falling back to simple queue.', { error: errorMessage });
-            global.__SIMPLE_QUEUE_MODE = true;
-            return getJobFromSimpleQueue(jobId);
-        }
-        throw error;
-    }
-}
-async function getJobFromSimpleQueue(jobId) {
-    if (!redis_client_1.redis) {
-        return null;
-    }
-    try {
-        const jobInfo = await redis_client_1.redis.hgetall(`video-processing:job:${jobId}`);
-        if (!jobInfo || !jobInfo.data) {
-            return null;
-        }
-        const data = JSON.parse(jobInfo.data);
-        return {
-            id: jobId,
-            data,
-            name: QUEUE_NAME,
-            opts: {},
-            attemptsMade: 0,
-            finishedOn: jobInfo.status === 'completed' ? parseInt(jobInfo.finished || '0') : undefined,
-            processedOn: jobInfo.status === 'active' ? parseInt(jobInfo.started || '0') : undefined,
-            timestamp: parseInt(jobInfo.created || '0'),
-            delay: 0,
-            priority: 0
-        };
-    }
-    catch (error) {
-        logger.error('Error getting job from simple queue', { jobId, error });
-        return null;
-    }
-}
-const createWorker = (processor) => {
-    if (!connection) {
-        logger.error('🔴 Redis connection not configured. Cannot create worker.');
-        process.exit(1);
-    }
-    logger.info('🚀 Creating BullMQ worker (script-free mode)...');
-    try {
-        const worker = new bullmq_1.Worker(QUEUE_NAME, processor, {
-            connection,
-            concurrency: 5,
-            limiter: {
-                max: 10,
-                duration: 1000,
-            }
-        });
-        worker.on('completed', (job) => {
-            logger.info(`✅ Job completed`, { jobId: job.id });
-        });
-        worker.on('failed', (job, error) => {
-            if (job) {
-                logger.error(`🔴 Job failed`, { jobId: job.id, error: error.message, attempts: job.attemptsMade });
-            }
-            else {
-                logger.error('🔴 An unknown job failed', { error: error.message });
-            }
-        });
-        worker.on('error', (error) => {
-            logger.error('BullMQ worker error', { error: error.message });
-            // If script errors occur, we should fall back to simple processing
-            if (error.message.includes('NOPERM') || error.message.includes('script')) {
-                logger.warn('⚠️ BullMQ worker failed due to script permissions. Consider using simple job processing.');
-                global.__SIMPLE_QUEUE_MODE = true;
-            }
-        });
-        logger.info('✅ BullMQ worker created successfully (script-free mode).');
-        return worker;
-    }
-    catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('NOPERM') || errorMessage.includes('script')) {
-            logger.error('🔴 BullMQ worker creation failed due to script permissions. Using simple job processing.', { error: errorMessage });
-            global.__SIMPLE_QUEUE_MODE = true;
-            // Return a mock worker that processes jobs directly
-            return createSimpleWorker(processor);
-        }
-        throw error;
-    }
-};
-exports.createWorker = createWorker;
-// Simple worker implementation for Upstash free tier
-function createSimpleWorker(processor) {
-    logger.info('🔄 Creating simple worker (no scripts)...');
-    const worker = {
-        on: (event, handler) => {
-            // Mock event handlers
-        },
-        close: async () => {
-            logger.info('Simple worker closed');
-        }
-    };
-    // Start polling for jobs
-    const pollJobs = async () => {
-        if (!redis_client_1.redis)
-            return;
-        try {
-            // Get job from simple queue
-            const jobData = await redis_client_1.redis.rpop('video-processing:jobs');
-            if (jobData) {
-                const data = JSON.parse(jobData);
-                const job = {
-                    id: `simple-${Date.now()}`,
-                    data,
-                    name: QUEUE_NAME,
-                    opts: {},
-                    attemptsMade: 0,
-                    timestamp: Date.now()
-                };
-                logger.info('Processing job from simple queue', { jobId: job.id, videoId: data.videoId });
-                await processor(job);
-                logger.info('✅ Simple job completed', { jobId: job.id });
-            }
-        }
-        catch (error) {
-            logger.error('Error processing simple queue job', { error });
-        }
-        // Poll again after 5 seconds
-        setTimeout(pollJobs, 5000);
-    };
-    // Start polling
-    setTimeout(pollJobs, 1000);
-    logger.info('✅ Simple worker created and polling for jobs.');
-    return worker;
-}
-/**
- * Starts a simple Redis worker that polls for jobs without using scripts
- * This is compatible with Upstash free tier restrictions
- */
-async function startSimpleWorker(processor, shouldStop = () => false) {
-    logger.info('🚀 Starting simple Redis worker (script-free)...');
-    await initializeJobQueue();
-    if (!redis_client_1.redis) {
-        logger.error('❌ Redis not available, cannot start worker');
-        throw new Error('Redis connection required for worker');
-    }
-    // Polling function
-    const pollForJobs = async () => {
-        while (!shouldStop()) {
-            try {
-                // Try to get a job from the simple queue
-                const jobData = await redis_client_1.redis.rpop('video-processing:jobs');
-                if (jobData) {
-                    const data = JSON.parse(jobData);
-                    logger.info('📦 Found job in queue', { videoId: data.videoId, userId: data.userId });
-                    try {
-                        // Update job status to active
-                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
-                            status: 'active',
-                            started: Date.now().toString(),
-                        });
-                        // Process the job
-                        await processor(data);
-                        // Mark job as completed
-                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
-                            status: 'completed',
-                            finished: Date.now().toString(),
-                        });
-                        logger.info('✅ Job processing completed successfully', { videoId: data.videoId });
-                    }
-                    catch (jobError) {
-                        // Mark job as failed
-                        await redis_client_1.redis.hset(`video-processing:job:${data.videoDbId}`, {
-                            status: 'failed',
-                            finished: Date.now().toString(),
-                            error: jobError instanceof Error ? jobError.message : String(jobError),
-                        });
-                        logger.error('❌ Job processing failed', {
-                            videoId: data.videoId,
-                            error: jobError instanceof Error ? jobError.message : String(jobError)
-                        });
-                    }
-                }
-                else {
-                    // No jobs found, wait before polling again
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            }
-            catch (pollError) {
-                logger.error('Error polling for jobs', {
-                    error: pollError instanceof Error ? pollError.message : String(pollError)
-                });
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, 10000));
-            }
-        }
-        logger.info('🛑 Worker stopped polling (shutdown requested)');
-    };
-    logger.info('✅ Simple worker started, polling for jobs...');
-    // Start polling (non-blocking)
-    pollForJobs().catch(error => {
-        logger.error('Critical error in worker polling', { error });
+    const { executeQuery } = await Promise.resolve().then(() => __importStar(require('./db')));
+    const jobs = await executeQuery(async (sql) => {
+        return await sql `SELECT * FROM video_summaries WHERE id = ${jobId}`;
     });
+    if (jobs.length === 0)
+        return null;
+    return jobs[0];
 }
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    logger.info('Shutting down job queue and worker...');
-    if (queue) {
-        await queue.close();
+async function startSimpleWorker(processor, shouldStop = () => false) {
+    logger.info('🚀 Starting production-grade DB polling worker...');
+    try {
+        const pollForJobs = async () => {
+            let pollCount = 0;
+            logger.info('🎯 POLLING LOOP STARTED - this should appear in logs!');
+            while (!shouldStop()) {
+                pollCount++;
+                try {
+                    logger.info('🔍 Polling database for queued jobs...', { pollCount, userId: undefined, email: undefined });
+                    const { executeQuery } = await Promise.resolve().then(() => __importStar(require('./db')));
+                    logger.info('📊 Executing database query for queued jobs...');
+                    const queuedJobs = await executeQuery(async (sql) => {
+                        return await sql `
+              SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
+              FROM video_summaries vs
+              JOIN videos v ON vs.video_id = v.id
+              WHERE vs.processing_status = 'queued'
+              ORDER BY vs.created_at ASC
+              LIMIT 1
+            `;
+                    });
+                    logger.info('RAW queuedJobs:', queuedJobs);
+                    if (queuedJobs.length === 0) {
+                        const allVideos = await executeQuery(async (sql) => sql `SELECT id, video_id, title FROM videos`);
+                        const allSummaries = await executeQuery(async (sql) => sql `SELECT id, video_id, processing_status FROM video_summaries`);
+                        logger.warn('All videos:', allVideos);
+                        logger.warn('All video_summaries:', allSummaries);
+                    }
+                    if (queuedJobs.length > 0) {
+                        const job = queuedJobs[0];
+                        logger.info('🟢 Found queued job in DB, starting processing...', job);
+                        let reconstructedJobData = null;
+                        if (job.job_data) {
+                            try {
+                                reconstructedJobData = typeof job.job_data === 'string' ? JSON.parse(job.job_data) : job.job_data;
+                            }
+                            catch (e) {
+                                logger.error('❌ Failed to parse job_data JSON', { error: e, job_data: job.job_data, userId: undefined, email: undefined });
+                            }
+                        }
+                        if (reconstructedJobData) {
+                            logger.info('✅ Using job_data from DB', reconstructedJobData);
+                            // Fail-fast: skip jobs with missing userId or userEmail
+                            if (!reconstructedJobData.userId || !reconstructedJobData.userEmail) {
+                                logger.error('❌ Skipping job: userId or userEmail missing in job_data', { jobId: job.summary_id, jobData: reconstructedJobData, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
+                                // Mark job as failed in DB
+                                await executeQuery(async (sql) => {
+                                    await sql `UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
+                                });
+                                return;
+                            }
+                            // Assert videoId is not a UUID (DB ID)
+                            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reconstructedJobData.videoId)) {
+                                logger.error('❌ reconstructedJobData.videoId is a UUID, not a YouTube ID! This will cause SupaData 404.', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId });
+                                throw new Error('reconstructedJobData.videoId is a UUID, not a YouTube ID!');
+                            }
+                            // Assert videoDbId is a UUID
+                            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reconstructedJobData.videoDbId)) {
+                                logger.error('❌ reconstructedJobData.videoDbId is not a UUID! This will break DB relations.', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId });
+                                throw new Error('reconstructedJobData.videoDbId is not a UUID!');
+                            }
+                        }
+                        if (!reconstructedJobData) {
+                            // Fallback for legacy jobs - use data from polling query
+                            logger.warn('⚠️ Using legacy job reconstruction path (job_data is null)');
+                            // We already have the YouTube video ID from the polling query
+                            if (job.youtube_video_id) {
+                                // Get additional details
+                                const jobDetails = await executeQuery(async (sql) => {
+                                    return await sql `
+                    SELECT v.video_id as youtube_video_id, v.id as video_db_id, vs.id as summary_id, vs.main_title as title, vs.video_duration_seconds as duration, v.channel_title, v.thumbnail_url, v.user_id, vs.processing_status, u.email, u.full_name
+                    FROM videos v
+                    JOIN video_summaries vs ON v.id = vs.video_id
+                    LEFT JOIN users u ON v.user_id = u.id
+                    WHERE vs.id = ${job.summary_id}
+                  `;
+                                });
+                                logger.info('RAW jobDetails:', jobDetails);
+                                if (jobDetails.length > 0) {
+                                    const details = jobDetails[0];
+                                    reconstructedJobData = {
+                                        videoId: job.youtube_video_id, // USE THE YOUTUBE_VIDEO_ID FROM POLLING QUERY!
+                                        videoDbId: job.video_db_id, // This is the database UUID
+                                        summaryDbId: job.summary_id,
+                                        userId: details.user_id,
+                                        userEmail: details.email || 'unknown@example.com',
+                                        user: { id: details.user_id, email: details.email, name: details.full_name },
+                                        metadata: {
+                                            title: details.title,
+                                            duration: details.duration,
+                                            channelTitle: details.channel_title,
+                                            thumbnailUrl: details.thumbnail_url
+                                        },
+                                        totalDurationSeconds: details.duration || 0,
+                                        creditsNeeded: Math.max(1, Math.ceil((details.duration || 0) / 60))
+                                    };
+                                    logger.warn('⚠️ Legacy job reconstructed with YouTube ID from polling query', { reconstructedJobData, userId: undefined, email: undefined });
+                                }
+                                else {
+                                    logger.error('No job details found for summary_id', { summary_id: job.summary_id });
+                                }
+                            }
+                            else {
+                                logger.error('No youtube_video_id in polling query result', { job });
+                            }
+                        }
+                        if (reconstructedJobData) {
+                            // Update DB status to processing
+                            await executeQuery(async (sql) => {
+                                await sql `UPDATE video_summaries SET processing_status = 'processing' WHERE id = ${job.summary_id}`;
+                            });
+                            logger.info('🔄 Starting job processing', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
+                            try {
+                                await processor(reconstructedJobData);
+                                await executeQuery(async (sql) => {
+                                    await sql `UPDATE video_summaries SET processing_status = 'completed' WHERE id = ${job.summary_id}`;
+                                });
+                                logger.info('✅ Job processing completed successfully', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
+                            }
+                            catch (jobError) {
+                                await executeQuery(async (sql) => {
+                                    await sql `UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
+                                });
+                                logger.error('❌ Job processing failed', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, error: jobError instanceof Error ? jobError.message : String(jobError), userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
+                            }
+                        }
+                        else {
+                            logger.error('❌ No valid job data found for processing. Skipping job.', { job });
+                        }
+                    }
+                    // Wait before polling again
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                catch (pollError) {
+                    logger.error('Error polling for jobs', { error: pollError instanceof Error ? pollError.message : String(pollError), pollCount, userId: undefined, email: undefined });
+                    await new Promise(resolve => setTimeout(resolve, 10000));
+                }
+            }
+            logger.info('🛑 Worker stopped polling (shutdown requested)');
+        };
+        logger.info('✅ DB polling worker initialized, starting polling loop...');
+        await pollForJobs();
     }
-    process.exit(0);
-});
+    catch (error) {
+        logger.error('❌ Critical error starting DB polling worker', { error: error instanceof Error ? error.message : String(error), userId: undefined, email: undefined });
+        throw error;
+    }
+}

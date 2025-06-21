@@ -33,18 +33,18 @@ async function getUserSubscription(userId) {
     const result = await (0, db_1.executeQuery)(async (sql) => {
         return await sql `
       SELECT 
-        id,
-        email,
+            id, 
+            email,
         full_name,
-        subscription_tier,
-        subscription_status,
+            subscription_tier, 
+            subscription_status, 
         subscription_end_date,
         subscription_id,
-        credits_used,
-        credits_reserved,
-        last_credit_reset,
-        created_at,
-        updated_at
+            credits_used,
+            credits_reserved,
+            last_credit_reset,
+            created_at,
+            updated_at
       FROM users
       WHERE id = ${userId}
     `;
@@ -160,7 +160,7 @@ async function consumeCredits(userId, credits) {
         return false;
     await (0, db_1.executeQuery)(async (sql) => {
         return await sql `
-      UPDATE users
+      UPDATE users 
       SET 
         credits_used = COALESCE(credits_used, 0) + ${credits},
         credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) - ${credits})
@@ -178,19 +178,19 @@ async function resetMonthlyCredits() {
     try {
         await (0, db_1.executeQuery)(async (sql) => {
             return await sql `
-        UPDATE users 
-        SET credits_used = 0
-        WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-        OR last_credit_reset IS NULL
-      `;
+      UPDATE users 
+      SET credits_used = 0
+      WHERE date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+      OR last_credit_reset IS NULL
+    `;
         });
         await (0, db_1.executeQuery)(async (sql) => {
             return await sql `
-        UPDATE users 
-        SET last_credit_reset = NOW()
-        WHERE last_credit_reset IS NULL
-        OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
-      `;
+      UPDATE users 
+      SET last_credit_reset = NOW()
+      WHERE last_credit_reset IS NULL
+      OR date_trunc('month', last_credit_reset) < date_trunc('month', NOW())
+    `;
         });
         console.log('Monthly credits reset completed');
     }
@@ -205,10 +205,10 @@ async function reserveCredits(userId, creditsToReserve) {
     try {
         await (0, db_1.executeQuery)(async (sql) => {
             return await sql `
-        UPDATE users
+      UPDATE users
         SET credits_reserved = COALESCE(credits_reserved, 0) + ${creditsToReserve}
-        WHERE id = ${userId}
-      `;
+      WHERE id = ${userId}
+    `;
         });
         (0, cache_1.getCacheManager)().invalidateUserSubscription(userId);
     }
