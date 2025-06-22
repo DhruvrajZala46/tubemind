@@ -144,14 +144,13 @@ export default function MainContent() {
       
       {/* Main Content Area */}
       <div className="w-full max-w-3xl mx-auto mt-6 mb-8">
-        {/* Video Input Section - Clean and minimal */}
-        <div className="w-full bg-[#161B22] rounded-xl p-6 border border-[#30363D] shadow-lg">
-          {/* Video URL Input */}
-          <form className="flex flex-col items-center w-full" autoComplete="off" onSubmit={(e) => {
-            e.preventDefault();
-            if (input && !error) handleProcess(input);
-          }}>
-            <div className="flex w-full">
+        {/* Video Input Section - Claude AI style */}
+        <form className="flex flex-col items-center w-full" autoComplete="off" onSubmit={(e) => {
+          e.preventDefault();
+          if (input && !error) handleProcess(input);
+        }}>
+          <div className="w-full flex items-center justify-center">
+            <div className="flex w-full items-center bg-transparent border border-[#30363D] rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-[#DC143C]/20 transition-all px-3 py-2" style={{ background: 'rgba(32,34,37,0.85)' }}>
               <input
                 type="text"
                 value={input}
@@ -170,30 +169,32 @@ export default function MainContent() {
                 }}
                 onBlur={() => setTouched(true)}
                 placeholder="Enter YouTube video URL to summarize..."
-                className="w-full bg-[#21262D] border border-[#30363D] rounded-[8px] px-4 py-3 text-[#F0F6FC] placeholder-[#8B949E] focus:border-[#58A6FF] focus:ring-2 focus:ring-[#58A6FF]/30 transition-colors text-[16px] font-normal font-sans outline-none"
+                className="flex-1 bg-transparent border-none outline-none px-6 py-5 text-[#F0F6FC] placeholder-[#8B949E] text-[17px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
+                style={{ minWidth: 0 }}
               />
               <button
                 type="submit"
-                className="bg-[#FF0033] hover:bg-[#FF0033]/90 text-white px-6 py-2 rounded-lg ml-3 transition-colors font-medium text-[14px] font-sans border-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
+                className="ml-2 flex items-center justify-center h-12 px-6 rounded-2xl bg-[#DC143C] hover:bg-[#DC143C]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
                 disabled={!!error || !input.trim() || isSubmitting}
+                style={{ minWidth: 0 }}
               >
-                {isSubmitting ? <ElegantLoader size="sm" /> : <ArrowUp className="w-4 h-4" />}
+                {isSubmitting ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-white" />}
               </button>
             </div>
-            {error && touched && (
-              <div className="text-[#FF0033] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
-                {error}
-              </div>
-            )}
-          </form>
-          
-          {/* Video Thumbnail Preview */}
-          {thumbnailUrl && !error && (
-            <div className="mt-4 p-4 bg-[#21262D] rounded-[8px] border border-[#30363D] flex flex-col items-center">
-              <img src={thumbnailUrl} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
+          </div>
+          {error && touched && (
+            <div className="text-[#DC143C] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
+              {error}
             </div>
           )}
-        </div>
+        </form>
+        
+        {/* Video Thumbnail Preview */}
+        {thumbnailUrl && !error && (
+          <div className="mt-4 p-4 bg-[#21262D] rounded-[8px] border border-[#30363D] flex flex-col items-center">
+            <img src={thumbnailUrl} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
+          </div>
+        )}
       </div>
       
       {/* Error Display */}

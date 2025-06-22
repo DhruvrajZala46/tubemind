@@ -324,9 +324,9 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
     }
     
     // 4. First time login check (if no usage history)
-    const isFirstTime = localStorage.getItem('tubegpt_seen_credits') === null;
+    const isFirstTime = localStorage.getItem('tubemind_seen_credits') === null;
     if (isFirstTime) {
-      localStorage.setItem('tubegpt_seen_credits', 'true');
+      localStorage.setItem('tubemind_seen_credits', 'true');
       return true;
     }
     
@@ -356,7 +356,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
         {/* Sidebar Header - Claude Style */}
         <div className="flex items-center px-4 py-3 border-b border-[#30363D] justify-between flex-shrink-0">
           {!isCollapsed && (
-            <div className="text-[#F0F6FC] text-xl font-bold font-sans truncate">TubeGPT</div>
+            <Link href="/" className="text-[#F0F6FC] text-xl font-bold font-sans truncate hover:text-white transition-colors cursor-pointer">TubeMind</Link>
           )}
           <button 
             onClick={toggleCollapse}
@@ -384,7 +384,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
             return () => clearTimeout(failsafeTimer);
           }}
           className={cn(
-            "flex items-center justify-center bg-[#E5484D] text-white rounded-lg hover:bg-[#FF5C61] text-sm font-medium btn-instant instant-feedback cursor-pointer",
+            "flex items-center justify-center bg-[#DC143C] text-white rounded-lg hover:bg-[#DC143C]/90 text-sm font-medium btn-instant instant-feedback cursor-pointer",
             isCollapsed ? "w-10 h-10 p-0" : "w-full px-4 py-2"
           )}
         >
@@ -576,17 +576,17 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                 <div className="w-full h-3 bg-[#21262D] rounded-full overflow-hidden mb-1">
                   <div 
                     style={{ width: `${Math.min(100, Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100))}%` }} 
-                    className="h-full bg-[#FF0033] transition-all duration-500 ease-out"
+                    className="h-full bg-[#DC143C] transition-all duration-500 ease-out"
                   ></div>
                 </div>
                 {Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100) >= 90 && (
-                  <div className="text-xs text-[#FF0033] mt-1 font-medium animate-pulse">
-                    You are near your monthly limit. <a href="/pricing" className="underline hover:text-[#FF3366] transition-colors">Upgrade now</a>
+                  <div className="text-xs text-[#DC143C] mt-1 font-medium animate-pulse">
+                    You are near your monthly limit. <a href="/pricing" className="underline hover:text-[#DC143C] transition-colors">Upgrade now</a>
                   </div>
                 )}
                 {Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100) >= 100 && (
-                  <div className="text-xs text-[#FF0033] mt-1 font-medium animate-pulse">
-                    You have reached your monthly limit. <a href="/pricing" className="underline hover:text-[#FF3366] transition-colors">Upgrade to continue</a>
+                  <div className="text-xs text-[#DC143C] mt-1 font-medium animate-pulse">
+                    You have reached your monthly limit. <a href="/pricing" className="underline hover:text-[#DC143C] transition-colors">Upgrade to continue</a>
                   </div>
                 )}
                 {Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100) >= 50 && Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100) < 90 && (

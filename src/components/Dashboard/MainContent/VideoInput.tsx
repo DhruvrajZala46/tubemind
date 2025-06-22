@@ -41,14 +41,14 @@ export default function DashboardVideoInput() {
           />
           <button
             type="submit"
-            className="bg-[#FF0033] hover:bg-[#FF0033]/90 text-white px-6 py-2 rounded-lg ml-3 transition-colors font-medium text-[14px] font-sans border-none"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white px-6 py-2 rounded-lg ml-3 transition-colors font-medium text-[14px] font-sans border-none"
             disabled={!!error || !url.trim()}
           >
             Summarize
           </button>
         </div>
         {error && touched && (
-          <div className="text-[#FF0033] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
+          <div className="text-[#DC143C] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
             {error}
           </div>
         )}

@@ -4,7 +4,7 @@ import styles from './MainContent.module.css';
 import { ElegantLoader } from "../../ui/elegant-loader";
 
 const buttons = [
-  { label: "Summarize", color: "#FF0033", primary: true },
+  { label: "Summarize", color: "#DC143C", primary: true },
   { label: "Download", color: "#404040", primary: false },
   { label: "Share", color: "#404040", primary: false }
 ];
@@ -27,7 +27,7 @@ export default function ActionButtons() {
           className={`
             px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium text-[14px] sm:text-[15px] transition-all duration-200
             ${btn.primary 
-              ? "bg-[#FF0033] hover:bg-[#E60029] text-white shadow-sm hover:shadow-md" 
+              ? "bg-[#DC143C] hover:bg-[#DC143C]/90 text-white shadow-sm hover:shadow-md" 
               : "bg-[#2F2F2F] hover:bg-[#404040] text-[#F0F6FC] border border-[#404040] hover:border-[#525252]"}
             disabled:opacity-50 disabled:cursor-not-allowed btn-instant relative ${styles.actionButton}
           `}

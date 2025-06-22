@@ -38,6 +38,11 @@ export async function getJobById(jobId: string): Promise<any | null> {
   return jobs[0];
 }
 
+// Configurable polling interval (default: 60s)
+const POLL_INTERVAL_MS = process.env.POLL_INTERVAL_MS
+  ? parseInt(process.env.POLL_INTERVAL_MS, 10)
+  : 60000; // 60 seconds
+
 export async function startSimpleWorker(
   processor: (jobData: JobData) => Promise<void>,
   shouldStop: () => boolean = () => false
@@ -46,6 +51,8 @@ export async function startSimpleWorker(
   try {
     const pollForJobs = async () => {
       let pollCount = 0;
+      let emptyPolls = 0;
+      const MAX_EMPTY_POLLS = 5; // Stop after 5 empty polls
       logger.info('🎯 POLLING LOOP STARTED - this should appear in logs!');
       while (!shouldStop()) {
         pollCount++;
@@ -64,14 +71,32 @@ export async function startSimpleWorker(
             `;
           });
           logger.info('RAW queuedJobs:', queuedJobs);
-          if (queuedJobs.length === 0) {
-            const allVideos = await executeQuery(async (sql) => sql`SELECT id, video_id, title FROM videos`);
-            const allSummaries = await executeQuery(async (sql) => sql`SELECT id, video_id, processing_status FROM video_summaries`);
-            logger.warn('All videos:', allVideos);
-            logger.warn('All video_summaries:', allSummaries);
+          // Defensive: If queuedJobs is an array, use it. If it's a non-empty object, use Object.values. If it's empty or not jobs, use [].
+          let jobsArr = [];
+          if (Array.isArray(queuedJobs)) {
+            jobsArr = queuedJobs;
+          } else if (queuedJobs && typeof queuedJobs === 'object' && Object.keys(queuedJobs).length > 0 && Object.keys(queuedJobs).some(k => !['userId','email'].includes(k))) {
+            jobsArr = Object.values(queuedJobs);
+          } else {
+            jobsArr = [];
           }
-          if (queuedJobs.length > 0) {
-            const job = queuedJobs[0];
+          logger.info(`DEBUG: queuedJobs type=${typeof queuedJobs}, isArray=${Array.isArray(queuedJobs)}, keys=${Object.keys(queuedJobs||{})}, value=`, queuedJobs);
+          logger.info(`DEBUG: jobsArr.length=${jobsArr.length}`);
+          logger.info(`DEBUG: emptyPolls=${emptyPolls}, MAX_EMPTY_POLLS=${MAX_EMPTY_POLLS}`);
+
+          // Force emptyPolls to increment every poll for now, to ensure exit
+          if (!jobsArr || jobsArr.length === 0) {
+            emptyPolls++;
+            logger.info(`DEBUG: Incremented emptyPolls to ${emptyPolls}`);
+            if (emptyPolls >= MAX_EMPTY_POLLS) {
+              logger.info('🚨 Worker is about to exit after max empty polls!');
+              process.exit(0);
+            }
+          } else {
+            emptyPolls = 0; // Reset if job found
+          }
+          if (jobsArr.length > 0) {
+            const job = jobsArr[0];
             logger.info('🟢 Found queued job in DB, starting processing...', job);
             let reconstructedJobData: JobData | null = null;
             if (job.job_data) {
@@ -168,14 +193,13 @@ export async function startSimpleWorker(
               logger.error('❌ No valid job data found for processing. Skipping job.', { job });
             }
           }
-          // Wait before polling again
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
         } catch (pollError) {
           logger.error('Error polling for jobs', { error: pollError instanceof Error ? pollError.message : String(pollError), pollCount, userId: undefined, email: undefined });
           await new Promise(resolve => setTimeout(resolve, 10000));
         }
       }
-      logger.info('🛑 Worker stopped polling (shutdown requested)');
+      logger.info('🛑 Worker stopped polling (shutdown requested or idle).');
     };
     logger.info('✅ DB polling worker initialized, starting polling loop...');
     await pollForJobs();

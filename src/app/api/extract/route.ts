@@ -235,6 +235,17 @@ export async function POST(request: NextRequest) {
       logger.info('JobData to be queued', { jobData });
       await addJobToQueue(jobData);
       logger.info('Job added to DB queue successfully', { userId, videoId, summaryId });
+
+      // --- Trigger the Leapcell worker on-demand ---
+      // Replace with your actual Leapcell worker URL and port if needed
+      const WORKER_URL = process.env.WORKER_TRIGGER_URL || 'http://localhost:8080/start';
+      try {
+        await fetch(WORKER_URL, { method: 'POST' });
+        logger.info('Triggered Leapcell worker via HTTP POST', { WORKER_URL });
+      } catch (triggerError) {
+        logger.error('Failed to trigger Leapcell worker', { error: triggerError instanceof Error ? triggerError.message : String(triggerError), WORKER_URL });
+      }
+      // --- End trigger ---
     } catch (error: any) {
       logger.error('Failed to add job to DB queue', { userId, data: { videoId, error: error.message } });
       // Release reserved credits if job queueing fails

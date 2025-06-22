@@ -12,6 +12,7 @@ import { Button } from '../components/ui/button';
 function Header({ theme, setTheme }: { theme: string; setTheme: (t: string) => void }) {
   const { isSignedIn } = useAuth();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleGetStarted = () => {
     if (isSignedIn) {
@@ -24,51 +25,83 @@ function Header({ theme, setTheme }: { theme: string; setTheme: (t: string) => v
   };
 
   return (
-    <header className="fixed top-0 left-0 w-full z-30 bg-[#161B22]/95 backdrop-blur-md border-b border-[#30363D]">
+    <header className="fixed top-0 left-0 w-full z-30 bg-[#161B22]/95 backdrop-blur-md border-b border-[#30363D] shadow-lg">
       <nav className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-        {/* Logo with Asterisk */}
-        <div className="flex items-center gap-2">
-          <span className="text-[#FF0033] text-2xl transform-gpu animate-pulse-slow">
-            ✴
-          </span>
-          <span className="text-[#F0F6FC] font-semibold text-lg sm:text-xl">TubeGPT</span>
-          <span className="text-[#8B949E] text-sm ml-2 hidden sm:inline">Watch Less, Learn More</span>
-        </div>
-        
-        {/* Menu - Hidden on mobile */}
-        <div className="hidden lg:flex gap-8 text-[#8B949E] font-medium">
-          <a href="#features" className="hover:text-[#F0F6FC] transition cursor-pointer">Features</a>
-          <a href="#pricing" className="hover:text-[#F0F6FC] transition cursor-pointer">Pricing</a>
-          <a href="#about" className="hover:text-[#F0F6FC] transition cursor-pointer">About</a>
-        </div>
-        
-        {/* Auth & Theme - Mobile optimized */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {!isSignedIn && (
-            <SignInButton mode="modal">
-              <button className="px-3 py-2 sm:px-4 text-[#F0F6FC] bg-[#21262D] hover:bg-[#30363D] rounded-lg transition font-medium cursor-pointer text-sm sm:text-base">
-                Sign in
-              </button>
-            </SignInButton>
-          )}
-          <button 
-            onClick={handleGetStarted}
-            className="px-3 py-2 sm:px-4 bg-[#FF0033] hover:bg-[#FF0033]/90 text-white rounded-lg transition font-medium cursor-pointer text-sm sm:text-base"
-          >
-            Get Started
-          </button>
-          <SignUpButton mode="modal">
-            <button data-clerk-sign-up className="hidden">Hidden Signup Trigger</button>
-          </SignUpButton>
-          <button
-            aria-label="Toggle theme"
-            className="p-2 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-[#F0F6FC] transition cursor-pointer hidden sm:flex"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+        {/* Desktop: left logo, right menu; Mobile: centered logo, right hamburger */}
+        <div className="flex flex-1 items-center justify-between w-full">
+          {/* Logo/brand: left on desktop, centered on mobile */}
+          <div className="flex items-center gap-1 sm:gap-2 lg:gap-2">
+            <Link href="/" className="flex items-center gap-1 group align-middle">
+              <img src="/logo.svg" alt="TubeMind Logo" className="w-12 h-12 animate-spin-slow" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+              <span className="text-[#F0F6FC] font-semibold text-xl sm:text-2xl" style={{lineHeight:'1',verticalAlign:'middle'}}>TubeMind</span>
+            </Link>
+          </div>
+          {/* Desktop menu and actions */}
+          <div className="hidden lg:flex items-center gap-8 text-[#8B949E] font-medium ml-auto">
+            <a href="#problem-with-youtube" className="hover:text-[#F0F6FC] transition cursor-pointer">Features</a>
+            <a href="#pricing" className="hover:text-[#F0F6FC] transition cursor-pointer">Pricing</a>
+            <a href="#about" className="hover:text-[#F0F6FC] transition cursor-pointer">About</a>
+            {!isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="px-4 py-2 text-[#F0F6FC] bg-[#21262D] hover:bg-[#30363D] rounded-full transition font-medium cursor-pointer text-base pill-btn ml-4">
+                  Sign in
+                </button>
+              </SignInButton>
+            )}
+            <button 
+              onClick={handleGetStarted}
+              className="px-5 py-2 bg-[#DC143C] hover:bg-[#DC143C]/90 text-white rounded-full transition font-semibold cursor-pointer text-base pill-btn shadow-md ml-2"
+            >
+              Get Started
+            </button>
+          </div>
+          {/* Hamburger for mobile */}
+          <div className="flex lg:hidden items-center gap-2 ml-auto">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 w-10 h-10 rounded-xl bg-[#23272F] hover:bg-[#30363D] text-[#F0F6FC] transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#DC143C]/20 flex items-center justify-center"
+              aria-label="Open menu"
+              style={{ boxShadow: '0 1px 6px 0 rgba(0,0,0,0.08)' }}
+            >
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-menu"><line x1="3" y1="7" x2="19" y2="7"/><line x1="3" y1="12" x2="19" y2="12"/><line x1="3" y1="17" x2="19" y2="17"/></svg>
+            </button>
+          </div>
         </div>
       </nav>
+      {/* Mobile Menu Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col sm:hidden">
+          <div className="bg-[#161B22] border-b border-[#30363D] shadow-lg p-4 flex flex-col gap-4 animate-slide-in-left relative">
+            <div className="flex items-center gap-1 justify-center mb-2">
+              <Link href="/" className="flex items-center gap-1 group align-middle">
+                <img src="/logo.svg" alt="TubeMind Logo" className="w-12 h-12 animate-spin-slow" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                <span className="text-[#F0F6FC] font-semibold text-xl" style={{lineHeight:'1',verticalAlign:'middle'}}>TubeMind</span>
+              </Link>
+            </div>
+            <a href="#problem-with-youtube" className="block text-[#8B949E] hover:text-[#F0F6FC] text-base font-medium py-2 rounded-xl text-center transition">Features</a>
+            <a href="#pricing" className="block text-[#8B949E] hover:text-[#F0F6FC] text-base font-medium py-2 rounded-xl text-center transition">Pricing</a>
+            <a href="#about" className="block text-[#8B949E] hover:text-[#F0F6FC] text-base font-medium py-2 rounded-xl text-center transition">About</a>
+            {!isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="w-full py-3 bg-[#21262D] hover:bg-[#30363D] text-[#F0F6FC] rounded-full font-semibold text-base pill-btn mt-2">Sign in</button>
+              </SignInButton>
+            )}
+            <button
+              onClick={handleGetStarted}
+              className="w-full py-3 bg-[#DC143C] hover:bg-[#DC143C]/90 text-white rounded-full font-semibold text-base pill-btn shadow-md mt-2"
+            >
+              Get Started
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-[#23272F] hover:bg-[#30363D] text-[#F0F6FC] focus:outline-none"
+              aria-label="Close menu"
+            >
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
@@ -99,12 +132,12 @@ function CommunitySection() {
     <section className="w-full bg-[#161B22] border border-[#30363D] rounded-xl mt-16 mb-8 py-10 px-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold text-[#F0F6FC]">From the Community</h2>
-        <Link href="#" className="text-[#FF0033] hover:text-[#FF0033]/90 font-medium flex items-center gap-1">
+        <Link href="#" className="text-[#DC143C] hover:text-[#DC143C]/90 font-medium flex items-center gap-1">
           View All <ArrowUpRight className="w-4 h-4" />
         </Link>
       </div>
       <div className="text-[#8B949E]">
-        Discover how others are using TubeGPT to transform their learning experience.
+        Discover how others are using TubeMind to transform their learning experience.
       </div>
     </section>
   );
@@ -126,7 +159,7 @@ function ProblemWithYouTube() {
         
           ].map(({ icon: Icon, text }, index) => (
             <li key={index} className="flex items-start gap-2 sm:gap-3">
-              <span className="text-[#FF0033] mt-0.5">
+              <span className="text-[#DC143C] mt-0.5">
                 <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </span>
               <span className="text-[#F0F6FC] text-sm sm:text-base">{text}</span>
@@ -170,7 +203,7 @@ function BetterWayToLearn() {
         {/* Lightning-Fast Summaries */}
         <div className="bg-[#161B22] rounded-xl p-4 sm:p-6 border border-[#30363D] flex flex-col">
           <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <span className="bg-[#FF0033] p-1.5 sm:p-2 rounded-lg">
+            <span className="bg-[#DC143C] p-1.5 sm:p-2 rounded-lg">
               <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-[#F0F6FC]" />
             </span>
             <h3 className="text-lg sm:text-xl font-semibold text-[#F0F6FC]">1 Video = 5 Minutes of Learning</h3>
@@ -238,7 +271,7 @@ export default function HomePage() {
                   Why watch for 30 
                   <span className="mx-2">minutes</span>
                   <br className="sm:hidden" />
-                  <span className="block sm:inline text-transparent bg-gradient-to-r from-[#FF0033] via-[#FF4366] to-[#FF0033] bg-clip-text">
+                  <span className="block sm:inline text-transparent bg-gradient-to-r from-[#DC143C] via-[#DC143C] to-[#DC143C] bg-clip-text">
                     when you can learn it all in 3?
                   </span>
                 </h1>
@@ -253,7 +286,7 @@ export default function HomePage() {
                 <button 
                   onClick={handleTryForFree}
                   disabled={loadingTryFree}
-                  className="w-full max-w-xs h-12 sm:h-14 bg-gradient-to-r from-[#FF0033] to-[#FF4366] text-white font-semibold text-base sm:text-lg rounded-2xl transition-all duration-300 hover:shadow-[0_8px_32px_rgba(255,0,51,0.4)] active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed relative flex items-center justify-center"
+                  className="w-full max-w-xs h-12 sm:h-14 bg-gradient-to-r from-[#DC143C] to-[#DC143C] text-white font-semibold text-base sm:text-lg rounded-2xl transition-all duration-300 hover:shadow-[0_8px_32px_rgba(220,20,60,0.4)] active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed relative flex items-center justify-center"
                 >
                   {loadingTryFree ? (
                     <div className="flex items-center gap-2">
@@ -321,7 +354,7 @@ export default function HomePage() {
               <div className="text-center mb-8 sm:mb-12">
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">See It In Action</h2>
                 <p className="text-[#A0A8B0] text-lg sm:text-xl max-w-2xl mx-auto">
-                  Watch how TubeGPT transforms a 20-minute video into a 3-minute learning experience
+                  Watch how TubeMind transforms a 20-minute video into a 3-minute learning experience
                 </p>
               </div>
               
@@ -338,7 +371,7 @@ export default function HomePage() {
                       </div>
                       <div className="hidden sm:flex items-center gap-2 bg-[#161B22] rounded-lg px-3 py-1">
                         <div className="w-3 h-3 text-[#6B7280]">🔒</div>
-                        <span className="text-[#6B7280] text-sm">tubegpt.com</span>
+                        <span className="text-[#6B7280] text-sm">tubemind.com</span>
                       </div>
                       <div className="w-12"></div>
                     </div>
@@ -347,13 +380,13 @@ export default function HomePage() {
                     <div className="h-[280px] sm:h-[400px] md:h-[480px] bg-gradient-to-br from-[#0D1117] via-[#161B22] to-[#1A1F26] flex items-center justify-center relative overflow-hidden">
                       {/* Animated Background Pattern */}
                       <div className="absolute inset-0 opacity-10">
-                        <div className="absolute top-10 left-10 w-20 h-20 border border-[#FF0033] rounded-full animate-pulse"></div>
+                        <div className="absolute top-10 left-10 w-20 h-20 border border-[#DC143C] rounded-full animate-pulse"></div>
                         <div className="absolute bottom-10 right-10 w-16 h-16 border border-[#00D4AA] rounded-full animate-pulse delay-1000"></div>
-                        <div className="absolute top-1/2 left-1/3 w-12 h-12 border border-[#FF4366] rounded-full animate-pulse delay-500"></div>
+                        <div className="absolute top-1/2 left-1/3 w-12 h-12 border border-[#DC143C] rounded-full animate-pulse delay-500"></div>
                       </div>
                       
                       <div className="text-center z-10">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 bg-gradient-to-r from-[#FF0033] to-[#FF4366] rounded-full flex items-center justify-center">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 bg-gradient-to-r from-[#DC143C] to-[#DC143C] rounded-full flex items-center justify-center">
                           <span className="text-white text-2xl sm:text-3xl transform-gpu animate-pulse-slow">✴</span>
                         </div>
                         <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Demo Coming Soon</h3>
@@ -372,16 +405,16 @@ export default function HomePage() {
           <ProblemWithYouTube />
           <BetterWayToLearn />
 
-          {/* What is TubeGPT Section */}
+          {/* What is TubeMind Section */}
           <section className="w-full max-w-4xl mx-auto flex flex-col items-center mb-8 sm:mb-12 px-4">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#F0F6FC] mb-4 sm:mb-6 text-center">Meet TubeGPT</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#F0F6FC] mb-4 sm:mb-6 text-center">Meet TubeMind</h2>
             {/* Why it's different callout */}
             <div className="bg-[#161B22] text-[#F0F6FC] font-semibold text-base sm:text-lg md:text-xl rounded-xl px-4 sm:px-6 md:px-8 py-4 sm:py-6 text-center max-w-3xl shadow-lg border border-[#30363D]">
               <div className="mb-2 sm:mb-3">
-                Instantly turns any YouTube video into a <span className="text-[#F0F6FC] bg-[#FF0033] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-sm sm:text-base">3–5 minute</span> readable experience — with the same value as watching it fully.
+                Instantly turns any YouTube video into a <span className="text-[#F0F6FC] bg-[#DC143C] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-sm sm:text-base">3–5 minute</span> readable experience — with the same value as watching it fully.
               </div>
               <div className="text-[#8B949E] text-sm sm:text-base">
-                No playback. No skipping. Just <span className="text-[#FF0033] font-semibold">100% of the insights</span>, structured with timestamps — so clear, you won't believe you didn't watch it.
+                No playback. No skipping. Just <span className="text-[#DC143C] font-semibold">100% of the insights</span>, structured with timestamps — so clear, you won't believe you didn't watch it.
               </div>
             </div>
           </section>
@@ -396,7 +429,7 @@ export default function HomePage() {
               <Card className="bg-[#161B22] border-[#30363D] text-[#F0F6FC] w-full max-w-sm mx-auto">
                 <CardHeader className="text-center p-4 sm:p-6">
                   <CardTitle className="text-xl sm:text-2xl mb-2">Free</CardTitle>
-                  <CardDescription className="text-sm">Try TubeGPT for free</CardDescription>
+                  <CardDescription className="text-sm">Try TubeMind for free</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6 pt-0">
                   <div className="text-3xl sm:text-4xl font-bold mb-4 text-center">$0</div>
@@ -465,9 +498,9 @@ export default function HomePage() {
               </Card>
 
               {/* Pro Plan Card - Highlighted */}
-              <Card className="bg-[#161B22] border-[#FF0033] border-2 text-[#F0F6FC] w-full max-w-sm mx-auto relative sm:transform sm:scale-105 shadow-2xl sm:col-span-2 lg:col-span-1">
+              <Card className="bg-[#161B22] border-[#DC143C] border-2 text-[#F0F6FC] w-full max-w-sm mx-auto relative sm:transform sm:scale-105 shadow-2xl sm:col-span-2 lg:col-span-1">
                 <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-[#FF0033] text-white px-3 py-0.5 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm font-semibold">
+                  <span className="bg-[#DC143C] text-white px-3 py-0.5 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm font-semibold">
                     RECOMMENDED
                   </span>
                 </div>
@@ -496,7 +529,7 @@ export default function HomePage() {
                 </CardContent>
                 <CardFooter className="p-4 sm:p-6 pt-0">
                   <button
-                    className="w-full bg-[#FF0033] hover:bg-[#FF0033]/90 text-white font-semibold py-2.5 sm:py-3 rounded-lg transition disabled:opacity-60 cursor-pointer text-sm sm:text-base relative flex items-center justify-center min-h-[44px]"
+                    className="w-full bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold py-2.5 sm:py-3 rounded-lg transition disabled:opacity-60 cursor-pointer text-sm sm:text-base relative flex items-center justify-center min-h-[44px]"
                     onClick={() => handleCheckout(PLAN_PRODUCT_IDS.pro, 'pro')}
                     disabled={loadingPlan !== null}
                   >

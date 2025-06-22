@@ -1,7 +1,7 @@
 "use strict";
 // NOTE: Product IDs for plans are set in src/app/page.tsx and src/app/api/webhook/route.ts. Update them there if you change plans in Polar.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.POLAR_CONFIG = exports.PLAN_CONFIGS = exports.CHECKOUT_CANCEL_URL = exports.CHECKOUT_SUCCESS_URL = exports.DEPLOYMENT_CHECKLIST = exports.validateEnvironment = exports.getPolarConfig = exports.getCurrentEnvironment = exports.getPlanById = exports.getPlanByProductId = exports.PLANS = exports.PLAN_LIMITS = exports.PRODUCT_IDS = void 0;
+exports.POLAR_CONFIG = exports.PLAN_CONFIGS = exports.CHECKOUT_CANCEL_URL = exports.CHECKOUT_SUCCESS_URL = exports.DEPLOYMENT_CHECKLIST = exports.validateEnvironment = exports.getPolarConfig = exports.getCurrentEnvironment = exports.getPlanById = exports.getPlanByProductId = exports.PLANS = exports.PLAN_LIMITS = exports.getProductIds = exports.PRODUCT_IDS = void 0;
 // Environment-aware configuration for different deployment stages
 const ENV_CONFIG = {
     development: {
@@ -35,8 +35,8 @@ exports.PRODUCT_IDS = {
     },
     production: {
         // TODO: Update these when moving to production
-        basic: "5ee6ffad-ea07-47bf-8219-ad7b77ce4e3f",
-        pro: "a0cb28d8-e607-4063-b3ea-c753178bbf53"
+        basic: "soon",
+        pro: "soon"
     }
 };
 // Get product IDs for current environment
@@ -46,7 +46,8 @@ const getProductIds = () => {
     }
     return exports.PRODUCT_IDS.sandbox;
 };
-const currentProductIds = getProductIds();
+exports.getProductIds = getProductIds;
+const currentProductIds = (0, exports.getProductIds)();
 const config = ENV_CONFIG[currentEnv];
 exports.PLAN_LIMITS = {
     free: {

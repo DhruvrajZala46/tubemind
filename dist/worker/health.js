@@ -70,7 +70,7 @@ function startHealthCheckServer() {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     status: 'healthy',
-                    service: 'tubegpt-worker',
+                    service: 'tubemind-worker',
                     timestamp: new Date().toISOString(),
                     system: systemInfo,
                     redis: redisStatus,

@@ -1,5 +1,5 @@
 /**
- * logger.ts - Centralized logging utility for TubeGPT
+ * logger.ts - Centralized logging utility for TubeMind
  * 
  * This file provides standardized logging functions with timestamps,
  * log levels, and structured formatting to make debugging easier.

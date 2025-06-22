@@ -67,7 +67,7 @@ export const InstantButton: React.FC<InstantButtonProps> = ({
   const baseClasses = 'inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
-    primary: 'bg-[#E5484D] text-white hover:bg-[#FF5C61] focus:ring-[#E5484D]',
+    primary: 'bg-[#DC143C] text-white hover:bg-[#DC143C]/90 focus:ring-[#DC143C]',
     secondary: 'bg-[#21262D] text-[#F0F6FC] hover:bg-[#30363D] border border-[#30363D] focus:ring-[#58A6FF]',
     outline: 'border border-[#30363D] text-[#F0F6FC] hover:bg-[#21262D] focus:ring-[#58A6FF]',
     ghost: 'text-[#ABB2BF] hover:text-[#F0F6FC] hover:bg-[#21262D] focus:ring-[#58A6FF]'

@@ -3,35 +3,26 @@ import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks'
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import env from '../../../lib/env';
+import { getPlanByProductId, PLAN_LIMITS, getProductIds } from '../../../config/plans';
 
 const sql = neon(env.DATABASE_URL);
 const logger = createLogger('payment:webhook');
 
-// Your actual product IDs from your Polar dashboard
-const PLAN_PRODUCT_IDS = {
-  basic: '5ee6ffad-ea07-47bf-8219-ad7b77ce4e3f',
-  pro: 'a0cb28d8-e607-4063-b3ea-c753178bbf53',
-};
+// Use product IDs from config/plans.ts for the current environment
+const currentProductIds = getProductIds();
 
 function getSubscriptionTier(productId: string): string {
   logger.debug(`Checking product ID for subscription tier`, { data: { productId }});
-  logger.debug(`Product ID references`, { data: { 
-    basic: PLAN_PRODUCT_IDS.basic, 
-    pro: PLAN_PRODUCT_IDS.pro 
-  }});
-  
-  if (productId === PLAN_PRODUCT_IDS.basic) {
+  logger.debug(`Product ID references`, { data: currentProductIds });
+  if (productId === currentProductIds.basic) {
     logger.info('Matched BASIC plan subscription');
     return 'basic';
   }
-  if (productId === PLAN_PRODUCT_IDS.pro) {
+  if (productId === currentProductIds.pro) {
     logger.info('Matched PRO plan subscription');
     return 'pro';
   }
-  
-  logger.warn('No subscription tier match found for product ID, defaulting to FREE', { 
-    data: { productId } 
-  });
+  logger.warn('No subscription tier match found for product ID, defaulting to FREE', { data: { productId } });
   return 'free';
 }
 
@@ -148,7 +139,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Check for idempotency to prevent duplicate processing
-    const idempotencyKey = `${event.type}_${event.data?.id || 'unknown'}_${Date.now()}`;
+    const idempotencyKey = `${event.type}_${event.data?.id || 'unknown'}`;
     const alreadyProcessed = await checkIdempotencyKey(idempotencyKey);
     
     if (alreadyProcessed) {
@@ -258,68 +249,77 @@ export async function POST(request: NextRequest) {
 
 async function handleSuccessfulCheckout(checkoutData: any) {
   try {
-    // Extract customer email from checkout data
+    // Extract customer email and userId from checkout data
     const customerEmail = checkoutData.customer_email || checkoutData.customerEmail;
+    const userId = checkoutData.user_id || checkoutData.userId;
     const productId = checkoutData.product_id || checkoutData.productId;
     
-    if (!customerEmail) {
-      logger.error('No customer email in checkout data', { data: { checkoutData: JSON.stringify(checkoutData).substring(0, 200) }});
+    if (!customerEmail && !userId) {
+      logger.error('No customer email or userId in checkout data', { data: { checkoutData: JSON.stringify(checkoutData).substring(0, 200) }});
       return;
     }
 
     const tier = getSubscriptionTier(productId);
-    logger.info(`Processing checkout for email: ${customerEmail}, tier: ${tier}`);
-    
-    // Get the appropriate credit limit for the tier
-    const creditLimits = {
-      free: 60,
-      basic: 1800, // 1 hr/day * 30 days
-      pro: 6000    // 3 hr/day * 30 days
-    };
-    
-    const creditLimit = creditLimits[tier as keyof typeof creditLimits] || 60;
-    
-    // Try to update by email first
-    const updateByEmailResult = await sql`
+    logger.info(`Processing checkout for user: ${userId || customerEmail}, tier: ${tier}`);
+    const creditLimit = PLAN_LIMITS[tier as keyof typeof PLAN_LIMITS]?.creditsPerMonth || 60;
+    const emailLower = customerEmail ? customerEmail.toLowerCase() : undefined;
+
+    // Try to find user by userId first, then by email
+    let userRow = null;
+    if (userId) {
+      const userResult = await sql`SELECT * FROM users WHERE id = ${userId}`;
+      if (userResult.length > 0) userRow = userResult[0];
+    }
+    if (!userRow && emailLower) {
+      const userResult = await sql`SELECT * FROM users WHERE LOWER(email) = ${emailLower}`;
+      if (userResult.length > 0) userRow = userResult[0];
+    }
+    if (!userRow) {
+      logger.warn(`🚨 Webhook: No matching user for userId/email ${userId || emailLower}. Manual review required.`);
+      return;
+    }
+
+    // Only update if the user's current plan/status/credits are not already correct
+    if (
+      userRow.subscription_tier === tier &&
+      userRow.subscription_status === 'active' &&
+      userRow.credits_limit === creditLimit &&
+      userRow.credits_used === 0
+    ) {
+      logger.info(`User ${userRow.id} already has correct plan/status/credits. Skipping update.`);
+      return;
+    }
+
+    // Update user by id
+    const updateResult = await sql`
       UPDATE users 
       SET 
         subscription_tier = ${tier},
         subscription_status = 'active',
         subscription_id = ${checkoutData.subscription_id || null},
         credits_used = 0,
+        credits_limit = ${creditLimit},
         last_credit_reset = NOW(),
         updated_at = NOW()
-      WHERE email = ${customerEmail}
+      WHERE id = ${userRow.id}
       RETURNING id, email, subscription_tier
     `;
-
-    if (updateByEmailResult.length > 0) {
-      logger.info(`✅ Updated existing user by email: ${customerEmail} to ${tier}`, {
-        data: { 
-          userId: updateByEmailResult[0].id, 
-          newTier: tier,
-          creditLimit: creditLimit
-        }
+    if (updateResult.length > 0) {
+      logger.info(`✅ Updated user ${userRow.id} to ${tier}`, {
+        data: { userId: updateResult[0].id, newTier: tier, creditLimit: creditLimit }
       });
       
       // Verify the update was successful
       const verifyResult = await sql`
-        SELECT subscription_tier, subscription_status, credits_used 
+        SELECT subscription_tier, subscription_status, credits_used, credits_limit 
         FROM users 
-        WHERE email = ${customerEmail}
+        WHERE LOWER(email) = ${emailLower}
       `;
       
       if (verifyResult.length > 0) {
-        logger.info(`✅ Verification: User ${customerEmail} now has tier: ${verifyResult[0].subscription_tier}, status: ${verifyResult[0].subscription_status}`);
+        logger.info(`✅ Verification: User ${userRow.email} now has tier: ${verifyResult[0].subscription_tier}, status: ${verifyResult[0].subscription_status}`);
       }
-      
-      return;
     }
-
-    // If no user found, log and exit – no risky fallback updates.
-    logger.warn(`🚨 Webhook: No matching user for email ${customerEmail}. Manual review required.`);
-    return;
-    
   } catch (error: any) {
     logger.error('❌ Error handling successful checkout:', { data: { error: error?.message || String(error) }});
     throw error; // Re-throw for proper error handling
@@ -329,25 +329,40 @@ async function handleSuccessfulCheckout(checkoutData: any) {
 async function handleSubscriptionCreated(subscriptionData: any) {
   try {
     const customerEmail = subscriptionData.customer?.email;
+    const userId = subscriptionData.user_id || subscriptionData.userId;
     const productId = subscriptionData.product_id || subscriptionData.productId;
-    
-    if (!customerEmail) {
-      logger.error('No customer email in subscription data', { data: { subscriptionData: JSON.stringify(subscriptionData).substring(0, 200) }});
+    if (!customerEmail && !userId) {
+      logger.error('No customer email or userId in subscription data', { data: { subscriptionData: JSON.stringify(subscriptionData).substring(0, 200) }});
       return;
     }
-
     const tier = getSubscriptionTier(productId);
-    
-    // Get the appropriate credit limit for the tier
-    const creditLimits = {
-      free: 60,
-      basic: 1800, // 1 hr/day * 30 days
-      pro: 6000    // 3 hr/day * 30 days
-    };
-    
-    const creditLimit = creditLimits[tier as keyof typeof creditLimits] || 60;
-    
-    // Update user subscription details
+    const creditLimit = PLAN_LIMITS[tier as keyof typeof PLAN_LIMITS]?.creditsPerMonth || 60;
+    const emailLower = customerEmail ? customerEmail.toLowerCase() : undefined;
+    // Try to find user by userId first, then by email
+    let userRow = null;
+    if (userId) {
+      const userResult = await sql`SELECT * FROM users WHERE id = ${userId}`;
+      if (userResult.length > 0) userRow = userResult[0];
+    }
+    if (!userRow && emailLower) {
+      const userResult = await sql`SELECT * FROM users WHERE LOWER(email) = ${emailLower}`;
+      if (userResult.length > 0) userRow = userResult[0];
+    }
+    if (!userRow) {
+      logger.warn(`🚨 No user found for subscription creation with userId/email: ${userId || emailLower}`);
+      return;
+    }
+    // Only update if the user's current plan/status/credits are not already correct
+    if (
+      userRow.subscription_tier === tier &&
+      userRow.subscription_status === 'active' &&
+      userRow.credits_limit === creditLimit &&
+      userRow.credits_used === 0
+    ) {
+      logger.info(`User ${userRow.id} already has correct plan/status/credits. Skipping update.`);
+      return;
+    }
+    // Update user by id
     const updateResult = await sql`
       UPDATE users 
       SET 
@@ -356,33 +371,16 @@ async function handleSubscriptionCreated(subscriptionData: any) {
         subscription_id = ${subscriptionData.id},
         subscription_end_date = ${subscriptionData.current_period_end || subscriptionData.currentPeriodEnd},
         credits_used = 0,
+        credits_limit = ${creditLimit},
         last_credit_reset = NOW(),
         updated_at = NOW()
-      WHERE email = ${customerEmail}
+      WHERE id = ${userRow.id}
       RETURNING id, email, subscription_tier
     `;
-    
     if (updateResult.length > 0) {
-      logger.info(`✅ Subscription created for user: ${customerEmail} with tier: ${tier}`, {
-        data: { 
-          userId: updateResult[0].id, 
-          subscriptionId: subscriptionData.id,
-          creditLimit: creditLimit
-        }
+      logger.info(`✅ Subscription created for user: ${userRow.email} with tier: ${tier}`, {
+        data: { userId: updateResult[0].id, subscriptionId: subscriptionData.id, creditLimit: creditLimit }
       });
-      
-      // Verify the update was successful
-      const verifyResult = await sql`
-        SELECT subscription_tier, subscription_status, credits_used 
-        FROM users 
-        WHERE email = ${customerEmail}
-      `;
-      
-      if (verifyResult.length > 0) {
-        logger.info(`✅ Verification: User ${customerEmail} now has tier: ${verifyResult[0].subscription_tier}, status: ${verifyResult[0].subscription_status}`);
-      }
-    } else {
-      logger.warn(`🚨 No user found for subscription creation with email: ${customerEmail}`);
     }
   } catch (error: any) {
     logger.error('❌ Error handling subscription created:', { data: { error: error?.message || String(error) }});

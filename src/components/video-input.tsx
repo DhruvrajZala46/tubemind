@@ -38,7 +38,7 @@ export default function VideoInput({ onProcess, isProcessing }: VideoInputProps)
     <Card className="w-full max-w-2xl mx-auto premium-card shadow-xl border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-2xl font-bold">
-          <Youtube className="w-7 h-7 text-[#FF0033] animate-bounce-slow" />
+          <Youtube className="w-7 h-7 text-[#DC143C] animate-bounce-slow" />
           <span className="gradient-accent bg-clip-text text-transparent">Extract Knowledge from YouTube Video</span>
         </CardTitle>
       </CardHeader>
@@ -53,18 +53,18 @@ export default function VideoInput({ onProcess, isProcessing }: VideoInputProps)
               onChange={(e) => setUrl(e.target.value)}
               disabled={isProcessing}
               className={
-                'peer h-14 px-4 pt-6 pb-2 text-lg rounded-xl border-2 border-transparent focus:border-[#FF0033] focus:ring-2 focus:ring-[#FF0033]/20 transition-all bg-white/80 shadow-md font-medium' +
-                (error ? ' border-[#FF0033] focus:border-[#FF0033] focus:ring-[#FF0033]/20' : '')
+                'peer h-14 px-4 pt-6 pb-2 text-lg rounded-xl border-2 border-transparent focus:border-[#DC143C] focus:ring-2 focus:ring-[#DC143C]/20 transition-all bg-white/80 shadow-md font-medium' +
+                (error ? ' border-[#DC143C] focus:border-[#DC143C] focus:ring-[#DC143C]/20' : '')
               }
             />
             <Label
               htmlFor="youtube-url"
-              className="absolute left-4 top-4 text-gray-500 text-base font-semibold pointer-events-none transition-all duration-200 peer-focus:-translate-y-3 peer-focus:scale-90 peer-focus:text-[#FF0033] peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
+              className="absolute left-4 top-4 text-gray-500 text-base font-semibold pointer-events-none transition-all duration-200 peer-focus:-translate-y-3 peer-focus:scale-90 peer-focus:text-[#DC143C] peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100"
             >
               YouTube Video URL
             </Label>
             {error && (
-              <div className="flex items-center gap-2 text-[#FF0033] text-sm mt-2 animate-shake">
+              <div className="flex items-center gap-2 text-[#DC143C] text-sm mt-2 animate-shake">
                 <AlertCircle className="w-4 h-4" />
                 {error}
               </div>

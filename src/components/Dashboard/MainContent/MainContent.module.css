@@ -11,6 +11,57 @@
   transform: scale(1.1) rotate(12deg);
 }
 
+/* Mobile Logo Animation - Psychologically Addictive & Soothing */
+@keyframes floatNatural {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translateY(-6px) rotate(90deg) scale(1.02);
+  }
+  50% {
+    transform: translateY(0) rotate(180deg) scale(1);
+  }
+  75% {
+    transform: translateY(4px) rotate(270deg) scale(0.98);
+  }
+  100% {
+    transform: translateY(0) rotate(360deg) scale(1);
+  }
+}
+
+@keyframes breatheGlow {
+  0% {
+    filter: drop-shadow(0 0 8px rgba(220, 20, 60, 0.3)) brightness(1);
+  }
+  25% {
+    filter: drop-shadow(0 0 12px rgba(220, 20, 60, 0.5)) brightness(1.05);
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(220, 20, 60, 0.7)) brightness(1.1);
+  }
+  75% {
+    filter: drop-shadow(0 0 12px rgba(220, 20, 60, 0.5)) brightness(1.05);
+  }
+  100% {
+    filter: drop-shadow(0 0 8px rgba(220, 20, 60, 0.3)) brightness(1);
+  }
+}
+
+.mobileLogo {
+  animation: 
+    floatNatural 12s cubic-bezier(0.45, 0, 0.55, 1) infinite,
+    breatheGlow 5s ease-in-out infinite;
+  transform-origin: center center;
+  transition: all 0.5s ease;
+}
+
+.mobileLogo:hover {
+  animation-duration: 8s, 3s;
+  filter: drop-shadow(0 0 25px rgba(220, 20, 60, 0.8)) brightness(1.15);
+  transform: scale(1.05);
+}
+
 .inputField {
   font-family: 'Inter', system-ui, sans-serif;
   transition: all 0.2s ease;

@@ -11,7 +11,7 @@ export default function GlobalError({ error, reset }: { error: Error; reset: () 
         <div className="flex gap-4">
           <button
             onClick={() => reset()}
-            className="bg-[#FF0033] hover:bg-[#FF3366] text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
           >
             Try Again
           </button>

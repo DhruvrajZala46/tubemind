@@ -149,7 +149,7 @@ async function getVideoTranscript(videoId) {
     };
     const headers = {
         'x-api-key': transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey,
-        'User-Agent': 'TubeGPT/1.0',
+        'User-Agent': 'TubeMind/1.0',
         'Accept': 'application/json',
     };
     const maskedKey = transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey ? transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey.slice(0, 2) + '***' + transcript_config_1.TRANSCRIPT_CONFIG.supadataApiKey.slice(-2) : undefined;

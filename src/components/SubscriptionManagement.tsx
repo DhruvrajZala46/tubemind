@@ -96,7 +96,7 @@ export default function SubscriptionManagement() {
         {/* Progress Bar */}
         <div className="w-full bg-[#21262D] rounded-full h-2.5 mb-2">
           <div 
-            className="bg-[#FF0033] h-2.5 rounded-full" 
+            className="bg-[#DC143C] h-2.5 rounded-full" 
             style={{ width: `${Math.min(subscription.usagePercentage, 100)}%` }}
           ></div>
         </div>
@@ -111,7 +111,7 @@ export default function SubscriptionManagement() {
         <div className="space-y-3">
           <button
             onClick={handleManageSubscription}
-            className="w-full bg-[#FF0033] hover:bg-[#FF0033]/90 text-white font-semibold py-2 px-4 rounded-lg transition"
+            className="w-full bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold py-2 px-4 rounded-lg transition"
           >
             🔧 Manage Subscription
           </button>
@@ -131,7 +131,7 @@ export default function SubscriptionManagement() {
           <p className="text-[#8B949E] mb-3">You're on the free plan</p>
           <button
             onClick={() => window.location.href = '/#pricing'}
-            className="bg-[#FF0033] hover:bg-[#FF0033]/90 text-white font-semibold py-2 px-4 rounded-lg transition"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold py-2 px-4 rounded-lg transition"
           >
             Upgrade Plan
           </button>
@@ -141,7 +141,7 @@ export default function SubscriptionManagement() {
       {/* Contact Support */}
       <div className="mt-4 pt-4 border-t border-[#30363D]">
         <p className="text-[#8B949E] text-sm text-center">
-          Need help? <a href="mailto:support@tubegpt.com" className="text-[#FF0033] hover:underline">Contact Support</a>
+                      Need help? <a href="mailto:support@tubemind.com" className="text-[#DC143C] hover:underline">Contact Support</a>
         </p>
       </div>
     </div>

@@ -39,7 +39,7 @@ export const ThemedError: React.FC<ThemedErrorProps> = ({
           <button
             onClick={onRetry}
             disabled={isRetrying}
-            className="bg-[#FF0033] hover:bg-[#FF3366] text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-medium px-4 py-2 rounded-lg text-xs transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
           >
             {isRetrying ? (
               <>
@@ -69,7 +69,7 @@ export const ThemedError: React.FC<ThemedErrorProps> = ({
           <button
             onClick={onRetry}
             disabled={isRetrying}
-            className="bg-[#FF0033] hover:bg-[#FF3366] text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isRetrying ? (
               <>
@@ -167,7 +167,7 @@ export const SubscriptionError: React.FC<{
         {onUpgrade && (
           <button
             onClick={onUpgrade}
-            className="bg-[#FF0033] hover:bg-[#FF3366] text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+            className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
           >
             Upgrade Plan
           </button>
@@ -200,7 +200,7 @@ export const ErrorToast: React.FC<{
 
   return (
     <div className="fixed top-4 right-4 z-50 max-w-sm">
-      <div className="bg-[#161B22] border border-[#FF0033] rounded-lg p-4 shadow-xl">
+      <div className="bg-[#161B22] border border-[#DC143C] rounded-lg p-4 shadow-xl">
         <div className="flex items-start gap-3">
           <div className="text-lg">⚠️</div>
           <div className="flex-1">

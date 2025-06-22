@@ -12,7 +12,7 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
-// Universal Worker Process for TubeGPT
+// Universal Worker Process for TubeMind
 // Works identically in both development and production environments
 
 // Check environment type
@@ -52,6 +52,7 @@ import { startSimpleWorker, JobData } from '../lib/job-queue';
 import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
+import http from 'http';
 
 const logger = createLogger('worker:extract');
 
@@ -60,6 +61,7 @@ logger.info(`✅ Node.js version: ${process.version}`);
 logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
 
 let isShuttingDown = false;
+let workerRunning = false;
 
 const shutdown = (signal: string) => {
   if (isShuttingDown) return;
@@ -104,7 +106,27 @@ async function startWorker() {
   }
 }
 
-startWorker();
+// HTTP endpoint to trigger the worker on-demand
+const server = http.createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/start') {
+    if (!workerRunning) {
+      workerRunning = true;
+      startWorker().finally(() => { workerRunning = false; });
+      res.writeHead(200);
+      res.end('Worker started');
+    } else {
+      res.writeHead(200);
+      res.end('Worker already running');
+    }
+  } else {
+    res.writeHead(404);
+    res.end('Not found');
+  }
+});
+
+server.listen(process.env.WORKER_TRIGGER_PORT || 8080, () => {
+  console.log('Worker trigger server listening on port', process.env.WORKER_TRIGGER_PORT || 8080);
+});
 
 /**
  * Direct video processing function for backup when job queue fails

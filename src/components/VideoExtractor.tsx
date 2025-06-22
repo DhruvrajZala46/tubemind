@@ -322,7 +322,7 @@ export const VideoExtractor: React.FC<VideoExtractorProps> = ({
               error={errorHandler.currentError.error}
               type={errorHandler.currentError.type}
               onRetry={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-              onContactSupport={() => window.open('mailto:support@tubegpt.com', '_blank')}
+              onContactSupport={() => window.open('mailto:support@tubemind.com', '_blank')}
             />
           )}
           

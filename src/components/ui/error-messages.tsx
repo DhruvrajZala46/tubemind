@@ -411,7 +411,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
 
         {showContactSupport && config.supportContactNeeded && (
           <button
-            onClick={onContactSupport || (() => window.open('mailto:support@tubegpt.com', '_blank'))}
+            onClick={onContactSupport || (() => window.open('mailto:support@tubemind.com', '_blank'))}
             className="inline-flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             <Mail size={16} />

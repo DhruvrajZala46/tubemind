@@ -62,21 +62,17 @@ export async function getUserSubscription(userId: string): Promise<any> {
     }
 
   const user = result[0];
-    
-  // Calculate credits_limit based on subscription_tier
-  let creditsLimit = 60; // Default free tier limit
-  switch (user.subscription_tier) {
-    case 'basic':
-      creditsLimit = 300; // 5 hours
-      break;
-    case 'pro':
-      creditsLimit = 900; // 15 hours  
-      break;
-    case 'enterprise':
-      creditsLimit = -1; // Unlimited
-      break;
-    default:
-      creditsLimit = 60; // Free tier
+  
+  // Use credits_limit from DB if present, otherwise fallback to PLAN_LIMITS
+  let creditsLimit: number = 60; // Default to 60 as a final fallback
+  if (user.credits_limit !== undefined && user.credits_limit !== null) {
+    creditsLimit = user.credits_limit;
+  } else {
+    // Fallback to PLAN_LIMITS config
+    const planLimits = SUBSCRIPTION_LIMITS[user.subscription_tier as keyof typeof SUBSCRIPTION_LIMITS];
+    if (planLimits?.creditsPerMonth !== undefined) {
+      creditsLimit = planLimits.creditsPerMonth;
+    }
   }
 
   const creditsUsed = user.credits_used || 0;

@@ -16,7 +16,7 @@ import { PaywallProvider } from '../components/ui/paywall-provider';
 import { CreditProvider } from '../lib/credit-context';
 
 export const metadata: Metadata = {
-  title: "TubeGPT - YouTube Video Summarizer",
+  title: "TubeMind - YouTube Video Summarizer",
   description: "Extract knowledge from any YouTube video instantly with AI-powered summaries.",
 };
 
@@ -28,6 +28,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <link rel="icon" href="/favicon.ico" />
+        </head>
         <body className="antialiased font-sans" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
           {/* <SentryErrorBoundary> */}
             <CreditProvider>

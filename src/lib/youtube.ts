@@ -183,7 +183,7 @@ export async function getVideoTranscript(videoId: string): Promise<TranscriptIte
   };
   const headers = {
     'x-api-key': TRANSCRIPT_CONFIG.supadataApiKey,
-    'User-Agent': 'TubeGPT/1.0',
+            'User-Agent': 'TubeMind/1.0',
     'Accept': 'application/json',
   };
   const maskedKey = TRANSCRIPT_CONFIG.supadataApiKey ? TRANSCRIPT_CONFIG.supadataApiKey.slice(0, 2) + '***' + TRANSCRIPT_CONFIG.supadataApiKey.slice(-2) : undefined;

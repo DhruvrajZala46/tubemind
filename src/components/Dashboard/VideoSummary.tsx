@@ -6,6 +6,7 @@ const ReactMarkdown = React.lazy(() => import('react-markdown'));
 import { LoadingState } from '../ui/loading-states';
 import { useMainLoading } from '../../lib/main-loading-context.tsx';
 import { ElegantLoader } from '../ui/elegant-loader';
+import { CircularProgressWithLoader } from '../ui/CircularProgressWithLoader';
 
 // ChatGPT-style markdown renderer with typewriter effect
 function ChatGPTMarkdown({ 
@@ -33,7 +34,7 @@ function ChatGPTMarkdown({
   
   useEffect(() => {
     if (summaryId) {
-      const viewedSummaries = JSON.parse(localStorage.getItem('tubegpt_viewed_summaries') || '[]');
+      const viewedSummaries = JSON.parse(localStorage.getItem('tubemind_viewed_summaries') || '[]');
       hasBeenViewed.current = viewedSummaries.includes(summaryId);
     }
   }, [summaryId]);
@@ -87,10 +88,10 @@ function ChatGPTMarkdown({
         
         // Mark this summary as viewed
         if (summaryId) {
-          const viewedSummaries = JSON.parse(localStorage.getItem('tubegpt_viewed_summaries') || '[]');
+          const viewedSummaries = JSON.parse(localStorage.getItem('tubemind_viewed_summaries') || '[]');
           if (!viewedSummaries.includes(summaryId)) {
             viewedSummaries.push(summaryId);
-            localStorage.setItem('tubegpt_viewed_summaries', JSON.stringify(viewedSummaries));
+            localStorage.setItem('tubemind_viewed_summaries', JSON.stringify(viewedSummaries));
           }
         }
       }
@@ -304,6 +305,14 @@ function unescapeString(str: string) {
     .replace(/\\\\/g, '\\');
 }
 
+// Map status to progress
+const statusToProgress: Record<string, number> = {
+  queued: 10,
+  transcribing: 40,
+  summarizing: 80,
+  completed: 100,
+};
+
 export default function VideoSummary({ summary: initialSummary, videoId, summaryId }: VideoSummaryProps) {
   console.log('VideoSummary summary prop:', initialSummary);
   const { showMainLoading, hideMainLoading } = useMainLoading();
@@ -321,6 +330,41 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
     console.log('🔍 DEBUG: isComplete function - status:', `"${status}"`, 'result:', result, 'status type:', typeof status);
     return result;
   };
+
+  const [displayedProgress, setDisplayedProgress] = useState(statusToProgress[initialSummary.processing_status] || 10);
+  const [targetProgress, setTargetProgress] = useState(statusToProgress[initialSummary.processing_status] || 10);
+  const progressAnimationRef = useRef<NodeJS.Timeout | null>(null);
+
+  // When backend status changes, update targetProgress
+  useEffect(() => {
+    setTargetProgress(statusToProgress[initialSummary.processing_status] || 10);
+  }, [initialSummary.processing_status]);
+
+  // Animate displayedProgress toward targetProgress
+  useEffect(() => {
+    if (displayedProgress === targetProgress) return;
+    if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
+    // Fast at first, then slow as it approaches target
+    progressAnimationRef.current = setInterval(() => {
+      setDisplayedProgress(prev => {
+        if (prev === targetProgress) {
+          if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
+          return prev;
+        }
+        // Move faster if far, slower if close
+        const diff = Math.abs(targetProgress - prev);
+        const step = diff > 20 ? 3 : diff > 10 ? 2 : 1;
+        if (prev < targetProgress) {
+          return Math.min(prev + step, targetProgress);
+        } else {
+          return Math.max(prev - step, targetProgress);
+        }
+      });
+    }, 30);
+    return () => {
+      if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
+    };
+  }, [targetProgress, displayedProgress]);
 
   useEffect(() => {
     // Only show the main page loader on the initial load, not on navigation
@@ -415,18 +459,51 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
     
     if (isProcessing(summary.processing_status)) {
       console.log('🔍 DEBUG: Taking processing path');
-      let message = "Your summary is being generated...";
-      if (summary.processing_status === 'transcribing') {
-        message = "Step 1/2: Transcribing audio from video...";
-      } else if (summary.processing_status === 'summarizing') {
-        message = "Step 2/2: Generating insights with AI...";
-      }
+      // Animate progress up to 80% while processing, 100% on completion
+      const [fakeProgress, setFakeProgress] = useState(10);
+      const [target, setTarget] = useState(80);
+
+      useEffect(() => {
+        if (summary.processing_status === 'queued') setTarget(30);
+        else if (summary.processing_status === 'transcribing') setTarget(60);
+        else if (summary.processing_status === 'summarizing') setTarget(80);
+        else if (summary.processing_status === 'completed') setTarget(100);
+      }, [summary.processing_status]);
+
+      useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+        if (fakeProgress < target) {
+          interval = setInterval(() => {
+            setFakeProgress(prev => {
+              if (summary.processing_status === 'completed') return 100;
+              if (prev < target) {
+                // Dynamic step: fast at first, slower as it approaches target
+                const diff = target - prev;
+                let step = 1;
+                if (diff > 40) step = 3;
+                else if (diff > 20) step = 2;
+                else if (diff > 10) step = 1.5;
+                else if (diff > 5) step = 1;
+                else step = 0.5;
+                return Math.min(prev + step, target);
+              }
+              if (interval) clearInterval(interval);
+              return prev;
+            });
+          }, 50);
+        }
+        if (summary.processing_status === 'completed') setFakeProgress(100);
+        return () => { if (interval) clearInterval(interval); };
+      }, [target, summary.processing_status]);
+
       return (
         <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-4">
-           <ElegantLoader size="lg" />
-           <p className="text-lg font-semibold mt-6 text-white">Processing Video</p>
-           <p className="text-gray-400 mt-2">{message}</p>
-         </div>
+          <div className="mb-6">
+            <CircularProgressWithLoader progress={fakeProgress} size={64} />
+          </div>
+          <p className="text-lg font-semibold mt-6 text-white">Processing Video</p>
+          <p className="text-gray-400 mt-2">Please wait while we process your summary.</p>
+        </div>
       );
     }
 

@@ -35,13 +35,13 @@ export const PRODUCT_IDS = {
   },
   production: {
     // TODO: Update these when moving to production
-    basic: "5ee6ffad-ea07-47bf-8219-ad7b77ce4e3f", 
-    pro: "a0cb28d8-e607-4063-b3ea-c753178bbf53"
+    basic: "soon", 
+    pro: "soon"
   }
 };
 
 // Get product IDs for current environment
-const getProductIds = () => {
+export const getProductIds = () => {
   if (currentEnv === 'production') {
     return PRODUCT_IDS.production;
   }
