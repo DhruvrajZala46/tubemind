@@ -13,6 +13,7 @@ import { addJobToQueue, JobData } from '../../../lib/job-queue';
 import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 import { getOrCreateUser } from '../../../lib/auth-utils';
+import { randomUUID } from 'crypto';
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
@@ -195,11 +196,11 @@ export async function POST(request: NextRequest) {
     }
 
     // After inserting the video and summary, add the job to the DB queue
-    let summaryId: string;
+    const summaryId = randomUUID();
     const jobData: JobData = {
       videoId,
       videoDbId,
-      summaryDbId: '', // will set after insert
+      summaryDbId: summaryId,
       userId,
       userEmail,
       user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
@@ -211,14 +212,19 @@ export async function POST(request: NextRequest) {
       const summaryInsertResult = await dbWithRetry(async () => {
         return await executeQuery(async (sql) => {
           return await sql`
-            INSERT INTO video_summaries (video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
-            VALUES (${videoDbId}, ${metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds}, ${JSON.stringify(jobData)})
+            INSERT INTO video_summaries (
+              id, video_id, main_title, overall_summary, created_at, updated_at,
+              raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens,
+              input_cost, output_cost, total_cost, video_duration_seconds, processing_status, job_data
+            )
+            VALUES (
+              ${summaryId}, ${videoDbId}, ${metadata.title}, '', NOW(), NOW(),
+              '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds}, 'queued', ${JSON.stringify(jobData)}
+            )
             RETURNING id
           `;
         });
       }, 'Create Summary Entry');
-      summaryId = summaryInsertResult[0].id;
-      jobData.summaryDbId = summaryId;
     } catch (error: any) {
       logger.error('Failed to create summary entry', { userId, data: { videoId, error: error.message } });
       // Release reserved credits if summary creation fails
