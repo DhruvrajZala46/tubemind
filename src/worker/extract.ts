@@ -1,9 +1,19 @@
-// FORCE Redis to be enabled - MUST BE FIRST BEFORE ANY IMPORTS
+// --- ALL IMPORTS FIRST ---
+import 'dotenv/config';
+import { startSimpleWorker, JobData } from '../lib/job-queue';
+import { processVideoJob } from '../lib/video-processor';
+import { startHealthCheckServer } from './health';
+import { createLogger } from '../lib/logger';
+import http from 'http';
+
+// --- THEN logger ---
+const logger = createLogger('worker:extract');
+
+// --- THEN your Redis config, env loading, etc ---
 process.env.DISABLE_REDIS = 'false';
 process.env.FORCE_REDIS_ON_WINDOWS = 'true';
 
 console.log('🔧 INITIAL Redis Configuration BEFORE IMPORTS:');
-console.log(`   DISABLE_REDIS: ${process.env.DISABLE_REDIS}`);
 console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
 
 // Load .env.local only in development
@@ -35,9 +45,7 @@ if (!isLeapcellEnvironment) {
 process.env.DISABLE_REDIS = 'false';
 process.env.FORCE_REDIS_ON_WINDOWS = 'true';
 
-// Verify the override worked
 console.log('🔧 REDIS Configuration AFTER env override:');
-console.log(`   DISABLE_REDIS (should be false): ${process.env.DISABLE_REDIS}`);
 console.log(`   FORCE_REDIS_ON_WINDOWS (should be true): ${process.env.FORCE_REDIS_ON_WINDOWS}`);
 
 console.log('🔧 FINAL Redis Configuration:');
@@ -46,20 +54,10 @@ console.log(`   UPSTASH_REDIS_REST_URL: ${process.env.UPSTASH_REDIS_REST_URL ? '
 console.log(`   UPSTASH_REDIS_REST_TOKEN: ${process.env.UPSTASH_REDIS_REST_TOKEN ? 'SET' : 'NOT SET'}`);
 console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
 
-const logger = createLogger('worker:extract');
-
 // Add this after logger is defined and environment variables are loaded
 const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL || 'NOT SET';
 const maskedDbUrl = dbUrl.replace(/(:)([^:]*)(@)/, (m, p1, p2, p3) => p1 + '*****' + p3);
 logger.info(`🔗 Neon DB connection string: ${maskedDbUrl}`);
-
-// NOW import modules after environment is properly set
-import 'dotenv/config'; // Load environment variables from .env files
-import { startSimpleWorker, JobData } from '../lib/job-queue';
-import { processVideoJob } from '../lib/video-processor';
-import { startHealthCheckServer } from './health';
-import { createLogger } from '../lib/logger';
-import http from 'http';
 
 logger.info('🚀 Worker process starting...');
 logger.info(`✅ Node.js version: ${process.version}`);
@@ -174,4 +172,4 @@ export async function processVideoDirectly(
     logger.error(`❌ Direct video processing failed for ${videoId}: ${errorMessage}`);
     throw error;
   }
-} 
+}
