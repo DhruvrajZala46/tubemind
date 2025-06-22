@@ -59,10 +59,10 @@ export async function startSimpleWorker(
         try {
           logger.info('🔍 Polling database for queued jobs...', { pollCount, userId: undefined, email: undefined });
           logger.info('🔍 [job-queue] About to execute database query for queued jobs...');
+          const { executeQuery } = await import('./db');
           let queuedJobs;
           try {
-            const { executeQuery } = await import('./db');
-            queuedJobs = await executeQuery(async (sql) => {
+            queuedJobs = await executeQuery(async (sql: any) => {
               return await sql`
                 SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
                 FROM video_summaries vs
@@ -72,14 +72,19 @@ export async function startSimpleWorker(
                 LIMIT 1;
               `;
             });
-            logger.info('[job-queue] DB query result:', queuedJobs);
+            logger.info('[job-queue] DB query result', { result: queuedJobs });
           } catch (dbError) {
-            logger.error('[job-queue] DB query failed:', dbError);
+            logger.error('[job-queue] DB query failed', { error: dbError instanceof Error ? dbError.message : dbError });
             throw dbError;
           }
-          logger.info(`DEBUG: queuedJobs type=${typeof queuedJobs}, isArray=${Array.isArray(queuedJobs)}, keys=${Object.keys(queuedJobs||{})}, value=`, queuedJobs);
-          logger.info(`DEBUG: jobsArr.length=${queuedJobs.length}`);
-          logger.info(`DEBUG: emptyPolls=${emptyPolls}, MAX_EMPTY_POLLS=${MAX_EMPTY_POLLS}`);
+          logger.info('DEBUG: queuedJobs', {
+            type: typeof queuedJobs,
+            isArray: Array.isArray(queuedJobs),
+            keys: Object.keys(queuedJobs || {}),
+            value: queuedJobs
+          });
+          logger.info('DEBUG: jobsArr.length', { length: queuedJobs.length });
+          logger.info('DEBUG: emptyPolls', { emptyPolls, MAX_EMPTY_POLLS });
 
           // Force emptyPolls to increment every poll for now, to ensure exit
           if (!queuedJobs || queuedJobs.length === 0) {
