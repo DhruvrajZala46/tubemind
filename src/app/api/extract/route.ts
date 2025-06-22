@@ -196,17 +196,29 @@ export async function POST(request: NextRequest) {
 
     // After inserting the video and summary, add the job to the DB queue
     let summaryId: string;
+    const jobData: JobData = {
+      videoId,
+      videoDbId,
+      summaryDbId: '', // will set after insert
+      userId,
+      userEmail,
+      user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
+      metadata,
+      totalDurationSeconds,
+      creditsNeeded
+    };
     try {
       const summaryInsertResult = await dbWithRetry(async () => {
         return await executeQuery(async (sql) => {
           return await sql`
-            INSERT INTO video_summaries (video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds)
-            VALUES (${videoDbId}, ${metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds})
+            INSERT INTO video_summaries (video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
+            VALUES (${videoDbId}, ${metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds}, ${JSON.stringify(jobData)})
             RETURNING id
           `;
         });
       }, 'Create Summary Entry');
       summaryId = summaryInsertResult[0].id;
+      jobData.summaryDbId = summaryId;
     } catch (error: any) {
       logger.error('Failed to create summary entry', { userId, data: { videoId, error: error.message } });
       // Release reserved credits if summary creation fails
@@ -221,17 +233,6 @@ export async function POST(request: NextRequest) {
     }
     // Add job to DB-based queue
     try {
-      const jobData: JobData = {
-        videoId,
-        videoDbId,
-        summaryDbId: summaryId,
-        userId,
-        userEmail,
-        user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
-        metadata,
-        totalDurationSeconds,
-        creditsNeeded
-      };
       logger.info('JobData to be queued', { jobData });
       await addJobToQueue(jobData);
       logger.info('Job added to DB queue successfully', { userId, videoId, summaryId });
