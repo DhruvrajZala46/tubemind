@@ -169,8 +169,8 @@ export async function POST(request: NextRequest) {
 // Helper function to determine subscription tier from product ID
 function getSubscriptionTier(productId: string): string {
   const PLAN_PRODUCT_IDS = {
-    basic: '6384a5e9-0656-4a58-8503-0294caefa09b',
-    pro: 'c2dc830c-17d2-436a-aedb-b74c2a79837a',
+    basic: '861cd62e-ceb6-4beb-8c06-43a8652eae8c',
+    pro: '4b2f5d5d-cba5-4ec2-b80e-d9053eec75b5',
   };
   
   logger.debug(`Checking product ID for subscription tier`, { data: { productId }});

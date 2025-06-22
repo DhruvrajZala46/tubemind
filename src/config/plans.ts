@@ -34,9 +34,8 @@ export const PRODUCT_IDS = {
     pro: "a0cb28d8-e607-4063-b3ea-c753178bbf53"
   },
   production: {
-    // TODO: Update these when moving to production
-    basic: "soon", 
-    pro: "soon"
+    basic: "861cd62e-ceb6-4beb-8c06-43a8652eae8c",
+    pro: "4b2f5d5d-cba5-4ec2-b80e-d9053eec75b5"
   }
 };
 

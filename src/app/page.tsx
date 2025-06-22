@@ -233,8 +233,8 @@ export default function HomePage() {
   const router = useRouter();
 
   const PLAN_PRODUCT_IDS = {
-    basic: '5ee6ffad-ea07-47bf-8219-ad7b77ce4e3f',
-    pro: 'a0cb28d8-e607-4063-b3ea-c753178bbf53',
+    basic: '861cd62e-ceb6-4beb-8c06-43a8652eae8c',
+    pro: '4b2f5d5d-cba5-4ec2-b80e-d9053eec75b5',
   };
 
   const handleCheckout = async (productId: string, plan: 'basic' | 'pro') => {
