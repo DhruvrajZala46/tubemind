@@ -58,34 +58,31 @@ export async function startSimpleWorker(
         pollCount++;
         try {
           logger.info('🔍 Polling database for queued jobs...', { pollCount, userId: undefined, email: undefined });
-          const { executeQuery } = await import('./db');
-          logger.info('📊 Executing database query for queued jobs...');
-          const queuedJobs = await executeQuery(async (sql) => {
-            return await sql`
-              SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
-              FROM video_summaries vs
-              JOIN videos v ON vs.video_id = v.id
-              WHERE vs.processing_status = 'queued'
-              ORDER BY vs.created_at ASC
-              LIMIT 1
-            `;
-          });
-          logger.info('RAW queuedJobs:', queuedJobs);
-          // Defensive: If queuedJobs is an array, use it. If it's a non-empty object, use Object.values. If it's empty or not jobs, use [].
-          let jobsArr = [];
-          if (Array.isArray(queuedJobs)) {
-            jobsArr = queuedJobs;
-          } else if (queuedJobs && typeof queuedJobs === 'object' && Object.keys(queuedJobs).length > 0 && Object.keys(queuedJobs).some(k => !['userId','email'].includes(k))) {
-            jobsArr = Object.values(queuedJobs);
-          } else {
-            jobsArr = [];
+          logger.info('🔍 [job-queue] About to execute database query for queued jobs...');
+          let queuedJobs;
+          try {
+            const { executeQuery } = await import('./db');
+            queuedJobs = await executeQuery(async (sql) => {
+              return await sql`
+                SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
+                FROM video_summaries vs
+                JOIN videos v ON vs.video_id = v.id
+                WHERE vs.processing_status = 'queued'
+                ORDER BY vs.created_at ASC
+                LIMIT 1;
+              `;
+            });
+            logger.info('[job-queue] DB query result:', queuedJobs);
+          } catch (dbError) {
+            logger.error('[job-queue] DB query failed:', dbError);
+            throw dbError;
           }
           logger.info(`DEBUG: queuedJobs type=${typeof queuedJobs}, isArray=${Array.isArray(queuedJobs)}, keys=${Object.keys(queuedJobs||{})}, value=`, queuedJobs);
-          logger.info(`DEBUG: jobsArr.length=${jobsArr.length}`);
+          logger.info(`DEBUG: jobsArr.length=${queuedJobs.length}`);
           logger.info(`DEBUG: emptyPolls=${emptyPolls}, MAX_EMPTY_POLLS=${MAX_EMPTY_POLLS}`);
 
           // Force emptyPolls to increment every poll for now, to ensure exit
-          if (!jobsArr || jobsArr.length === 0) {
+          if (!queuedJobs || queuedJobs.length === 0) {
             emptyPolls++;
             logger.info(`DEBUG: Incremented emptyPolls to ${emptyPolls}`);
             if (emptyPolls >= MAX_EMPTY_POLLS) {
@@ -95,8 +92,8 @@ export async function startSimpleWorker(
           } else {
             emptyPolls = 0; // Reset if job found
           }
-          if (jobsArr.length > 0) {
-            const job = jobsArr[0];
+          if (queuedJobs.length > 0) {
+            const job = queuedJobs[0];
             logger.info('🟢 Found queued job in DB, starting processing...', job);
             let reconstructedJobData: JobData | null = null;
             if (job.job_data) {
