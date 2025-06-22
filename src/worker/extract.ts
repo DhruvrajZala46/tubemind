@@ -6,9 +6,6 @@ import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
 import http from 'http';
 
-// --- THEN logger ---
-const logger = createLogger('worker:extract');
-
 // --- THEN your Redis config, env loading, etc ---
 process.env.DISABLE_REDIS = 'false';
 process.env.FORCE_REDIS_ON_WINDOWS = 'true';
@@ -53,6 +50,9 @@ console.log(`   DISABLE_REDIS: ${process.env.DISABLE_REDIS}`);
 console.log(`   UPSTASH_REDIS_REST_URL: ${process.env.UPSTASH_REDIS_REST_URL ? 'SET' : 'NOT SET'}`);
 console.log(`   UPSTASH_REDIS_REST_TOKEN: ${process.env.UPSTASH_REDIS_REST_TOKEN ? 'SET' : 'NOT SET'}`);
 console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
+
+// --- THEN logger ---
+const logger = createLogger('worker:extract');
 
 // Add this after logger is defined and environment variables are loaded
 const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL || 'NOT SET';
