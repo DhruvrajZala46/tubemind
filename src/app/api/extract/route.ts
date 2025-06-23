@@ -9,7 +9,7 @@ import { dbWithRetry } from '../../../lib/error-recovery';
 import { metrics } from '../../../lib/monitoring';
 import { trackVideoProcessing } from '../../../lib/api-middleware';
 import { calculateVideoCredits } from '../../../lib/credit-utils';
-import { addJobToQueue, JobData } from '../../../lib/job-queue';
+import { addJobToQueue, JobData } from '../../../lib/job-queue-redis-only';
 import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 import { getOrCreateUser } from '../../../lib/auth-utils';

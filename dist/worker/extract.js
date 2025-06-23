@@ -39,7 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.processVideoDirectly = processVideoDirectly;
 // --- ALL IMPORTS FIRST ---
 require("dotenv/config");
-const job_queue_1 = require("../lib/job-queue");
+const job_queue_redis_only_1 = require("../lib/job-queue-redis-only");
 const video_processor_1 = require("../lib/video-processor");
 const health_1 = require("./health");
 const logger_1 = require("../lib/logger");
@@ -146,7 +146,7 @@ async function startWorker() {
         const handleJob = async (jobData) => {
             const jobId = `${jobData.videoDbId}-${Date.now()}`;
             logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`, {
-                source: (0, redis_queue_1.isRedisAvailable)() ? 'Redis' : 'Database',
+                source: 'Worker',
                 userId: jobData.userId
             });
             try {
@@ -166,7 +166,7 @@ async function startWorker() {
             }
         };
         logger.info('🔥 Starting enhanced worker (Redis + DB polling)...');
-        await (0, job_queue_1.startSimpleWorker)(handleJob, () => isShuttingDown);
+        await (0, job_queue_redis_only_1.startSimpleWorker)(handleJob, () => isShuttingDown);
         logger.info('🛑 Enhanced worker returned unexpectedly!');
         console.log('⏳ Enhanced worker is running. Press Ctrl+C to exit.');
     }

@@ -1,6 +1,6 @@
 // --- ALL IMPORTS FIRST ---
 import 'dotenv/config';
-import { startSimpleWorker, JobData } from '../lib/job-queue';
+import { startSimpleWorker, JobData } from '../lib/job-queue-redis-only';
 import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
@@ -121,7 +121,7 @@ async function startWorker() {
     const handleJob = async (jobData: JobData) => {
       const jobId = `${jobData.videoDbId}-${Date.now()}`;
       logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`, {
-        source: isRedisAvailable() ? 'Redis' : 'Database',
+        source: 'Worker',
         userId: jobData.userId
       });
       
