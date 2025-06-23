@@ -79,11 +79,11 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 async function startWorker() {
+  console.log('🚨 ENTERED startWorker');
   try {
     logger.info('🏥 Starting health check server...');
     startHealthCheckServer();
     logger.info('✅ Health check server started.');
-
     const handleJob = async (jobData: JobData) => {
       const jobId = `${jobData.videoDbId}-${Date.now()}`;
       logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
@@ -95,23 +95,22 @@ async function startWorker() {
         throw error;
       }
     };
-
-    // Start the new DB-polling worker
     logger.info('🔥 About to call startSimpleWorker (DB polling mode) - this should start polling...');
     await startSimpleWorker(handleJob, () => isShuttingDown);
     logger.info('🛑 startSimpleWorker returned unexpectedly!');
-
     logger.info('✅ Worker created and listening for jobs.');
     console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
   } catch (error) {
     logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
-    process.exit(1);
+    console.error('💥 A critical error occurred during worker initialization.', error);
+    setTimeout(() => process.exit(1), 1000);
   }
 }
 
 // HTTP endpoint to trigger the worker on-demand
 const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/start') {
+    console.log('🚨 /start endpoint triggered');
     if (!workerRunning) {
       workerRunning = true;
       startWorker().finally(() => { workerRunning = false; });

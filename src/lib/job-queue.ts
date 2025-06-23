@@ -47,6 +47,7 @@ export async function startSimpleWorker(
   processor: (jobData: JobData) => Promise<void>,
   shouldStop: () => boolean = () => false
 ): Promise<void> {
+  console.log('🚨 ENTERED startSimpleWorker');
   logger.info('🚀 Starting production-grade DB polling worker...');
   try {
     const pollForJobs = async () => {
@@ -85,14 +86,12 @@ export async function startSimpleWorker(
           });
           logger.info('DEBUG: jobsArr.length', { length: queuedJobs.length });
           logger.info('DEBUG: emptyPolls', { emptyPolls, MAX_EMPTY_POLLS });
-
-          // Force emptyPolls to increment every poll for now, to ensure exit
           if (!queuedJobs || queuedJobs.length === 0) {
             emptyPolls++;
             logger.info(`DEBUG: Incremented emptyPolls to ${emptyPolls}`);
             if (emptyPolls >= MAX_EMPTY_POLLS) {
               logger.info('🚨 Worker is about to exit after max empty polls!');
-              process.exit(0);
+              setTimeout(() => process.exit(0), 1000); // Give logs time to flush
             }
           } else {
             emptyPolls = 0; // Reset if job found
@@ -198,6 +197,7 @@ export async function startSimpleWorker(
           await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
         } catch (pollError) {
           logger.error('Error polling for jobs', { error: pollError instanceof Error ? pollError.message : String(pollError), pollCount, userId: undefined, email: undefined });
+          console.error('Error polling for jobs', pollError);
           await new Promise(resolve => setTimeout(resolve, 10000));
         }
       }
@@ -207,6 +207,7 @@ export async function startSimpleWorker(
     await pollForJobs();
   } catch (error) {
     logger.error('❌ Critical error starting DB polling worker', { error: error instanceof Error ? error.message : String(error), userId: undefined, email: undefined });
-    throw error;
+    console.error('❌ Critical error starting DB polling worker', error);
+    setTimeout(() => process.exit(1), 1000);
   }
 }
