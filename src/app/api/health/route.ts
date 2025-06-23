@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import { monitoring } from '../../../lib/monitoring';
+import { executeQuery } from '@/lib/db';
+import { checkRedisHealth, getRedisQueueStats } from '@/lib/redis-queue';
 
 const logger = createLogger('health-check');
 
@@ -54,6 +56,10 @@ export async function GET(request: NextRequest) {
     const responseTime = Date.now() - startTime;
     const systemHealth = monitoring.getSystemHealth();
 
+    // Test Redis connection and get stats
+    const redisHealth = await checkRedisHealth();
+    const redisStats = await getRedisQueueStats();
+
     const healthStatus = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
@@ -67,6 +73,13 @@ export async function GET(request: NextRequest) {
         activeAlerts: systemHealth.activeAlerts,
         criticalAlerts: systemHealth.criticalAlerts,
         recentErrors: systemHealth.recentErrors
+      },
+      redis: {
+        status: redisHealth.isConnected ? 'healthy' : 'unavailable',
+        enabled: redisHealth.isEnabled,
+        connected: redisHealth.isConnected,
+        url: redisHealth.url,
+        stats: redisStats
       }
     };
 
@@ -83,7 +96,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      error: 'Health check system failure'
+      responseTime: `${Date.now() - startTime}ms`,
+      error: 'Health check system failure',
+      services: {
+        database: {
+          status: 'error',
+          error: error instanceof Error ? error.message : String(error)
+        },
+        redis: {
+          status: 'unknown',
+          error: 'Could not check due to database error'
+        }
+      }
     }, { status: 503 });
   }
 }
@@ -93,12 +117,14 @@ async function checkDatabase(): Promise<ServiceHealth> {
   const start = Date.now();
   try {
     const db = getDbConnection();
-    await db`SELECT 1 as test`;
-    return {
-      status: 'healthy',
-      responseTime: Date.now() - start,
-      lastChecked: new Date().toISOString()
-    };
+    const dbTest = await executeQuery(async (sql) => {
+      return await sql`SELECT 1 as test, NOW() as timestamp`;
+    });
+          return {
+        status: 'healthy',
+        responseTime: Date.now() - start,
+        lastChecked: new Date().toISOString()
+      };
   } catch (error: any) {
     return {
       status: 'unhealthy',

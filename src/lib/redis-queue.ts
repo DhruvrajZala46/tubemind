@@ -1,0 +1,305 @@
+import { Redis } from '@upstash/redis';
+import { createLogger } from './logger';
+import { JobData } from './job-queue';
+
+const logger = createLogger('redis-queue');
+
+// Initialize Upstash Redis client
+let redis: Redis | null = null;
+let redisInitialized = false;
+
+// Job queue configuration
+const QUEUE_NAME = 'video_processing_jobs';
+const PROCESSING_SET = 'processing_jobs';
+const FAILED_SET = 'failed_jobs';
+
+// Initialize Redis connection
+export async function initializeRedisQueue(): Promise<boolean> {
+  if (redisInitialized && redis) {
+    return true;
+  }
+
+  try {
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (!url || !token) {
+      logger.warn('⚠️ Upstash Redis credentials not found, will use DB fallback');
+      return false;
+    }
+
+    redis = new Redis({
+      url,
+      token,
+      retry: {
+        retries: 3,
+        backoff: (retryCount) => Math.pow(2, retryCount) * 1000, // Exponential backoff
+      },
+    });
+
+    // Test connection
+    const pingResult = await redis.ping();
+    if (pingResult === 'PONG') {
+      redisInitialized = true;
+      logger.info('✅ Redis queue initialized successfully');
+      return true;
+    } else {
+      throw new Error('Redis ping failed');
+    }
+  } catch (error) {
+    logger.error('❌ Failed to initialize Redis queue', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    redis = null;
+    redisInitialized = false;
+    return false;
+  }
+}
+
+// Check if Redis is available
+export function isRedisAvailable(): boolean {
+  return redisInitialized && redis !== null;
+}
+
+// Add job to Redis queue
+export async function addJobToRedisQueue(jobData: JobData): Promise<{ jobId: string; usedRedis: boolean }> {
+  const jobId = jobData.summaryDbId;
+  
+  try {
+    // Try Redis first
+    if (!isRedisAvailable()) {
+      await initializeRedisQueue();
+    }
+
+    if (isRedisAvailable() && redis) {
+      // Serialize job data
+      const serializedJob = JSON.stringify({
+        ...jobData,
+        addedAt: Date.now(),
+        status: 'queued'
+      });
+
+      // Add to queue using Redis LIST (LPUSH for queue, RPOP for processing)
+      await redis.lpush(QUEUE_NAME, serializedJob);
+      
+      // Also store in a hash for easy lookup by ID
+      await redis.hset(`job:${jobId}`, {
+        data: serializedJob,
+        status: 'queued',
+        addedAt: Date.now()
+      });
+
+      logger.info('✅ Job added to Redis queue', { jobId, userId: jobData.userId });
+      return { jobId, usedRedis: true };
+    } else {
+      // Redis not available, will fallback to DB
+      logger.warn('⚠️ Redis not available, will use DB fallback', { jobId });
+      return { jobId, usedRedis: false };
+    }
+  } catch (error) {
+    logger.error('❌ Failed to add job to Redis queue', { 
+      jobId, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return { jobId, usedRedis: false };
+  }
+}
+
+// Get next job from Redis queue
+export async function getNextJobFromRedis(): Promise<JobData | null> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return null;
+    }
+
+    // Pop job from queue (RPOP for FIFO processing)
+    const jobString = await redis.rpop(QUEUE_NAME);
+    
+    if (!jobString) {
+      return null; // No jobs available
+    }
+
+    const jobData = JSON.parse(jobString) as JobData & { addedAt: number; status: string };
+    
+    // Move job to processing set
+    await redis.sadd(PROCESSING_SET, jobData.summaryDbId);
+    await redis.hset(`job:${jobData.summaryDbId}`, {
+      status: 'processing',
+      startedAt: Date.now()
+    });
+
+    logger.info('✅ Retrieved job from Redis queue', { 
+      jobId: jobData.summaryDbId, 
+      userId: jobData.userId 
+    });
+
+    return jobData;
+  } catch (error) {
+    logger.error('❌ Failed to get job from Redis queue', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return null;
+  }
+}
+
+// Mark job as completed
+export async function markJobCompleted(jobId: string): Promise<boolean> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return false;
+    }
+
+    // Remove from processing set
+    await redis.srem(PROCESSING_SET, jobId);
+    
+    // Update job status
+    await redis.hset(`job:${jobId}`, {
+      status: 'completed',
+      completedAt: Date.now()
+    });
+
+    // Set expiration for completed job data (24 hours)
+    await redis.expire(`job:${jobId}`, 86400);
+
+    logger.info('✅ Job marked as completed in Redis', { jobId });
+    return true;
+  } catch (error) {
+    logger.error('❌ Failed to mark job as completed in Redis', { 
+      jobId, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return false;
+  }
+}
+
+// Mark job as failed
+export async function markJobFailed(jobId: string, errorMessage: string): Promise<boolean> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return false;
+    }
+
+    // Remove from processing set and add to failed set
+    await redis.srem(PROCESSING_SET, jobId);
+    await redis.sadd(FAILED_SET, jobId);
+    
+    // Update job status
+    await redis.hset(`job:${jobId}`, {
+      status: 'failed',
+      failedAt: Date.now(),
+      error: errorMessage
+    });
+
+    // Set expiration for failed job data (7 days for debugging)
+    await redis.expire(`job:${jobId}`, 604800);
+
+    logger.error('❌ Job marked as failed in Redis', { jobId, error: errorMessage });
+    return true;
+  } catch (error) {
+    logger.error('❌ Failed to mark job as failed in Redis', { 
+      jobId, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return false;
+  }
+}
+
+// Get job status from Redis
+export async function getJobStatus(jobId: string): Promise<any | null> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return null;
+    }
+
+    const jobData = await redis.hgetall(`job:${jobId}`);
+    return jobData && Object.keys(jobData).length > 0 ? jobData : null;
+  } catch (error) {
+    logger.error('❌ Failed to get job status from Redis', { 
+      jobId, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return null;
+  }
+}
+
+// Get queue statistics
+export async function getRedisQueueStats(): Promise<{
+  queueLength: number;
+  processingCount: number;
+  failedCount: number;
+} | null> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return null;
+    }
+
+    const [queueLength, processingCount, failedCount] = await Promise.all([
+      redis.llen(QUEUE_NAME),
+      redis.scard(PROCESSING_SET),
+      redis.scard(FAILED_SET)
+    ]);
+
+    return {
+      queueLength,
+      processingCount,
+      failedCount
+    };
+  } catch (error) {
+    logger.error('❌ Failed to get Redis queue stats', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return null;
+  }
+}
+
+// Health check for Redis
+export async function checkRedisHealth(): Promise<{
+  isConnected: boolean;
+  isEnabled: boolean;
+  url?: string;
+  stats?: any;
+}> {
+  try {
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    
+    if (!url || !token) {
+      return {
+        isConnected: false,
+        isEnabled: false,
+        url: 'Not configured'
+      };
+    }
+
+    if (!isRedisAvailable()) {
+      await initializeRedisQueue();
+    }
+
+    if (isRedisAvailable() && redis) {
+      const pingResult = await redis.ping();
+      const stats = await getRedisQueueStats();
+      
+      return {
+        isConnected: pingResult === 'PONG',
+        isEnabled: true,
+        url: url.replace(/\/\/.*@/, '//***@'), // Mask credentials
+        stats
+      };
+    } else {
+      return {
+        isConnected: false,
+        isEnabled: false,
+        url: url.replace(/\/\/.*@/, '//***@')
+      };
+    }
+  } catch (error) {
+    logger.error('❌ Redis health check failed', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return {
+      isConnected: false,
+      isEnabled: true,
+      url: process.env.UPSTASH_REDIS_REST_URL?.replace(/\/\/.*@/, '//***@') || 'Unknown'
+    };
+  }
+} 

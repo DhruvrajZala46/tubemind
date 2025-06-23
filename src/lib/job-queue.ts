@@ -1,4 +1,13 @@
 import { createLogger } from './logger';
+import { 
+  addJobToRedisQueue, 
+  getNextJobFromRedis, 
+  markJobCompleted, 
+  markJobFailed,
+  initializeRedisQueue,
+  isRedisAvailable,
+  checkRedisHealth 
+} from './redis-queue';
 
 const logger = createLogger('job-queue');
 
@@ -14,8 +23,42 @@ export type JobData = {
   creditsNeeded: number;
 };
 
-// DB-based addJobToQueue
-export async function addJobToQueue(data: JobData): Promise<{ jobId: string }> {
+// Enhanced addJobToQueue with Redis integration
+export async function addJobToQueue(data: JobData): Promise<{ jobId: string; usedRedis?: boolean }> {
+  logger.info('🚀 Adding job to queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId });
+
+  try {
+    // Try Redis first
+    const redisResult = await addJobToRedisQueue(data);
+    
+    if (redisResult.usedRedis) {
+      logger.info('✅ Job added to Redis queue successfully', { 
+        jobId: data.summaryDbId, 
+        videoId: data.videoId, 
+        userId: data.userId 
+      });
+
+      // Also add to DB as backup for reliability
+      await addJobToDbQueue(data);
+      logger.info('✅ Job also added to DB queue as backup', { jobId: data.summaryDbId });
+
+      return { jobId: data.summaryDbId, usedRedis: true };
+    }
+  } catch (error) {
+    logger.error('❌ Redis queue failed, falling back to DB', { 
+      jobId: data.summaryDbId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  // Fallback to DB queue
+  logger.info('📝 Using DB queue (Redis not available)', { jobId: data.summaryDbId });
+  const dbResult = await addJobToDbQueue(data);
+  return { jobId: dbResult.jobId, usedRedis: false };
+}
+
+// Original DB-based addJobToQueue (now internal)
+async function addJobToDbQueue(data: JobData): Promise<{ jobId: string }> {
   const { executeQuery } = await import('./db');
   await executeQuery(async (sql: any) => {
     await sql`

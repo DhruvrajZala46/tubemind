@@ -4,6 +4,7 @@ import { startSimpleWorker, JobData } from '../lib/job-queue';
 import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
+import { initializeRedisQueue, isRedisAvailable } from '../lib/redis-queue';
 import http from 'http';
 import { neon } from '@neondatabase/serverless';
 
@@ -60,7 +61,7 @@ const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || proce
 const maskedDbUrl = dbUrl.replace(/(:)([^:]*)(@)/, (m, p1, p2, p3) => p1 + '*****' + p3);
 logger.info(`🔗 Neon DB connection string: ${maskedDbUrl}`);
 
-logger.info('🚀 Worker process starting...');
+logger.info('🚀 Enhanced worker process starting with Redis integration...');
 logger.info(`✅ Node.js version: ${process.version}`);
 logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
 
@@ -70,7 +71,7 @@ let workerRunning = false;
 const shutdown = (signal: string) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  logger.info(`👋 Received ${signal}. Shutting down worker...`);
+  logger.info(`👋 Received ${signal}. Shutting down enhanced worker...`);
   setTimeout(() => {
     process.exit(0);
   }, 5000);
@@ -79,9 +80,10 @@ const shutdown = (signal: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// --- PRE-FLIGHT NEON DB CONNECTIVITY TEST ---
+// --- PRE-FLIGHT TESTS ---
 (async () => {
   try {
+    // Test Neon DB connectivity
     const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL;
     if (!connectionString) {
       console.error('❌ No Neon connection string found in env');
@@ -91,62 +93,153 @@ process.on('SIGINT', () => shutdown('SIGINT'));
       const result = await sql`SELECT 1 as test`;
       console.log('🟢 [Preflight] Neon test query succeeded:', result);
     }
+
+    // Test Redis connectivity
+    console.log('🔍 [Preflight] Testing Redis connectivity...');
+    const redisInitialized = await initializeRedisQueue();
+    if (redisInitialized) {
+      console.log('🟢 [Preflight] Redis connection successful!');
+    } else {
+      console.log('⚠️ [Preflight] Redis not available, will use DB fallback');
+    }
   } catch (err) {
-    console.error('🔴 [Preflight] Neon test query failed:', err);
+    console.error('🔴 [Preflight] Tests failed:', err);
   }
 })();
 
 async function startWorker() {
-  console.log('🚨 ENTERED startWorker');
+  console.log('🚨 ENTERED startWorker with Redis integration');
   try {
     logger.info('🏥 Starting health check server...');
     startHealthCheckServer();
     logger.info('✅ Health check server started.');
+
+    // Initialize Redis queue
+    const redisInitialized = await initializeRedisQueue();
+    logger.info(`🔗 Redis initialization: ${redisInitialized ? '✅ Success' : '⚠️ Failed, using DB only'}`);
+
     const handleJob = async (jobData: JobData) => {
       const jobId = `${jobData.videoDbId}-${Date.now()}`;
-      logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`);
+      logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`, {
+        source: isRedisAvailable() ? 'Redis' : 'Database',
+        userId: jobData.userId
+      });
+      
       try {
         await processVideoJob(jobData);
-        logger.info(`✅ Job ${jobId} completed successfully.`);
+        logger.info(`✅ Job ${jobId} completed successfully.`, {
+          videoId: jobData.videoId,
+          userId: jobData.userId
+        });
       } catch (error) {
-        logger.error(`❌ Job ${jobId} failed.`, { error: error instanceof Error ? error.message : String(error) });
+        logger.error(`❌ Job ${jobId} failed.`, { 
+          error: error instanceof Error ? error.message : String(error),
+          videoId: jobData.videoId,
+          userId: jobData.userId
+        });
         throw error;
       }
     };
-    logger.info('🔥 About to call startSimpleWorker (DB polling mode) - this should start polling...');
+    
+    logger.info('🔥 Starting enhanced worker (Redis + DB polling)...');
     await startSimpleWorker(handleJob, () => isShuttingDown);
-    logger.info('🛑 startSimpleWorker returned unexpectedly!');
-    logger.info('✅ Worker created and listening for jobs.');
-    console.log('⏳ Worker is running and waiting for jobs. Press Ctrl+C to exit.');
+    logger.info('🛑 Enhanced worker returned unexpectedly!');
+    console.log('⏳ Enhanced worker is running. Press Ctrl+C to exit.');
   } catch (error) {
-    logger.error('💥 A critical error occurred during worker initialization.', { error: error instanceof Error ? error.message : String(error) });
-    console.error('💥 A critical error occurred during worker initialization.', error);
+    logger.error('💥 Critical error during enhanced worker initialization.', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    console.error('💥 Critical error during enhanced worker initialization.', error);
     setTimeout(() => process.exit(1), 1000);
   }
 }
 
-// HTTP endpoint to trigger the worker on-demand
+// Enhanced HTTP endpoint to trigger the worker on-demand
 const server = http.createServer(async (req, res) => {
-  if (req.method === 'POST' && req.url === '/start') {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  
+  // CORS headers for all requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/start') {
     console.log('🚨 /start endpoint triggered');
     if (!workerRunning) {
       workerRunning = true;
       startWorker().finally(() => { workerRunning = false; });
-      res.writeHead(200);
-      res.end('Worker started');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        success: true, 
+        message: 'Enhanced worker started',
+        redis: isRedisAvailable()
+      }));
     } else {
-      res.writeHead(200);
-      res.end('Worker already running');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        success: true, 
+        message: 'Enhanced worker already running',
+        redis: isRedisAvailable()
+      }));
+    }
+  } else if (req.method === 'GET' && url.pathname === '/health') {
+    // Health check endpoint
+    try {
+      const { checkRedisHealth } = await import('../lib/redis-queue');
+      const redisHealth = await checkRedisHealth();
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'healthy',
+        worker: workerRunning ? 'running' : 'stopped',
+        redis: redisHealth,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error)
+      }));
+    }
+  } else if (req.method === 'GET' && url.pathname === '/stats') {
+    // Stats endpoint
+    try {
+      const { getRedisQueueStats } = await import('../lib/redis-queue');
+      const stats = await getRedisQueueStats();
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        worker: workerRunning ? 'running' : 'stopped',
+        redis: stats,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: error instanceof Error ? error.message : String(error)
+      }));
     }
   } else {
-    res.writeHead(404);
-    res.end('Not found');
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
   }
 });
 
 const PORT = process.env.WORKER_TRIGGER_PORT || 8079;
 server.listen(PORT, () => {
-  console.log('Worker trigger server listening on port', PORT);
+  console.log(`🚀 Enhanced worker trigger server listening on port ${PORT}`);
+  console.log(`📊 Health: http://localhost:${PORT}/health`);
+  console.log(`📈 Stats: http://localhost:${PORT}/stats`);
+  console.log(`🔥 Trigger: POST http://localhost:${PORT}/start`);
 });
 
 /**

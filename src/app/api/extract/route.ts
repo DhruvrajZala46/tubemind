@@ -240,17 +240,54 @@ export async function POST(request: NextRequest) {
     // Add job to DB-based queue
     try {
       logger.info('JobData to be queued', { jobData });
-      await addJobToQueue(jobData);
-      logger.info('Job added to DB queue successfully', { userId, videoId, summaryId });
-
-      // --- Trigger the Leapcell worker on-demand ---
-      // Replace with your actual Leapcell worker URL and port if needed
-      const WORKER_URL = process.env.WORKER_TRIGGER_URL || 'http://localhost:8080/start';
-      try {
-        await fetch(WORKER_URL, { method: 'POST' });
-        logger.info('Triggered Leapcell worker via HTTP POST', { WORKER_URL });
-      } catch (triggerError) {
-        logger.error('Failed to trigger Leapcell worker', { error: triggerError instanceof Error ? triggerError.message : String(triggerError), WORKER_URL });
+      
+      // --- Enhanced Worker Triggering ---
+      let triggerSuccess = false;
+      const jobResult = await addJobToQueue(jobData);
+      logger.info('Job queued successfully', { 
+        userId, 
+        videoId, 
+        summaryId, 
+        usedRedis: jobResult.usedRedis 
+      });
+      
+      if (jobResult.usedRedis) {
+        logger.info('✅ Job added to Redis queue - instant processing expected!', { 
+          jobId: summaryId, 
+          videoId, 
+          userId 
+        });
+        
+        // Trigger worker immediately for Redis jobs
+        const WORKER_URL = process.env.WORKER_TRIGGER_URL || 'http://localhost:8079/start';
+        try {
+          const response = await fetch(WORKER_URL, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            triggerSuccess = true;
+            logger.info('🚀 Enhanced worker triggered successfully', { 
+              WORKER_URL, 
+              redis: result.redis,
+              jobId: summaryId 
+            });
+          }
+        } catch (triggerError) {
+          logger.error('⚠️ Failed to trigger enhanced worker (processing will continue)', { 
+            error: triggerError instanceof Error ? triggerError.message : String(triggerError), 
+            WORKER_URL,
+            jobId: summaryId
+          });
+        }
+      } else {
+        logger.info('📝 Job added to DB queue - polling worker will process it', { 
+          jobId: summaryId, 
+          videoId, 
+          userId 
+        });
       }
       // --- End trigger ---
     } catch (error: any) {
