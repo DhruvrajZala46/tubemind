@@ -5,6 +5,7 @@ import { processVideoJob } from '../lib/video-processor';
 import { startHealthCheckServer } from './health';
 import { createLogger } from '../lib/logger';
 import http from 'http';
+import { neon } from '@neondatabase/serverless';
 
 // --- THEN your Redis config, env loading, etc ---
 process.env.DISABLE_REDIS = 'false';
@@ -77,6 +78,23 @@ const shutdown = (signal: string) => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
+// --- PRE-FLIGHT NEON DB CONNECTIVITY TEST ---
+(async () => {
+  try {
+    const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL;
+    if (!connectionString) {
+      console.error('❌ No Neon connection string found in env');
+    } else {
+      const sql = neon(connectionString);
+      console.log('🟢 [Preflight] Neon connection pool created');
+      const result = await sql`SELECT 1 as test`;
+      console.log('🟢 [Preflight] Neon test query succeeded:', result);
+    }
+  } catch (err) {
+    console.error('🔴 [Preflight] Neon test query failed:', err);
+  }
+})();
 
 async function startWorker() {
   console.log('🚨 ENTERED startWorker');
