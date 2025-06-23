@@ -6,7 +6,8 @@ import {
   markJobFailed,
   initializeRedisQueue,
   isRedisAvailable,
-  checkRedisHealth 
+  checkRedisHealth,
+  cleanCorruptedData
 } from './redis-queue';
 
 const logger = createLogger('redis-only-queue');
@@ -84,6 +85,13 @@ export async function startRedisOnlyWorker(
     const errorMsg = 'CRITICAL: Redis not available! Cannot start Redis-only worker. Set UPSTASH credentials.';
     logger.error(errorMsg);
     throw new Error(errorMsg);
+  }
+
+  // Clean any corrupted data from previous runs
+  logger.info('🧹 Cleaning any corrupted data from Redis queue...');
+  const cleanedItems = await cleanCorruptedData();
+  if (cleanedItems > 0) {
+    logger.info(`✅ Cleaned ${cleanedItems} corrupted items from Redis queue`);
   }
 
   logger.info('✅ REDIS-ONLY MODE ACTIVATED', {

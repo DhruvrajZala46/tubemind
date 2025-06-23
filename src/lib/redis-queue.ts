@@ -132,6 +132,66 @@ export async function addJobToRedisQueue(jobData: JobData): Promise<{ jobId: str
   }
 }
 
+// Clean corrupted data from Redis queue  
+export async function cleanCorruptedData(): Promise<number> {
+  try {
+    if (!isRedisAvailable() || !redis) {
+      return 0;
+    }
+
+    logger.info('🧹 Cleaning corrupted data from Redis queue...');
+    
+    let cleanedCount = 0;
+    const maxAttempts = 100; // Prevent infinite loop
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      // Peek at the oldest item without removing it
+      const items = await redis.lrange(QUEUE_NAME, -1, -1);
+      
+      if (items.length === 0) {
+        break; // Queue is empty
+      }
+      
+      const item = items[0];
+      
+      try {
+        // Try to parse the item
+        const parsed = JSON.parse(item);
+        
+        // Validate required fields
+        if (!parsed.summaryDbId || !parsed.videoId || !parsed.userId) {
+          throw new Error('Missing required fields');
+        }
+        
+        // Item is valid, stop cleaning
+        break;
+      } catch (parseError) {
+        // Item is corrupted, remove it
+        await redis.rpop(QUEUE_NAME);
+        cleanedCount++;
+        
+        logger.warn('🗑️ Removed corrupted item from queue', { 
+          item: item.substring(0, 100),
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        });
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      logger.info(`✅ Cleaned ${cleanedCount} corrupted items from Redis queue`);
+    } else {
+      logger.info('✅ No corrupted data found in Redis queue');
+    }
+    
+    return cleanedCount;
+  } catch (error) {
+    logger.error('❌ Failed to clean corrupted data', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return 0;
+  }
+}
+
 // Get next job from Redis queue
 export async function getNextJobFromRedis(): Promise<JobData | null> {
   try {
