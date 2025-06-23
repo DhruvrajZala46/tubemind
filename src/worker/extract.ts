@@ -228,18 +228,38 @@ const server = http.createServer(async (req, res) => {
         error: error instanceof Error ? error.message : String(error)
       }));
     }
+  } else if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/status')) {
+    // Default status endpoint for Cloud Run health checks
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'running',
+      worker: workerRunning ? 'active' : 'stopped',
+      service: 'TubeGPT Worker',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    }));
   } else {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
   }
 });
 
-const PORT = process.env.WORKER_TRIGGER_PORT || 8079;
+const PORT = process.env.PORT || process.env.WORKER_TRIGGER_PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 Enhanced worker trigger server listening on port ${PORT}`);
   console.log(`📊 Health: http://localhost:${PORT}/health`);
   console.log(`📈 Stats: http://localhost:${PORT}/stats`);
   console.log(`🔥 Trigger: POST http://localhost:${PORT}/start`);
+  
+  // Auto-start worker when server starts (required for Cloud Run)
+  console.log('🚀 Auto-starting enhanced worker...');
+  if (!workerRunning) {
+    workerRunning = true;
+    startWorker().catch(error => {
+      console.error('❌ Failed to start worker:', error);
+      // Don't exit process, keep HTTP server running for Cloud Run health checks
+    });
+  }
 });
 
 /**
