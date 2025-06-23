@@ -21,10 +21,24 @@ function getDbConnection() {
     if (!env.DATABASE_URL) {
       throw new Error('DATABASE_URL is not set. Please check your environment variables.');
     }
-    
-    // Create the connection pool only once
-    dbPool = neon(env.DATABASE_URL);
-    console.log('✅ Database connection pool initialized');
+    // Add timeout for pool creation
+    let poolCreated = false;
+    const timeout = setTimeout(() => {
+      if (!poolCreated) {
+        console.error('❌ DB pool creation timed out after 10s');
+        throw new Error('DB pool creation timed out after 10s');
+      }
+    }, 10000);
+    try {
+      dbPool = neon(env.DATABASE_URL);
+      poolCreated = true;
+      clearTimeout(timeout);
+      console.log('✅ Database connection pool initialized');
+    } catch (err) {
+      clearTimeout(timeout);
+      console.error('❌ Error during DB pool creation:', err);
+      throw err;
+    }
   }
   return dbPool;
 }
