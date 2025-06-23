@@ -17,7 +17,7 @@ export type JobData = {
 // DB-based addJobToQueue
 export async function addJobToQueue(data: JobData): Promise<{ jobId: string }> {
   const { executeQuery } = await import('./db');
-  await executeQuery(async (sql) => {
+  await executeQuery(async (sql: any) => {
     await sql`
       INSERT INTO video_summaries (id, video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
       VALUES (${data.summaryDbId}, ${data.videoDbId}, ${data.metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${data.totalDurationSeconds}, ${JSON.stringify(data)})
@@ -31,7 +31,7 @@ export async function addJobToQueue(data: JobData): Promise<{ jobId: string }> {
 // DB-based getJobById
 export async function getJobById(jobId: string): Promise<any | null> {
   const { executeQuery } = await import('./db');
-  const jobs = await executeQuery(async (sql) => {
+  const jobs = await executeQuery(async (sql: any) => {
     return await sql`SELECT * FROM video_summaries WHERE id = ${jobId}`;
   });
   if (jobs.length === 0) return null;
@@ -57,26 +57,34 @@ export async function startSimpleWorker(
       logger.info('🎯 POLLING LOOP STARTED - this should appear in logs!');
       while (!shouldStop()) {
         pollCount++;
+        let executeQuery: any;
         try {
+          ({ executeQuery } = await import('./db'));
           logger.info('🔍 Polling database for queued jobs...', { pollCount, userId: undefined, email: undefined });
           logger.info('🔍 [job-queue] About to execute database query for queued jobs...');
-          const { executeQuery } = await import('./db');
           let queuedJobs;
           try {
-            queuedJobs = await executeQuery(async (sql: any) => {
-              return await sql`
-                SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
-                FROM video_summaries vs
-                JOIN videos v ON vs.video_id = v.id
-                WHERE vs.processing_status = 'queued'
-                ORDER BY vs.created_at ASC
-                LIMIT 1;
-              `;
-            });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('DB query timeout after 10s')), 10000));
+            queuedJobs = await Promise.race([
+              executeQuery(async (sql: any) => {
+                return await sql`
+                  SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
+                  FROM video_summaries vs
+                  JOIN videos v ON vs.video_id = v.id
+                  WHERE vs.processing_status = 'queued'
+                  ORDER BY vs.created_at ASC
+                  LIMIT 1;
+                `;
+              }),
+              timeoutPromise
+            ]);
             logger.info('[job-queue] DB query result', { result: queuedJobs });
           } catch (dbError) {
             logger.error('[job-queue] DB query failed', { error: dbError instanceof Error ? dbError.message : dbError });
-            throw dbError;
+            console.error('[job-queue] DB query failed', dbError);
+            // Wait a bit before next poll to avoid hammering DB if error
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            continue;
           }
           logger.info('DEBUG: queuedJobs', {
             type: typeof queuedJobs,
@@ -113,7 +121,7 @@ export async function startSimpleWorker(
               if (!reconstructedJobData.userId || !reconstructedJobData.userEmail) {
                 logger.error('❌ Skipping job: userId or userEmail missing in job_data', { jobId: job.summary_id, jobData: reconstructedJobData, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
                 // Mark job as failed in DB
-                await executeQuery(async (sql) => {
+                await executeQuery(async (sql: any) => {
                   await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
                 });
                 return;
@@ -136,7 +144,7 @@ export async function startSimpleWorker(
               // We already have the YouTube video ID from the polling query
               if (job.youtube_video_id) {
                 // Get additional details
-                const jobDetails = await executeQuery(async (sql) => {
+                const jobDetails = await executeQuery(async (sql: any) => {
                   return await sql`
                     SELECT v.video_id as youtube_video_id, v.id as video_db_id, vs.id as summary_id, vs.main_title as title, vs.video_duration_seconds as duration, v.channel_title, v.thumbnail_url, v.user_id, vs.processing_status, u.email, u.full_name
                     FROM videos v
@@ -174,18 +182,18 @@ export async function startSimpleWorker(
             }
             if (reconstructedJobData) {
               // Update DB status to processing
-              await executeQuery(async (sql) => {
+              await executeQuery(async (sql: any) => {
                 await sql`UPDATE video_summaries SET processing_status = 'processing' WHERE id = ${job.summary_id}`;
               });
               logger.info('🔄 Starting job processing', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
               try {
                 await processor(reconstructedJobData);
-                await executeQuery(async (sql) => {
+                await executeQuery(async (sql: any) => {
                   await sql`UPDATE video_summaries SET processing_status = 'completed' WHERE id = ${job.summary_id}`;
                 });
                 logger.info('✅ Job processing completed successfully', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
               } catch (jobError) {
-                await executeQuery(async (sql) => {
+                await executeQuery(async (sql: any) => {
                   await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
                 });
                 logger.error('❌ Job processing failed', { videoId: reconstructedJobData.videoId, videoDbId: reconstructedJobData.videoDbId, error: jobError instanceof Error ? jobError.message : String(jobError), userId: reconstructedJobData.userId, email: reconstructedJobData.userEmail });
