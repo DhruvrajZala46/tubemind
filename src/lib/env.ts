@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import * as dotenv from 'dotenv';
 
-// Set default NODE_ENV if not defined (for local testing)
-if (typeof process.env.NODE_ENV === 'undefined') {
-  // Use Object.defineProperty to avoid read-only property error
-  Object.defineProperty(process.env, 'NODE_ENV', { 
-    value: 'development',
-    writable: true
-  });
-}
+// // Set default NODE_ENV if not defined (for local testing)
+// if (typeof process.env.NODE_ENV === 'undefined') {
+//   // Use Object.defineProperty to avoid read-only property error
+//   Object.defineProperty(process.env, 'NODE_ENV', { 
+//     value: 'development',
+//     writable: true
+//   });
+// }
 
 // Detect Leapcell environment
 const isLeapcellEnvironment = process.env.DEPLOYMENT_ENV === 'leapcell';
