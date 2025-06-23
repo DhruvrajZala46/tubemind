@@ -200,56 +200,63 @@ export async function getNextJobFromRedis(): Promise<JobData | null> {
     }
 
     // Pop job from queue (RPOP for FIFO processing)
-    const jobString = await redis.rpop(QUEUE_NAME);
+    const jobData = await redis.rpop(QUEUE_NAME);
     
-    if (!jobString) {
+    if (!jobData) {
       return null; // No jobs available
     }
 
-    // Ensure we have a valid string before parsing
-    if (typeof jobString !== 'string') {
-      logger.error('❌ Invalid job data type from Redis', { 
-        jobType: typeof jobString,
-        jobValue: jobString 
-      });
-      return null;
-    }
-
-    let jobData: JobData & { addedAt: number; status: string };
+    let parsedJobData: JobData & { addedAt: number; status: string };
     
-    try {
-      jobData = JSON.parse(jobString);
-    } catch (parseError) {
-      logger.error('❌ Failed to parse job JSON from Redis', { 
-        jobString: jobString.substring(0, 100),
-        parseError: parseError instanceof Error ? parseError.message : String(parseError)
+    // Handle both string and object cases (Redis might auto-deserialize)
+    if (typeof jobData === 'string') {
+      try {
+        parsedJobData = JSON.parse(jobData);
+      } catch (parseError) {
+        logger.error('❌ Failed to parse job JSON from Redis', { 
+          jobString: jobData.substring(0, 100),
+          parseError: parseError instanceof Error ? parseError.message : String(parseError)
+        });
+        return null;
+      }
+    } else if (typeof jobData === 'object' && jobData !== null) {
+      // Redis auto-deserialized the JSON - use it directly
+      parsedJobData = jobData as JobData & { addedAt: number; status: string };
+      logger.info('✅ Redis auto-deserialized job data', { 
+        jobId: parsedJobData.summaryDbId,
+        dataType: typeof jobData
+      });
+    } else {
+      logger.error('❌ Invalid job data type from Redis', { 
+        jobType: typeof jobData,
+        jobValue: jobData 
       });
       return null;
     }
 
     // Validate job data structure
-    if (!jobData.summaryDbId || !jobData.videoId || !jobData.userId) {
+    if (!parsedJobData.summaryDbId || !parsedJobData.videoId || !parsedJobData.userId) {
       logger.error('❌ Invalid job data structure from Redis', { 
-        hasJobId: !!jobData.summaryDbId,
-        hasVideoId: !!jobData.videoId,
-        hasUserId: !!jobData.userId
+        hasJobId: !!parsedJobData.summaryDbId,
+        hasVideoId: !!parsedJobData.videoId,
+        hasUserId: !!parsedJobData.userId
       });
       return null;
     }
     
     // Move job to processing set
-    await redis.sadd(PROCESSING_SET, jobData.summaryDbId);
-    await redis.hset(`job:${jobData.summaryDbId}`, {
+    await redis.sadd(PROCESSING_SET, parsedJobData.summaryDbId);
+    await redis.hset(`job:${parsedJobData.summaryDbId}`, {
       status: 'processing',
       startedAt: Date.now()
     });
 
     logger.info('✅ Retrieved job from Redis queue', { 
-      jobId: jobData.summaryDbId, 
-      userId: jobData.userId 
+      jobId: parsedJobData.summaryDbId, 
+      userId: parsedJobData.userId 
     });
 
-    return jobData;
+    return parsedJobData;
   } catch (error) {
     logger.error('❌ Failed to get job from Redis queue', { 
       error: error instanceof Error ? error.message : String(error) 
