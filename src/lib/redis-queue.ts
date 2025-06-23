@@ -72,12 +72,35 @@ export async function addJobToRedisQueue(jobData: JobData): Promise<{ jobId: str
     }
 
     if (isRedisAvailable() && redis) {
-      // Serialize job data
-      const serializedJob = JSON.stringify({
+      // Create job object with proper structure
+      const jobObject = {
         ...jobData,
         addedAt: Date.now(),
         status: 'queued'
-      });
+      };
+
+      // Serialize job data with error handling
+      let serializedJob: string;
+      try {
+        serializedJob = JSON.stringify(jobObject);
+      } catch (serializeError) {
+        logger.error('❌ Failed to serialize job data', { 
+          jobId,
+          error: serializeError instanceof Error ? serializeError.message : String(serializeError)
+        });
+        return { jobId, usedRedis: false };
+      }
+
+      // Validate serialization worked
+      try {
+        JSON.parse(serializedJob); // Test parse to ensure it's valid
+      } catch (validateError) {
+        logger.error('❌ Job serialization validation failed', { 
+          jobId,
+          error: validateError instanceof Error ? validateError.message : String(validateError)
+        });
+        return { jobId, usedRedis: false };
+      }
 
       // Add to queue using Redis LIST (LPUSH for queue, RPOP for processing)
       await redis.lpush(QUEUE_NAME, serializedJob);
@@ -89,7 +112,11 @@ export async function addJobToRedisQueue(jobData: JobData): Promise<{ jobId: str
         addedAt: Date.now()
       });
 
-      logger.info('✅ Job added to Redis queue', { jobId, userId: jobData.userId });
+      logger.info('✅ Job added to Redis queue', { 
+        jobId, 
+        userId: jobData.userId,
+        serializedLength: serializedJob.length
+      });
       return { jobId, usedRedis: true };
     } else {
       // Redis not available, will fallback to DB
@@ -119,7 +146,36 @@ export async function getNextJobFromRedis(): Promise<JobData | null> {
       return null; // No jobs available
     }
 
-    const jobData = JSON.parse(jobString) as JobData & { addedAt: number; status: string };
+    // Ensure we have a valid string before parsing
+    if (typeof jobString !== 'string') {
+      logger.error('❌ Invalid job data type from Redis', { 
+        jobType: typeof jobString,
+        jobValue: jobString 
+      });
+      return null;
+    }
+
+    let jobData: JobData & { addedAt: number; status: string };
+    
+    try {
+      jobData = JSON.parse(jobString);
+    } catch (parseError) {
+      logger.error('❌ Failed to parse job JSON from Redis', { 
+        jobString: jobString.substring(0, 100),
+        parseError: parseError instanceof Error ? parseError.message : String(parseError)
+      });
+      return null;
+    }
+
+    // Validate job data structure
+    if (!jobData.summaryDbId || !jobData.videoId || !jobData.userId) {
+      logger.error('❌ Invalid job data structure from Redis', { 
+        hasJobId: !!jobData.summaryDbId,
+        hasVideoId: !!jobData.videoId,
+        hasUserId: !!jobData.userId
+      });
+      return null;
+    }
     
     // Move job to processing set
     await redis.sadd(PROCESSING_SET, jobData.summaryDbId);
