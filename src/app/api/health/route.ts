@@ -6,7 +6,7 @@ import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import { monitoring } from '../../../lib/monitoring';
 import { executeQuery } from '@/lib/db';
-import { checkRedisHealth, getRedisQueueStats } from '@/lib/redis-queue';
+import { checkRedisHealth, getRedisQueueStats } from '../../../lib/redis-queue';
 
 const logger = createLogger('health-check');
 
