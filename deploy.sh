@@ -5,7 +5,7 @@ set -e
 
 # Configuration
 PROJECT_ID="${PROJECT_ID:-agile-entry-463508-u6}"
-QUEUE_NAME="${QUEUE_NAME:-my-queue}"
+QUEUE_NAME="${QUEUE_NAME:-video-processing-queue}"
 REGION="${REGION:-us-central1}"
 WORKER_SERVICE_NAME="tubemind-worker"
 API_SERVICE_NAME="tubemind-api"

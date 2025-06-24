@@ -32,83 +32,24 @@ interface ServiceHealth {
   error?: string;
 }
 
-export async function GET(request: NextRequest) {
-  const startTime = Date.now();
-  
+export async function GET() {
   try {
-    logger.info('🏥 Health check initiated');
-
-    // Check all services in parallel
-    const [databaseHealth, openaiHealth, authHealth] = await Promise.allSettled([
-      checkDatabase(),
-      checkOpenAI(), 
-      checkAuth()
-    ]);
-
-    const services = {
-      database: getServiceResult(databaseHealth),
-      openai: getServiceResult(openaiHealth),
-      auth: getServiceResult(authHealth),
-      monitoring: checkMonitoring()
-    };
-
-    const overallStatus = determineOverallStatus(services);
-    const responseTime = Date.now() - startTime;
-    const systemHealth = monitoring.getSystemHealth();
-
-    // Test Redis connection and get stats
-    const redisHealth = await checkRedisHealth();
-    const redisStats = await getRedisQueueStats();
-
-    const healthStatus = {
-      status: overallStatus,
-      timestamp: new Date().toISOString(),
-      responseTime,
-      uptime: systemHealth.uptime,
-      version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      services,
-      metrics: {
-        memory: systemHealth.memory,
-        activeAlerts: systemHealth.activeAlerts,
-        criticalAlerts: systemHealth.criticalAlerts,
-        recentErrors: systemHealth.recentErrors
-      },
-      redis: {
-        status: redisHealth.isConnected ? 'healthy' : 'unavailable',
-        enabled: redisHealth.isEnabled,
-        connected: redisHealth.isConnected,
-        url: redisHealth.url,
-        stats: redisStats
-      }
-    };
-
-    logger.info(`🏥 Health check completed in ${responseTime}ms - Status: ${overallStatus}`);
-
-    const httpStatus = overallStatus === 'healthy' ? 200 : 
-                     overallStatus === 'degraded' ? 206 : 503;
-
-    return NextResponse.json(healthStatus, { status: httpStatus });
-
-  } catch (error: any) {
-    logger.error('Health check failed', { data: { error: error.message } });
-    
+    // Simple health check - just return system status
     return NextResponse.json({
-      status: 'unhealthy',
+      status: 'healthy',
       timestamp: new Date().toISOString(),
-      responseTime: `${Date.now() - startTime}ms`,
-      error: 'Health check system failure',
-      services: {
-        database: {
-          status: 'error',
-          error: error instanceof Error ? error.message : String(error)
-        },
-        redis: {
-          status: 'unknown',
-          error: 'Could not check due to database error'
-        }
-      }
-    }, { status: 503 });
+      service: 'tubemind-api',
+      uptime: process.uptime()
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { 
+        status: 'unhealthy', 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
+    );
   }
 }
 

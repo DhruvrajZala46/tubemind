@@ -1,6 +1,6 @@
 // Production-Grade Cloud Tasks Worker
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { processVideoJob } from '../lib/video-processor';
 import { createLogger } from '../lib/logger';
 
@@ -18,7 +18,7 @@ app.use((req, res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
@@ -26,7 +26,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ 
     service: 'tubemind-worker',
     status: 'ready',
@@ -35,7 +35,7 @@ app.get('/', (req, res) => {
 });
 
 // Main Cloud Tasks job processor
-app.post('/', async (req, res) => {
+app.post('/', async (req: Request, res: Response) => {
   const startTime = Date.now();
   let jobData: any = null;
   
@@ -105,7 +105,7 @@ app.post('/', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   logger.error('Unhandled error', { 
     error: err.message,
     stack: err.stack,
