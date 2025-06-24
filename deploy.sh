@@ -51,12 +51,13 @@ gcloud run deploy $WORKER_SERVICE_NAME \
   --platform managed \
   --project=$PROJECT_ID \
   --allow-unauthenticated \
-  --memory=1Gi \
+  --memory=512Mi \
   --cpu=1 \
-  --concurrency=10 \
+  --concurrency=20 \
   --timeout=900 \
-  --max-instances=100 \
+  --max-instances=10 \
   --min-instances=0 \
+  --cpu-throttling \
   --execution-environment=gen2 \
   --service-account="${PROJECT_ID}@appspot.gserviceaccount.com" \
   --set-env-vars="NODE_ENV=production,GCP_PROJECT=$PROJECT_ID,CLOUD_TASKS_QUEUE=$QUEUE_NAME,CLOUD_TASKS_LOCATION=$REGION"
@@ -78,12 +79,13 @@ gcloud run deploy $API_SERVICE_NAME \
   --platform managed \
   --project=$PROJECT_ID \
   --allow-unauthenticated \
-  --memory=512Mi \
+  --memory=256Mi \
   --cpu=1 \
-  --concurrency=80 \
+  --concurrency=100 \
   --timeout=300 \
-  --max-instances=50 \
+  --max-instances=5 \
   --min-instances=0 \
+  --cpu-throttling \
   --execution-environment=gen2 \
   --service-account="${PROJECT_ID}@appspot.gserviceaccount.com" \
   --set-env-vars="NODE_ENV=production,GCP_PROJECT=$PROJECT_ID,CLOUD_TASKS_QUEUE=$QUEUE_NAME,CLOUD_TASKS_LOCATION=$REGION,WORKER_URL=$WORKER_URL"
