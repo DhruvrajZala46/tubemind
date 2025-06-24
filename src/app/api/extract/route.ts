@@ -28,28 +28,17 @@ interface JobData {
   youtubeUrl: string;
 }
 
-// Safe async import for Cloud Tasks - only runs on server-side
+// Frontend-only fallback - no Cloud Tasks (for Vercel build compatibility)
 async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
-  try {
-    // Check if we're in server environment
-    if (typeof window !== 'undefined') {
-      throw new Error('Cloud Tasks can only be used on server-side');
-    }
-    
-    // Import both the module and the Google Cloud client dynamically
-    const [{ enqueueJob }, { CloudTasksClient }] = await Promise.all([
-      import('../../../lib/cloud-tasks-queue'),
-      import('@google-cloud/tasks')
-    ]);
-    
-    return await enqueueJob(jobData);
-  } catch (error) {
-    const logger = createLogger('api:extract');
-    logger.error('Failed to enqueue to Cloud Tasks', { 
-      error: error instanceof Error ? error.message : String(error) 
-    });
-    throw error;
-  }
+  // On Vercel, we don't have Cloud Tasks, so we'll just add to database
+  // The actual Cloud Tasks integration happens on the Cloud Run API service
+  logger.info('Frontend build - using database queue only', { 
+    videoId: jobData.videoId,
+    userId: jobData.userId 
+  });
+  
+  // Just return a placeholder task name for frontend builds
+  return `frontend-fallback-${jobData.summaryDbId}`;
 }
 
 // Fallback: Add job to database for manual processing
@@ -259,19 +248,19 @@ export async function POST(request: NextRequest) {
     };
     try {
       logger.info('JobData to be queued', { jobData });
+      
+      // For Vercel frontend: Add to database queue
+      // The Cloud Run API service will poll this and use Cloud Tasks
+      await addJobToDatabase(jobData);
+      logger.info('Job added to database queue (Cloud Run will process via Cloud Tasks)');
+      
+      // Also call the placeholder function for consistency
       await enqueueJobToCloudTasks(jobData);
-      logger.info('Job enqueued to Cloud Tasks');
+      
     } catch (queueError: any) {
-      logger.warn('Cloud Tasks failed, falling back to database queue', { userId, error: queueError.message });
-      try {
-        await addJobToDatabase(jobData);
-        logger.info('Job added to database queue as fallback');
-      } catch (dbError: any) {
-        logger.error('Both Cloud Tasks and database queue failed', { userId, error: dbError.message });
-        // Release reserved credits if both queueing methods fail
-        await releaseCredits(userId, creditsNeeded);
-        return NextResponse.json({ error: 'Failed to enqueue job. Please try again.' }, { status: 500 });
-      }
+      logger.error('Failed to queue video processing job', { userId, error: queueError.message });
+      await releaseCredits(userId, creditsNeeded);
+      return NextResponse.json({ error: 'Failed to queue video processing job.' }, { status: 500 });
     }
 
     return NextResponse.json({
