@@ -1,29 +1,14 @@
-# Multi-stage build for production-grade deployment
-FROM node:20-alpine as dependencies
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --only=production && npm cache clean --force
+# Production-grade Cloud Run Dockerfile
+FROM node:20-alpine
 
-FROM node:20-alpine as builder
 WORKDIR /app
+
+# Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
+
+# Copy source code
 COPY . .
-RUN npm run worker:build
-
-FROM node:20-alpine as runtime
-WORKDIR /app
-
-# Copy production dependencies
-COPY --from=dependencies /app/node_modules ./node_modules
-
-# Copy built worker
-COPY --from=builder /app/dist ./dist
-
-# Copy essential source files for runtime
-COPY --from=builder /app/src/lib ./src/lib
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/tsconfig.json ./
 
 # Set production environment
 ENV NODE_ENV=production
@@ -37,7 +22,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8080', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
+  CMD node -e "require('http').get('http://localhost:8080/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
 
-# Start the worker
-CMD ["node", "dist/worker/extract.js"]
+# Start the worker using tsx for TypeScript
+CMD ["npx", "tsx", "src/worker/extract.ts"]
