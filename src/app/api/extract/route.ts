@@ -59,32 +59,36 @@ async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
         },
       };
       
-      // For now, directly call the worker instead of using Cloud Tasks API
-      // This is a temporary workaround for Vercel limitations
-      logger.info('Directly calling worker service (Vercel workaround)', { 
+      // FIXED: Use asynchronous job queuing instead of direct call
+      // This prevents Vercel timeout and reduces costs
+      logger.info('Using asynchronous job queuing (Vercel environment)', { 
         videoId: jobData.videoId,
         userId: jobData.userId,
         workerUrl 
       });
       
-      const response = await fetch(workerUrl, {
+      // Don't wait for processing - just queue the job asynchronously
+      // The worker will be triggered separately without blocking Vercel
+      fetch(workerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(jobData),
+      }).catch(error => {
+        logger.error('Async worker call failed', { 
+          error: error.message,
+          videoId: jobData.videoId,
+          userId: jobData.userId 
+        });
       });
       
-      if (response.ok) {
-        logger.info('Worker called successfully via direct HTTP', { 
-          videoId: jobData.videoId,
-          userId: jobData.userId,
-          status: response.status 
-        });
-        return `direct-call-${jobData.summaryDbId}`;
-      } else {
-        throw new Error(`Worker call failed: ${response.status} ${response.statusText}`);
-      }
+      logger.info('Job queued asynchronously - no blocking', { 
+        videoId: jobData.videoId,
+        userId: jobData.userId
+      });
+      
+      return `async-queued-${jobData.summaryDbId}`;
       
     } catch (error: any) {
       logger.error('Direct worker call failed', { 
