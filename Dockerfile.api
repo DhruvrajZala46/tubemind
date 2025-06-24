@@ -1,4 +1,4 @@
-# Multi-stage build for production-grade deployment
+# Dockerfile for Next.js API Service
 FROM node:20-alpine as dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run worker:build
+RUN npm run build
 
 FROM node:20-alpine as runtime
 WORKDIR /app
@@ -17,21 +17,19 @@ WORKDIR /app
 # Copy production dependencies
 COPY --from=dependencies /app/node_modules ./node_modules
 
-# Copy built worker
-COPY --from=builder /app/dist ./dist
-
-# Copy essential source files for runtime
-COPY --from=builder /app/src/lib ./src/lib
+# Copy built Next.js app
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/next.config.mjs ./
 
 # Set production environment
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && adduser -S worker -u 1001
-USER worker
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+USER nextjs
 
 EXPOSE 8080
 
@@ -39,5 +37,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
 
-# Start the worker
-CMD ["node", "dist/worker/extract.js"]
+# Start Next.js
+CMD ["npm", "start"] 

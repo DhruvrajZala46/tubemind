@@ -1,0 +1,18 @@
+# Exclude backend/worker code from Vercel
+src/worker/
+src/lib/cloud-tasks-queue.ts
+src/lib/job-queue-redis-only.ts
+src/lib/redis-queue.ts
+src/lib/video-processor.ts
+Dockerfile
+deploy.sh
+*.worker.*
+dist/
+
+# Test files
+test-*.js
+*-test.js
+direct-worker-test.js
+
+# Cloud-specific files
+.gcloudignore 

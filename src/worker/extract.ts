@@ -1,168 +1,142 @@
-// --- ALL IMPORTS FIRST ---
+// Production-Grade Cloud Tasks Worker
 import 'dotenv/config';
-import { startSimpleWorker, JobData } from '../lib/job-queue-redis-only';
-import { processVideoJob } from '../lib/video-processor';
-import { startHealthCheckServer } from './health';
-import { createLogger } from '../lib/logger';
-import { initializeRedisQueue, isRedisAvailable } from '../lib/redis-queue';
-import http from 'http';
-import { neon } from '@neondatabase/serverless';
 import express from 'express';
-
-// --- THEN your Redis config, env loading, etc ---
-process.env.DISABLE_REDIS = 'false';
-process.env.FORCE_REDIS_ON_WINDOWS = 'true';
-
-console.log('🔧 INITIAL Redis Configuration BEFORE IMPORTS:');
-console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
-
-// Load .env.local only in development
-if (process.env.NODE_ENV !== 'production') {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('dotenv').config();
-}
-
-// Universal Worker Process for TubeMind
-// Works identically in both development and production environments
-
-// Check environment type
-const isLeapcellEnvironment = process.env.LEAPCELL === 'true' || process.env.DEPLOYMENT_ENV === 'leapcell';
-const isProductionEnv = process.env.NODE_ENV === 'production';
-
-// Load environment variables - works in all environments
-if (!isLeapcellEnvironment) {
-  try {
-    require('dotenv').config({ path: '.env.local' });
-    console.log('✅ Loaded environment variables from .env.local');
-  } catch (error) {
-    console.log('No .env.local file found or error loading it, using system environment variables');
-  }
-} else {
-  console.log('🚀 Running in Leapcell environment, using system environment variables');
-}
-
-// FORCE Redis again after loading env vars to override any .env.local settings
-process.env.DISABLE_REDIS = 'false';
-process.env.FORCE_REDIS_ON_WINDOWS = 'true';
-
-console.log('🔧 REDIS Configuration AFTER env override:');
-console.log(`   FORCE_REDIS_ON_WINDOWS (should be true): ${process.env.FORCE_REDIS_ON_WINDOWS}`);
-
-console.log('🔧 FINAL Redis Configuration:');
-console.log(`   DISABLE_REDIS: ${process.env.DISABLE_REDIS}`);
-console.log(`   UPSTASH_REDIS_REST_URL: ${process.env.UPSTASH_REDIS_REST_URL ? 'SET' : 'NOT SET'}`);
-console.log(`   UPSTASH_REDIS_REST_TOKEN: ${process.env.UPSTASH_REDIS_REST_TOKEN ? 'SET' : 'NOT SET'}`);
-console.log(`   FORCE_REDIS_ON_WINDOWS: ${process.env.FORCE_REDIS_ON_WINDOWS}`);
-
-// --- THEN logger ---
-const logger = createLogger('worker:extract');
-
-// Add this after logger is defined and environment variables are loaded
-const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL || 'NOT SET';
-const maskedDbUrl = dbUrl.replace(/(:)([^:]*)(@)/, (m, p1, p2, p3) => p1 + '*****' + p3);
-logger.info(`🔗 Neon DB connection string: ${maskedDbUrl}`);
-
-logger.info('🚀 Enhanced worker process starting with Redis integration...');
-logger.info(`✅ Node.js version: ${process.version}`);
-logger.info(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
-
-let isShuttingDown = false;
-let workerRunning = false;
-
-const shutdown = (signal: string) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-  logger.info(`👋 Received ${signal}. Shutting down enhanced worker...`);
-  setTimeout(() => {
-    process.exit(0);
-  }, 5000);
-};
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
-// --- PRE-FLIGHT TESTS ---
-(async () => {
-  try {
-    // Test Neon DB connectivity
-    const connectionString = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.POSTGRES_URL;
-    if (!connectionString) {
-      console.error('❌ No Neon connection string found in env');
-    } else {
-      const sql = neon(connectionString);
-      console.log('🟢 [Preflight] Neon connection pool created');
-      const result = await sql`SELECT 1 as test`;
-      console.log('🟢 [Preflight] Neon test query succeeded:', result);
-    }
-
-    // Test Redis connectivity
-    console.log('🔍 [Preflight] Testing Redis connectivity...');
-    const redisInitialized = await initializeRedisQueue();
-    if (redisInitialized) {
-      console.log('🟢 [Preflight] Redis connection successful!');
-    } else {
-      console.log('⚠️ [Preflight] Redis not available, will use DB fallback');
-    }
-  } catch (err) {
-    console.error('🔴 [Preflight] Tests failed:', err);
-  }
-})();
+import { processVideoJob } from '../lib/video-processor';
+import { createLogger } from '../lib/logger';
 
 const app = express();
-app.use(express.json());
+const logger = createLogger('cloud-tasks-worker');
 
+// Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.path}`, {
+    userAgent: req.get('user-agent'),
+    contentLength: req.get('content-length')
+  });
+  next();
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    service: 'tubemind-worker',
+    status: 'ready',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Main Cloud Tasks job processor
 app.post('/', async (req, res) => {
-  try {
-    await processVideoJob(req.body);
-    res.status(200).json({ status: 'done' });
-  } catch (err) {
-    console.error('Worker error:', err);
-    res.status(500).json({ error: 'Job failed' });
-  }
-});
-
-app.listen(process.env.PORT || 8080, () => {
-  console.log('Worker listening on port', process.env.PORT || 8080);
-});
-
-/**
- * Direct video processing function for backup when job queue fails
- * This ensures users always get their summaries even if Redis/worker issues occur
- */
-export async function processVideoDirectly(
-  videoId: string,
-  videoDbId: string,
-  summaryDbId: string,
-  userId: string,
-  userEmail: string,
-  metadata: any,
-  totalDurationSeconds: number,
-  creditsNeeded: number
-): Promise<void> {
-  logger.info(`🎬 Starting direct video processing for ${videoId}`);
+  const startTime = Date.now();
+  let jobData: any = null;
   
   try {
-    // Create VideoJob object
-    const job = {
-      videoId,
-      videoDbId,
-      summaryDbId,
-      userId,
-      userEmail,
-      user: { id: userId, email: userEmail },
-      metadata,
-      totalDurationSeconds,
-      creditsNeeded
-    };
+    // Parse job data from Cloud Tasks
+    jobData = req.body;
     
-    // Process the video directly using existing processing logic
-    const { processVideoExtraction } = await import('./extract-core');
-    await processVideoExtraction(job);
+    if (!jobData) {
+      logger.error('No job data received');
+      return res.status(400).json({ error: 'No job data provided' });
+    }
+
+    logger.info('Processing job', { 
+      jobType: jobData.type || 'video-processing',
+      videoId: jobData.videoId,
+      userId: jobData.userId 
+    });
+
+    // Process the video job
+    await processVideoJob(jobData);
     
-    logger.info(`✅ Direct video processing completed for ${videoId}`);
+    const processingTime = Date.now() - startTime;
+    logger.info('Job completed successfully', { 
+      videoId: jobData.videoId,
+      processingTimeMs: processingTime 
+    });
+
+    res.status(200).json({ 
+      status: 'completed',
+      processingTimeMs: processingTime,
+      timestamp: new Date().toISOString()
+    });
+
   } catch (error) {
+    const processingTime = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`❌ Direct video processing failed for ${videoId}: ${errorMessage}`);
-    throw error;
+    
+    logger.error('Job processing failed', {
+      error: errorMessage,
+      videoId: jobData?.videoId,
+      userId: jobData?.userId,
+      processingTimeMs: processingTime,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    // Return appropriate error status for Cloud Tasks retry logic
+    if (errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+      // Retryable error
+      res.status(429).json({ 
+        error: 'Rate limited - will retry',
+        retryable: true 
+      });
+    } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+      // Non-retryable error
+      res.status(401).json({ 
+        error: 'Authentication failed',
+        retryable: false 
+      });
+    } else {
+      // Generic retryable error
+      res.status(500).json({ 
+        error: 'Job processing failed',
+        retryable: true 
+      });
+    }
   }
-}
+});
+
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error', { 
+    error: err.message,
+    stack: err.stack,
+    path: req.path 
+  });
+  
+  res.status(500).json({ 
+    error: 'Internal server error',
+    retryable: true 
+  });
+});
+
+// Graceful shutdown
+const server = app.listen(process.env.PORT || 8080, () => {
+  logger.info(`Cloud Tasks worker listening on port ${process.env.PORT || 8080}`);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
+  });
+});
+
+export default app;
