@@ -1,13 +1,5 @@
 import { createLogger } from './logger';
-import { 
-  addJobToRedisQueue, 
-  getNextJobFromRedis, 
-  markJobCompleted, 
-  markJobFailed,
-  initializeRedisQueue,
-  isRedisAvailable,
-  checkRedisHealth 
-} from './redis-queue';
+import { enqueueJob } from './cloud-tasks-queue';
 
 const logger = createLogger('job-queue');
 
@@ -21,43 +13,43 @@ export type JobData = {
   metadata: any;
   totalDurationSeconds: number;
   creditsNeeded: number;
+  youtubeUrl: string;
 };
 
-// Enhanced addJobToQueue with Redis integration
-export async function addJobToQueue(data: JobData): Promise<{ jobId: string; usedRedis?: boolean }> {
-  logger.info('🚀 Adding job to queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId });
+// Cloud Tasks-based addJobToQueue
+export async function addJobToQueue(data: JobData): Promise<{ jobId: string; usedCloudTasks?: boolean }> {
+  logger.info('🚀 Adding job to Cloud Tasks queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId });
   
   try {
-    // Try Redis first
-    const redisResult = await addJobToRedisQueue(data);
+    // Use Cloud Tasks for job processing
+    const taskName = await enqueueJob(data);
     
-    if (redisResult.usedRedis) {
-      logger.info('✅ Job added to Redis queue successfully', { 
-        jobId: data.summaryDbId, 
-        videoId: data.videoId, 
-        userId: data.userId 
-      });
-      
-      // Also add to DB as backup for reliability
-      await addJobToDbQueue(data);
-      logger.info('✅ Job also added to DB queue as backup', { jobId: data.summaryDbId });
-      
-      return { jobId: data.summaryDbId, usedRedis: true };
-    }
+    logger.info('✅ Job added to Cloud Tasks successfully', { 
+      jobId: data.summaryDbId, 
+      videoId: data.videoId, 
+      userId: data.userId,
+      taskName 
+    });
+    
+    // Also add to DB for tracking
+    await addJobToDbQueue(data);
+    logger.info('✅ Job also added to DB for tracking', { jobId: data.summaryDbId });
+    
+    return { jobId: data.summaryDbId, usedCloudTasks: true };
+    
   } catch (error) {
-    logger.error('❌ Redis queue failed, falling back to DB', { 
+    logger.error('❌ Cloud Tasks queue failed, falling back to DB', { 
       jobId: data.summaryDbId, 
       error: error instanceof Error ? error.message : String(error) 
     });
+    
+    // Fallback to DB queue
+    const dbResult = await addJobToDbQueue(data);
+    return { jobId: dbResult.jobId, usedCloudTasks: false };
   }
-  
-  // Fallback to DB queue
-  logger.info('📝 Using DB queue (Redis not available)', { jobId: data.summaryDbId });
-  const dbResult = await addJobToDbQueue(data);
-  return { jobId: dbResult.jobId, usedRedis: false };
 }
 
-// Original DB-based addJobToQueue (now internal)
+// DB-based tracking (for status and fallback)
 async function addJobToDbQueue(data: JobData): Promise<{ jobId: string }> {
   const { executeQuery } = await import('./db');
   await executeQuery(async (sql: any) => {
@@ -67,7 +59,7 @@ async function addJobToDbQueue(data: JobData): Promise<{ jobId: string }> {
       ON CONFLICT (id) DO UPDATE SET job_data = EXCLUDED.job_data
     `;
   });
-  logger.info('✅ Job added to DB queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId, email: data.userEmail });
+  logger.info('✅ Job added to DB for tracking', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId });
   return { jobId: data.summaryDbId };
 }
 
@@ -81,217 +73,14 @@ export async function getJobById(jobId: string): Promise<any | null> {
   return jobs[0];
 }
 
-// Configurable polling interval (default: 60s for DB, 1s for Redis)
-const POLL_INTERVAL_MS = process.env.POLL_INTERVAL_MS
-  ? parseInt(process.env.POLL_INTERVAL_MS, 10)
-  : 60000; // 60 seconds
-
+// Legacy worker function - no longer needed with Cloud Tasks but kept for compatibility
 export async function startSimpleWorker(
   processor: (jobData: JobData) => Promise<void>,
   shouldStop: () => boolean = () => false
 ): Promise<void> {
-  console.log('🚨 REDIS-FIRST WORKER STARTING!');
-  logger.info('🚀 Starting REDIS-FIRST worker with DB fallback...');
+  logger.warn('⚠️ Legacy worker called - jobs are now processed by Cloud Tasks worker service');
+  logger.info('🚀 Cloud Tasks handles job processing automatically');
   
-  try {
-    // Initialize Redis
-    await initializeRedisQueue();
-    const redisAvailable = isRedisAvailable();
-    logger.info(`🔗 Redis status: ${redisAvailable ? '✅ AVAILABLE - Using instant processing' : '⚠️ Not available - Using DB polling'}`);
-
-    const pollForJobs = async () => {
-      let pollCount = 0;
-      let emptyPolls = 0;
-      const MAX_EMPTY_POLLS = redisAvailable ? 30 : 5; // More retries for Redis
-      const POLL_INTERVAL = redisAvailable ? 1000 : 10000; // 1s for Redis, 10s for DB (not 60s!)
-      
-      logger.info('🎯 REDIS-FIRST POLLING LOOP STARTED!', { 
-        redisAvailable, 
-        pollInterval: POLL_INTERVAL, 
-        redisCredentials: !!process.env.UPSTASH_REDIS_REST_URL,
-        redisUrl: process.env.UPSTASH_REDIS_REST_URL ? process.env.UPSTASH_REDIS_REST_URL.substring(0, 30) + '...' : 'NOT_SET'
-      });
-      
-      while (!shouldStop()) {
-        pollCount++;
-        
-        try {
-          let processedJob = false;
-          
-          // 🚀 STEP 1: Try Redis FIRST (if available)
-          if (redisAvailable) {
-            try {
-              const jobData = await getNextJobFromRedis();
-              if (jobData) {
-                logger.info('⚡ INSTANT Redis job found!', { 
-                  jobId: jobData.summaryDbId, 
-                  videoId: jobData.videoId,
-                  userId: jobData.userId 
-                });
-                emptyPolls = 0; // Reset empty polls
-                processedJob = true;
-                
-                try {
-                  await processor(jobData);
-                  await markJobCompleted(jobData.summaryDbId);
-                  logger.info('✅ Redis job completed successfully', { 
-                    videoId: jobData.videoId, 
-                    userId: jobData.userId 
-                  });
-                } catch (processingError) {
-                  await markJobFailed(jobData.summaryDbId, processingError instanceof Error ? processingError.message : String(processingError));
-                  logger.error('❌ Redis job processing failed', { 
-                    jobId: jobData.summaryDbId,
-                    error: processingError instanceof Error ? processingError.message : String(processingError),
-                    userId: jobData.userId 
-                  });
-                }
-                continue; // Continue to next iteration immediately
-              }
-            } catch (redisError) {
-              logger.error('⚠️ Redis polling failed, will try DB fallback', { 
-                error: redisError instanceof Error ? redisError.message : String(redisError) 
-              });
-            }
-          }
-          
-          // 🔄 STEP 2: Fallback to DB polling (only if no Redis job found)
-          if (!processedJob) {
-            const { executeQuery } = await import('./db');
-            logger.info('🔍 Checking database for queued jobs...', { pollCount, redisAvailable });
-            
-            try {
-              const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('DB query timeout after 10s')), 10000));
-              const queuedJobs = await Promise.race([
-                executeQuery(async (sql: any) => {
-                  return await sql`
-                    SELECT vs.id as summary_id, vs.video_id as video_db_id, v.video_id as youtube_video_id, v.user_id, v.title, vs.job_data
-                    FROM video_summaries vs
-                    JOIN videos v ON vs.video_id = v.id
-                    WHERE vs.processing_status = 'queued'
-                    ORDER BY vs.created_at ASC
-                    LIMIT 1;
-                  `;
-                }),
-                timeoutPromise
-              ]);
-              
-              if (!queuedJobs || queuedJobs.length === 0) {
-                emptyPolls++;
-                if (emptyPolls >= MAX_EMPTY_POLLS) {
-                  logger.info('🚨 Worker exiting after max empty polls!');
-                  setTimeout(() => process.exit(0), 1000);
-                }
-              } else {
-                emptyPolls = 0; // Reset if job found
-                const job = queuedJobs[0];
-                logger.info('🟢 Found queued job in DB, starting processing...', job);
-                
-                let reconstructedJobData: JobData | null = null;
-                
-                if (job.job_data) {
-                  try {
-                    reconstructedJobData = typeof job.job_data === 'string' ? JSON.parse(job.job_data) : job.job_data;
-                  } catch (e) {
-                    logger.error('❌ Failed to parse job_data JSON', { error: e });
-                  }
-                }
-                
-                if (!reconstructedJobData && job.youtube_video_id) {
-                  // Legacy job reconstruction
-                  const jobDetails = await executeQuery(async (sql: any) => {
-                    return await sql`
-                      SELECT v.video_id as youtube_video_id, v.id as video_db_id, vs.id as summary_id, vs.main_title as title, vs.video_duration_seconds as duration, v.channel_title, v.thumbnail_url, v.user_id, u.email, u.full_name
-                      FROM videos v
-                      JOIN video_summaries vs ON v.id = vs.video_id
-                      LEFT JOIN users u ON v.user_id = u.id
-                      WHERE vs.id = ${job.summary_id}
-                    `;
-                  });
-                  
-                  if (jobDetails.length > 0) {
-                    const details = jobDetails[0];
-                    reconstructedJobData = {
-                      videoId: job.youtube_video_id,
-                      videoDbId: job.video_db_id,
-                      summaryDbId: job.summary_id,
-                      userId: details.user_id,
-                      userEmail: details.email || 'unknown@example.com',
-                      user: { id: details.user_id, email: details.email, name: details.full_name },
-                      metadata: {
-                        title: details.title,
-                        duration: details.duration,
-                        channelTitle: details.channel_title,
-                        thumbnailUrl: details.thumbnail_url
-                      },
-                      totalDurationSeconds: details.duration || 0,
-                      creditsNeeded: Math.max(1, Math.ceil((details.duration || 0) / 60))
-                    };
-                  }
-                }
-                
-                if (reconstructedJobData && reconstructedJobData.userId && reconstructedJobData.userEmail) {
-                  // Update DB status to processing
-                  await executeQuery(async (sql: any) => {
-                    await sql`UPDATE video_summaries SET processing_status = 'processing' WHERE id = ${job.summary_id}`;
-                  });
-                  
-                  logger.info('🔄 Starting DB job processing', { 
-                    videoId: reconstructedJobData.videoId, 
-                    userId: reconstructedJobData.userId 
-                  });
-                  
-                  try {
-                    await processor(reconstructedJobData);
-                    await executeQuery(async (sql: any) => {
-                      await sql`UPDATE video_summaries SET processing_status = 'completed' WHERE id = ${job.summary_id}`;
-                    });
-                    logger.info('✅ DB job completed successfully', { 
-                      videoId: reconstructedJobData.videoId, 
-                      userId: reconstructedJobData.userId 
-                    });
-                  } catch (jobError) {
-                    await executeQuery(async (sql: any) => {
-                      await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
-                    });
-                    logger.error('❌ DB job processing failed', { 
-                      videoId: reconstructedJobData.videoId, 
-                      error: jobError instanceof Error ? jobError.message : String(jobError), 
-                      userId: reconstructedJobData.userId 
-                    });
-                  }
-                } else {
-                  logger.error('❌ Invalid job data, skipping', { job });
-                  await executeQuery(async (sql: any) => {
-                    await sql`UPDATE video_summaries SET processing_status = 'failed' WHERE id = ${job.summary_id}`;
-                  });
-                }
-              }
-            } catch (dbError) {
-              logger.error('❌ DB polling failed', { error: dbError instanceof Error ? dbError.message : String(dbError) });
-              await new Promise(resolve => setTimeout(resolve, 10000));
-              continue;
-            }
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
-        } catch (outerError) {
-          logger.error('❌ Critical error in polling loop', { 
-            error: outerError instanceof Error ? outerError.message : String(outerError) 
-          });
-          await new Promise(resolve => setTimeout(resolve, 10000));
-        }
-      }
-      
-      logger.info('🛑 Worker stopped polling (shutdown requested or idle).');
-    };
-    
-    logger.info('✅ Redis-first worker initialized, starting polling loop...');
-    await pollForJobs();
-  } catch (error) {
-    logger.error('❌ Critical error starting Redis-first worker', { 
-      error: error instanceof Error ? error.message : String(error) 
-    });
-    setTimeout(() => process.exit(1), 1000);
-  }
+  // No-op - Cloud Tasks handles the job processing
+  return Promise.resolve();
 } 

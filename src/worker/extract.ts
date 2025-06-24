@@ -45,7 +45,8 @@ app.post('/', async (req: Request, res: Response) => {
     
     if (!jobData) {
       logger.error('No job data received');
-      return res.status(400).json({ error: 'No job data provided' });
+      res.status(400).json({ error: 'No job data provided' });
+      return;
     }
 
     logger.info('Processing job', { 

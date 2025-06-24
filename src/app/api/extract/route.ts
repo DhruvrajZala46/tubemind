@@ -9,7 +9,6 @@ import { dbWithRetry } from '../../../lib/error-recovery';
 import { metrics } from '../../../lib/monitoring';
 import { trackVideoProcessing } from '../../../lib/api-middleware';
 import { calculateVideoCredits } from '../../../lib/credit-utils';
-import { addJobToQueue, JobData } from '../../../lib/job-queue-redis-only';
 import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 import { getOrCreateUser } from '../../../lib/auth-utils';
@@ -18,6 +17,20 @@ import { enqueueJob } from '../../../lib/cloud-tasks-queue';
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
+
+// Define JobData interface locally since we're no longer importing from redis queue
+interface JobData {
+  videoId: string;
+  videoDbId: string;
+  summaryDbId: string;
+  userId: string;
+  userEmail: string;
+  user: { id: string; email: string; name?: string };
+  metadata: any;
+  totalDurationSeconds: number;
+  creditsNeeded: number;
+  youtubeUrl: string;
+}
 
 function parseDurationToSeconds(durationStr: any) {
   if (typeof durationStr === 'number') return durationStr;
@@ -207,7 +220,8 @@ export async function POST(request: NextRequest) {
       user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
       metadata,
       totalDurationSeconds,
-      creditsNeeded
+      creditsNeeded,
+      youtubeUrl: url
     };
     try {
       logger.info('JobData to be queued', { jobData });
