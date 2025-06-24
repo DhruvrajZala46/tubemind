@@ -5,6 +5,7 @@ src/lib/job-queue-redis-only.ts
 src/lib/redis-queue.ts
 src/lib/video-processor.ts
 Dockerfile
+Dockerfile.api
 deploy.sh
 *.worker.*
 dist/
@@ -15,4 +16,40 @@ test-*.js
 direct-worker-test.js
 
 # Cloud-specific files
-.gcloudignore 
+.gcloudignore
+
+# Backend worker files
+src/worker/
+Dockerfile
+Dockerfile.api
+deploy.sh
+tsconfig.worker.json
+
+# Redis and Cloud Tasks specific files (backend only)
+src/lib/redis-queue.ts
+src/lib/job-queue-redis-only.ts
+
+# Development and testing files
+test-*.js
+*.test.js
+dev-worker.js
+direct-worker-test.js
+
+# Production deployment files
+start-*.js
+worker-*.txt
+
+# Documentation
+*.md
+!README.md
+
+# Scripts and configs
+clean-redis-queue.js
+fix-*.js
+polyfill-self.js
+
+# Migration files
+migrations/
+
+# Git filter
+git-filter-repo 

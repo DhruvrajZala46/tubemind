@@ -13,10 +13,6 @@ import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 import { getOrCreateUser } from '../../../lib/auth-utils';
 import { randomUUID } from 'crypto';
-import { enqueueJob } from '../../../lib/cloud-tasks-queue';
-
-const logger = createLogger('api:extract');
-const cache = getCacheManager();
 
 // Define JobData interface locally since we're no longer importing from redis queue
 interface JobData {
@@ -31,6 +27,22 @@ interface JobData {
   creditsNeeded: number;
   youtubeUrl: string;
 }
+
+// Async import for Cloud Tasks to avoid Vercel build issues
+async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
+  try {
+    // Dynamic import to avoid Vercel build issues
+    const { enqueueJob } = await import('../../../lib/cloud-tasks-queue');
+    return await enqueueJob(jobData);
+  } catch (error) {
+    const logger = createLogger('api:extract');
+    logger.error('Failed to import or use Cloud Tasks', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+const logger = createLogger('api:extract');
+const cache = getCacheManager();
 
 function parseDurationToSeconds(durationStr: any) {
   if (typeof durationStr === 'number') return durationStr;
@@ -225,7 +237,7 @@ export async function POST(request: NextRequest) {
     };
     try {
       logger.info('JobData to be queued', { jobData });
-      await enqueueJob(jobData);
+      await enqueueJobToCloudTasks(jobData);
       logger.info('Job enqueued to Cloud Tasks');
     } catch (queueError: any) {
       logger.error('Failed to enqueue job to Cloud Tasks', { userId, error: queueError.message });

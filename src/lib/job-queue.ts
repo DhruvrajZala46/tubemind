@@ -1,5 +1,4 @@
 import { createLogger } from './logger';
-import { enqueueJob } from './cloud-tasks-queue';
 
 const logger = createLogger('job-queue');
 
@@ -16,13 +15,25 @@ export type JobData = {
   youtubeUrl: string;
 };
 
+// Dynamic import for Cloud Tasks to avoid Vercel build issues
+async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
+  try {
+    // Only import when actually needed (server-side)
+    const { enqueueJob } = await import('./cloud-tasks-queue');
+    return await enqueueJob(jobData);
+  } catch (error) {
+    logger.error('Failed to import or use Cloud Tasks', { error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
 // Cloud Tasks-based addJobToQueue
 export async function addJobToQueue(data: JobData): Promise<{ jobId: string; usedCloudTasks?: boolean }> {
   logger.info('🚀 Adding job to Cloud Tasks queue', { jobId: data.summaryDbId, videoId: data.videoId, userId: data.userId });
   
   try {
     // Use Cloud Tasks for job processing
-    const taskName = await enqueueJob(data);
+    const taskName = await enqueueJobToCloudTasks(data);
     
     logger.info('✅ Job added to Cloud Tasks successfully', { 
       jobId: data.summaryDbId, 

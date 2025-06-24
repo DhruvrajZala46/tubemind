@@ -1,21 +1,36 @@
-import { CloudTasksClient } from '@google-cloud/tasks';
 import { createLogger } from './logger';
 
 const logger = createLogger('cloud-tasks-queue');
-
-// Initialize Cloud Tasks client
-const client = new CloudTasksClient();
 
 interface JobData {
   videoId: string;
   userId: string;
   youtubeUrl: string;
+  videoDbId?: string;
+  summaryDbId?: string;
+  userEmail?: string;
+  user?: { id: string; email: string; name?: string };
+  metadata?: any;
+  totalDurationSeconds?: number;
+  creditsNeeded?: number;
   type?: string;
   [key: string]: any;
 }
 
+// Check if we're in a Node.js environment (server-side)
+const isServerSide = typeof window === 'undefined';
+
 export async function enqueueJob(jobData: JobData): Promise<string> {
+  // Only run on server-side (Cloud Run worker or API routes)
+  if (!isServerSide) {
+    throw new Error('Cloud Tasks can only be used on the server side');
+  }
+
   try {
+    // Dynamically import Cloud Tasks client only on server-side
+    const { CloudTasksClient } = await import('@google-cloud/tasks');
+    const client = new CloudTasksClient();
+
     const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID || process.env.GCP_PROJECT;
     const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
     const queueName = process.env.CLOUD_TASKS_QUEUE_NAME || 'video-processing-queue';
