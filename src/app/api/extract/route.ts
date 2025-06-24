@@ -28,17 +28,67 @@ interface JobData {
   youtubeUrl: string;
 }
 
-// Frontend-only fallback - no Cloud Tasks (for Vercel build compatibility)
+// Cloud Tasks integration for production
 async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
-  // On Vercel, we don't have Cloud Tasks, so we'll just add to database
-  // The actual Cloud Tasks integration happens on the Cloud Run API service
-  logger.info('Frontend build - using database queue only', { 
-    videoId: jobData.videoId,
-    userId: jobData.userId 
-  });
-  
-  // Just return a placeholder task name for frontend builds
-  return `frontend-fallback-${jobData.summaryDbId}`;
+  try {
+    // Import Cloud Tasks dynamically to avoid build issues
+    const { CloudTasksClient } = await import('@google-cloud/tasks');
+    
+    const client = new CloudTasksClient();
+    const project = process.env.GCP_PROJECT || 'agile-entry-463508-u6';
+    const queue = process.env.CLOUD_TASKS_QUEUE || 'video-processing-queue';
+    const location = process.env.CLOUD_TASKS_LOCATION || 'us-central1';
+    const workerUrl = process.env.WORKER_SERVICE_URL || 'https://tubemind-worker-304961481608.us-central1.run.app';
+    
+    // Construct the fully qualified queue name
+    const parent = client.queuePath(project, location, queue);
+    
+    // Create the task
+    const task = {
+      httpRequest: {
+        httpMethod: 'POST' as const,
+        url: workerUrl,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: Buffer.from(JSON.stringify(jobData)).toString('base64'),
+      },
+    };
+    
+    logger.info('Creating Cloud Tasks job', { 
+      videoId: jobData.videoId,
+      userId: jobData.userId,
+      queue: parent,
+      workerUrl 
+    });
+    
+    // Send create task request
+    const request = { parent: parent, task: task };
+    const [response] = await client.createTask(request);
+    
+    logger.info('Cloud Tasks job created successfully', { 
+      taskName: response.name,
+      videoId: jobData.videoId,
+      userId: jobData.userId 
+    });
+    
+    return response.name || `task-${jobData.summaryDbId}`;
+    
+  } catch (error: any) {
+    logger.error('Failed to create Cloud Tasks job', { 
+      error: error.message,
+      videoId: jobData.videoId,
+      userId: jobData.userId 
+    });
+    
+    // Fallback to database-only for development/build compatibility
+    logger.info('Falling back to database queue only', { 
+      videoId: jobData.videoId,
+      userId: jobData.userId 
+    });
+    
+    return `fallback-${jobData.summaryDbId}`;
+  }
 }
 
 // Fallback: Add job to database for manual processing
