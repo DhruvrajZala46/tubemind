@@ -120,11 +120,11 @@ async function checkDatabase(): Promise<ServiceHealth> {
     const dbTest = await executeQuery(async (sql) => {
       return await sql`SELECT 1 as test, NOW() as timestamp`;
     });
-          return {
-        status: 'healthy',
-        responseTime: Date.now() - start,
-        lastChecked: new Date().toISOString()
-      };
+    return {
+      status: 'healthy',
+      responseTime: Date.now() - start,
+      lastChecked: new Date().toISOString()
+    };
   } catch (error: any) {
     return {
       status: 'unhealthy',

@@ -7,6 +7,7 @@ import { createLogger } from '../lib/logger';
 import { initializeRedisQueue, isRedisAvailable } from '../lib/redis-queue';
 import http from 'http';
 import { neon } from '@neondatabase/serverless';
+import express from 'express';
 
 // --- THEN your Redis config, env loading, etc ---
 process.env.DISABLE_REDIS = 'false';
@@ -107,159 +108,21 @@ process.on('SIGINT', () => shutdown('SIGINT'));
   }
 })();
 
-async function startWorker() {
-  console.log('🚨 ENTERED startWorker with Redis integration');
+const app = express();
+app.use(express.json());
+
+app.post('/', async (req, res) => {
   try {
-    logger.info('🏥 Starting health check server...');
-    startHealthCheckServer();
-    logger.info('✅ Health check server started.');
-
-    // Initialize Redis queue
-    const redisInitialized = await initializeRedisQueue();
-    logger.info(`🔗 Redis initialization: ${redisInitialized ? '✅ Success' : '⚠️ Failed, using DB only'}`);
-
-    const handleJob = async (jobData: JobData) => {
-      const jobId = `${jobData.videoDbId}-${Date.now()}`;
-      logger.info(`🔄 Processing job ${jobId} for video ${jobData.videoId}`, {
-        source: 'Worker',
-        userId: jobData.userId
-      });
-      
-      try {
-        await processVideoJob(jobData);
-        logger.info(`✅ Job ${jobId} completed successfully.`, {
-          videoId: jobData.videoId,
-          userId: jobData.userId
-        });
-      } catch (error) {
-        logger.error(`❌ Job ${jobId} failed.`, { 
-          error: error instanceof Error ? error.message : String(error),
-          videoId: jobData.videoId,
-          userId: jobData.userId
-        });
-        throw error;
-      }
-    };
-    
-    logger.info('🔥 Starting enhanced worker (Redis + DB polling)...');
-    await startSimpleWorker(handleJob, () => isShuttingDown);
-    logger.info('🛑 Enhanced worker returned unexpectedly!');
-    console.log('⏳ Enhanced worker is running. Press Ctrl+C to exit.');
-  } catch (error) {
-    logger.error('💥 Critical error during enhanced worker initialization.', { 
-      error: error instanceof Error ? error.message : String(error) 
-    });
-    console.error('💥 Critical error during enhanced worker initialization.', error);
-    setTimeout(() => process.exit(1), 1000);
-  }
-}
-
-// Enhanced HTTP endpoint to trigger the worker on-demand
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  
-  // CORS headers for all requests
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-
-  if (req.method === 'POST' && url.pathname === '/start') {
-    console.log('🚨 /start endpoint triggered');
-    if (!workerRunning) {
-      workerRunning = true;
-      startWorker().finally(() => { workerRunning = false; });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        message: 'Enhanced worker started',
-        redis: isRedisAvailable()
-      }));
-    } else {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        message: 'Enhanced worker already running',
-        redis: isRedisAvailable()
-      }));
-    }
-  } else if (req.method === 'GET' && url.pathname === '/health') {
-    // Health check endpoint
-    try {
-      const { checkRedisHealth } = await import('../lib/redis-queue');
-      const redisHealth = await checkRedisHealth();
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        status: 'healthy',
-        worker: workerRunning ? 'running' : 'stopped',
-        redis: redisHealth,
-        timestamp: new Date().toISOString()
-      }));
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        status: 'error',
-        error: error instanceof Error ? error.message : String(error)
-      }));
-    }
-  } else if (req.method === 'GET' && url.pathname === '/stats') {
-    // Stats endpoint
-    try {
-      const { getRedisQueueStats } = await import('../lib/redis-queue');
-      const stats = await getRedisQueueStats();
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        worker: workerRunning ? 'running' : 'stopped',
-        redis: stats,
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        timestamp: new Date().toISOString()
-      }));
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        error: error instanceof Error ? error.message : String(error)
-      }));
-    }
-  } else if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/status')) {
-    // Default status endpoint for Cloud Run health checks
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'running',
-      worker: workerRunning ? 'active' : 'stopped',
-      service: 'TubeGPT Worker',
-      version: '1.0.0',
-      timestamp: new Date().toISOString()
-    }));
-  } else {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Not found' }));
+    await processVideoJob(req.body);
+    res.status(200).json({ status: 'done' });
+  } catch (err) {
+    console.error('Worker error:', err);
+    res.status(500).json({ error: 'Job failed' });
   }
 });
 
-const PORT = process.env.PORT || process.env.WORKER_TRIGGER_PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`🚀 Enhanced worker trigger server listening on port ${PORT}`);
-  console.log(`📊 Health: http://localhost:${PORT}/health`);
-  console.log(`📈 Stats: http://localhost:${PORT}/stats`);
-  console.log(`🔥 Trigger: POST http://localhost:${PORT}/start`);
-  
-  // Auto-start worker when server starts (required for Cloud Run)
-  console.log('🚀 Auto-starting enhanced worker...');
-  if (!workerRunning) {
-    workerRunning = true;
-    startWorker().catch(error => {
-      console.error('❌ Failed to start worker:', error);
-      // Don't exit process, keep HTTP server running for Cloud Run health checks
-    });
-  }
+app.listen(process.env.PORT || 8080, () => {
+  console.log('Worker listening on port', process.env.PORT || 8080);
 });
 
 /**

@@ -14,6 +14,7 @@ import { validateVideoProcessingRequest } from '../../../lib/security-utils';
 import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../lib/subscription';
 import { getOrCreateUser } from '../../../lib/auth-utils';
 import { randomUUID } from 'crypto';
+import { enqueueJob } from '../../../lib/cloud-tasks-queue';
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
@@ -209,106 +210,28 @@ export async function POST(request: NextRequest) {
       creditsNeeded
     };
     try {
-      const summaryInsertResult = await dbWithRetry(async () => {
-        return await executeQuery(async (sql) => {
-          return await sql`
-            INSERT INTO video_summaries (
-              id, video_id, main_title, overall_summary, created_at, updated_at,
-              raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens,
-              input_cost, output_cost, total_cost, video_duration_seconds, processing_status, job_data
-            )
-            VALUES (
-              ${summaryId}, ${videoDbId}, ${metadata.title}, '', NOW(), NOW(),
-              '', '', 0, 0, 0, 0, 0, 0, ${totalDurationSeconds}, 'queued', ${JSON.stringify(jobData)}
-            )
-            RETURNING id
-          `;
-        });
-      }, 'Create Summary Entry');
-    } catch (error: any) {
-      logger.error('Failed to create summary entry', { userId, data: { videoId, error: error.message } });
-      // Release reserved credits if summary creation fails
-      await releaseCredits(userId, creditsNeeded);
-      return NextResponse.json({ error: 'Failed to create summary entry.' }, { status: 500 });
-    }
-
-    // Add fail-fast check and deep logging before queuing job
-    if (!userId || !userEmail) {
-      logger.error('❌ userId or userEmail missing before queuing job', { user, userId, userEmail });
-      return NextResponse.json({ error: 'Internal error: user information missing. Please sign out and sign in again.' }, { status: 500 });
-    }
-    // Add job to DB-based queue
-    try {
       logger.info('JobData to be queued', { jobData });
-      
-      // --- Enhanced Worker Triggering ---
-      let triggerSuccess = false;
-      const jobResult = await addJobToQueue(jobData);
-      logger.info('Job queued successfully', { 
-        userId, 
-        videoId, 
-        summaryId, 
-        usedRedis: jobResult.usedRedis 
-      });
-      
-      if (jobResult.usedRedis) {
-        logger.info('✅ Job added to Redis queue - instant processing expected!', { 
-          jobId: summaryId, 
-          videoId, 
-          userId 
-        });
-        
-        // Trigger worker immediately for Redis jobs
-        const WORKER_URL = process.env.WORKER_TRIGGER_URL || 'http://localhost:8079/start';
-        try {
-          const response = await fetch(WORKER_URL, { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            triggerSuccess = true;
-            logger.info('🚀 Enhanced worker triggered successfully', { 
-              WORKER_URL, 
-              redis: result.redis,
-              jobId: summaryId 
-            });
-          }
-        } catch (triggerError) {
-          logger.error('⚠️ Failed to trigger enhanced worker (processing will continue)', { 
-            error: triggerError instanceof Error ? triggerError.message : String(triggerError), 
-            WORKER_URL,
-            jobId: summaryId
-          });
-        }
-      } else {
-        logger.info('📝 Job added to DB queue - polling worker will process it', { 
-          jobId: summaryId, 
-          videoId, 
-          userId 
-        });
-      }
-      // --- End trigger ---
-    } catch (error: any) {
-      logger.error('Failed to add job to DB queue', { userId, data: { videoId, error: error.message } });
-      // Release reserved credits if job queueing fails
+      await enqueueJob(jobData);
+      logger.info('Job enqueued to Cloud Tasks');
+    } catch (queueError: any) {
+      logger.error('Failed to enqueue job to Cloud Tasks', { userId, error: queueError.message });
+      // Release reserved credits if queueing fails
       await releaseCredits(userId, creditsNeeded);
-      return NextResponse.json({ error: 'Failed to queue job.' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to enqueue job. Please try again.' }, { status: 500 });
     }
 
-    // Respond with job info
     return NextResponse.json({
       success: true,
       data: {
         videoId,
         summaryId,
-        jobId: summaryId,
-        creditsNeeded,
-        message: 'Job queued successfully',
+        alreadyProcessed: false,
+        processingStatus: 'queued',
+        title: metadata.title,
+        message: 'Job queued for processing',
         redirectUrl: `/dashboard/${videoDbId}`
       }
-    }, { status: 202 });
+    });
   } catch (error: any) {
     // This is a general catch-all for unexpected errors
     const e = error?.message || 'An unexpected error occurred.';
