@@ -5,8 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import { monitoring } from '../../../lib/monitoring';
-import { executeQuery } from '@/lib/db';
-import { checkRedisHealth, getRedisQueueStats } from '../../../lib/redis-queue';
+import { executeQuery } from '../../../lib/db';
 
 const logger = createLogger('health-check');
 
@@ -124,6 +123,25 @@ function checkMonitoring(): ServiceHealth {
   const start = Date.now();
   try {
     const health = monitoring.getSystemHealth();
+    return {
+      status: 'healthy',
+      responseTime: Date.now() - start,
+      lastChecked: new Date().toISOString()
+    };
+  } catch (error: any) {
+    return {
+      status: 'unhealthy',
+      responseTime: Date.now() - start,
+      lastChecked: new Date().toISOString(),
+      error: error.message
+    };
+  }
+}
+
+function checkQueue(): ServiceHealth {
+  const start = Date.now();
+  try {
+    // For Vercel frontend: Queue migrated to Cloud Tasks
     return {
       status: 'healthy',
       responseTime: Date.now() - start,
