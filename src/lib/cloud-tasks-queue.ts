@@ -11,7 +11,7 @@ export async function enqueueJob(jobData: any) {
   const parent = client.queuePath(project, location, queue);
   const task = {
     httpRequest: {
-      httpMethod: protos.google.cloud.tasks.v2.HttpMethod.POST, // <--- FIXED
+      httpMethod: protos.google.cloud.tasks.v2.HttpMethod.POST,
       url,
       headers: { 'Content-Type': 'application/json' },
       body: Buffer.from(JSON.stringify(jobData)).toString('base64'),
