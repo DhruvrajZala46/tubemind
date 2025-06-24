@@ -1,4 +1,3 @@
-import '../../polyfill-self';
 import type { Metadata } from "next";
 import "@fontsource/inter/900.css";
 import "@fontsource/inter/700.css";

@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJobById } from '../../../../lib/job-queue';
 import { createLogger } from '../../../../lib/logger';
+import { executeQuery } from '../../../../lib/db';
 
 const logger = createLogger('api:jobs:status');
+
+// Get job by ID directly from database to avoid import chain issues
+async function getJobById(jobId: string): Promise<any | null> {
+  try {
+    const jobs = await executeQuery(async (sql: any) => {
+      return await sql`SELECT * FROM video_summaries WHERE id = ${jobId}`;
+    });
+    if (jobs.length === 0) return null;
+    return jobs[0];
+  } catch (error) {
+    logger.error('Failed to get job from database', { 
+      jobId, 
+      error: error instanceof Error ? error.message : String(error) 
+    });
+    return null;
+  }
+}
 
 // This endpoint is used by the frontend to poll for the status of a video processing job.
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

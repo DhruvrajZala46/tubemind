@@ -28,6 +28,7 @@ tsconfig.worker.json
 # Redis and Cloud Tasks specific files (backend only)
 src/lib/redis-queue.ts
 src/lib/job-queue-redis-only.ts
+src/lib/cloud-tasks-queue.ts
 
 # Development and testing files
 test-*.js

@@ -14,7 +14,7 @@ import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../l
 import { getOrCreateUser } from '../../../lib/auth-utils';
 import { randomUUID } from 'crypto';
 
-// Define JobData interface locally since we're no longer importing from redis queue
+// Define JobData interface locally
 interface JobData {
   videoId: string;
   videoDbId: string;
@@ -28,17 +28,39 @@ interface JobData {
   youtubeUrl: string;
 }
 
-// Async import for Cloud Tasks to avoid Vercel build issues
+// Safe async import for Cloud Tasks - only runs on server-side
 async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
   try {
-    // Dynamic import to avoid Vercel build issues
-    const { enqueueJob } = await import('../../../lib/cloud-tasks-queue');
+    // Check if we're in server environment
+    if (typeof window !== 'undefined') {
+      throw new Error('Cloud Tasks can only be used on server-side');
+    }
+    
+    // Import both the module and the Google Cloud client dynamically
+    const [{ enqueueJob }, { CloudTasksClient }] = await Promise.all([
+      import('../../../lib/cloud-tasks-queue'),
+      import('@google-cloud/tasks')
+    ]);
+    
     return await enqueueJob(jobData);
   } catch (error) {
     const logger = createLogger('api:extract');
-    logger.error('Failed to import or use Cloud Tasks', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to enqueue to Cloud Tasks', { 
+      error: error instanceof Error ? error.message : String(error) 
+    });
     throw error;
   }
+}
+
+// Fallback: Add job to database for manual processing
+async function addJobToDatabase(jobData: JobData): Promise<void> {
+  await executeQuery(async (sql: any) => {
+    await sql`
+      INSERT INTO video_summaries (id, video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
+      VALUES (${jobData.summaryDbId}, ${jobData.videoDbId}, ${jobData.metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${jobData.totalDurationSeconds}, ${JSON.stringify(jobData)})
+      ON CONFLICT (id) DO UPDATE SET job_data = EXCLUDED.job_data
+    `;
+  });
 }
 
 const logger = createLogger('api:extract');
@@ -240,10 +262,16 @@ export async function POST(request: NextRequest) {
       await enqueueJobToCloudTasks(jobData);
       logger.info('Job enqueued to Cloud Tasks');
     } catch (queueError: any) {
-      logger.error('Failed to enqueue job to Cloud Tasks', { userId, error: queueError.message });
-      // Release reserved credits if queueing fails
-      await releaseCredits(userId, creditsNeeded);
-      return NextResponse.json({ error: 'Failed to enqueue job. Please try again.' }, { status: 500 });
+      logger.warn('Cloud Tasks failed, falling back to database queue', { userId, error: queueError.message });
+      try {
+        await addJobToDatabase(jobData);
+        logger.info('Job added to database queue as fallback');
+      } catch (dbError: any) {
+        logger.error('Both Cloud Tasks and database queue failed', { userId, error: dbError.message });
+        // Release reserved credits if both queueing methods fail
+        await releaseCredits(userId, creditsNeeded);
+        return NextResponse.json({ error: 'Failed to enqueue job. Please try again.' }, { status: 500 });
+      }
     }
 
     return NextResponse.json({
