@@ -1,7 +1,7 @@
 // Production-Grade Cloud Tasks Worker
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
-import { processVideoJob } from '../lib/video-processor';
+import { processVideoExtraction } from './extract-core';
 import { createLogger } from '../lib/logger';
 
 const app = express();
@@ -9,20 +9,26 @@ const logger = createLogger('cloud-tasks-worker');
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
-    userAgent: req.get('user-agent'),
-    contentLength: req.get('content-length')
-  });
-  next();
+
+// CORS middleware for Cloud Run
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
 });
 
-// Health check endpoint
+// Health check endpoint for Cloud Run
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ 
-    status: 'healthy', 
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    service: 'tubemind-worker'
   });
 });
 
@@ -49,18 +55,18 @@ app.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    logger.info('Processing job', { 
+    logger.info('Processing job with new progress tracking', { 
       jobType: jobData.type || 'video-processing',
       videoId: jobData.videoId,
-        userId: jobData.userId
-      });
+      userId: jobData.userId
+    });
       
-    // Process the video job
-        await processVideoJob(jobData);
+    // Process the video job using new extract-core with progress tracking
+    await processVideoExtraction(jobData);
     
     const processingTime = Date.now() - startTime;
     logger.info('Job completed successfully', { 
-          videoId: jobData.videoId,
+      videoId: jobData.videoId,
       processingTimeMs: processingTime 
     });
 
@@ -106,16 +112,17 @@ app.post('/', async (req: Request, res: Response) => {
 });
 
 // Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error('Unhandled error', { 
-    error: err.message,
-    stack: err.stack,
-    path: req.path 
+app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  logger.error('Unhandled error in worker', { 
+    error: error.message, 
+    stack: error.stack,
+    url: req.url,
+    method: req.method
   });
   
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
-    retryable: true 
+    timestamp: new Date().toISOString()
   });
 });
 

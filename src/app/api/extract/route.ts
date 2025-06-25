@@ -38,66 +38,69 @@ async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
   // Check if we're in Vercel environment - use HTTP API instead of SDK
   if (process.env.VERCEL || process.env.VERCEL_ENV) {
     try {
-      logger.info('Using HTTP API for Cloud Tasks (Vercel environment)', { 
-        videoId: jobData.videoId,
-        userId: jobData.userId 
-      });
-      
-      // Use Google Cloud REST API directly
-      const fetch = (await import('node-fetch')).default;
-      
-      const taskData = {
-        task: {
-          httpRequest: {
-            httpMethod: 'POST',
-            url: workerUrl,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: Buffer.from(JSON.stringify(jobData)).toString('base64'),
-          },
-        },
-      };
-      
-      // FIXED: Use asynchronous job queuing instead of direct call
-      // This prevents Vercel timeout and reduces costs
-      logger.info('Using asynchronous job queuing (Vercel environment)', { 
+      logger.info('Using direct HTTP call to worker (Vercel environment)', { 
         videoId: jobData.videoId,
         userId: jobData.userId,
         workerUrl 
       });
       
-      // Don't wait for processing - just queue the job asynchronously
-      // The worker will be triggered separately without blocking Vercel
-      fetch(workerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(jobData),
-      }).catch(error => {
-        logger.error('Async worker call failed', { 
-          error: error.message,
-          videoId: jobData.videoId,
-          userId: jobData.userId 
+      // Use dynamic import for node-fetch
+      const fetch = (await import('node-fetch')).default;
+      
+      // Create timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        // Make direct HTTP call to worker service
+        const response = await fetch(workerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(jobData),
+          signal: controller.signal
         });
-      });
-      
-      logger.info('Job queued asynchronously - no blocking', { 
-        videoId: jobData.videoId,
-        userId: jobData.userId
-      });
-      
-      return `async-queued-${jobData.summaryDbId}`;
-      
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error('Worker service returned error', { 
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+            workerUrl
+          });
+          throw new Error(`Worker service error: ${response.status} ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        logger.info('Worker service responded successfully', { 
+          videoId: jobData.videoId,
+          userId: jobData.userId,
+          result
+        });
+        
+        return `direct-call-${jobData.summaryDbId}`;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
     } catch (error: any) {
       logger.error('Direct worker call failed', { 
         error: error.message,
         videoId: jobData.videoId,
-        userId: jobData.userId 
+        userId: jobData.userId,
+        workerUrl,
+        stack: error.stack
       });
       
-      return `fallback-${jobData.summaryDbId}`;
+      // For now, don't throw - let the job stay in database queue
+      // In production, you might want to implement a retry mechanism
+      return `failed-${jobData.summaryDbId}`;
     }
   } else {
     // Use Cloud Tasks SDK for non-Vercel environments
