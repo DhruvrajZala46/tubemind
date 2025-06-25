@@ -22,18 +22,35 @@ export async function GET(
       return NextResponse.json({ error: 'Valid Summary ID is required' }, { status: 400 });
     }
 
-    const summaries = await executeQuery(async (sql) => {
-      return await sql`
-        SELECT 
-          vs.processing_status, 
-          vs.overall_summary,
-          COALESCE(vs.processing_progress, 0) as processing_progress,
-          COALESCE(vs.processing_stage, vs.processing_status) as processing_stage
-        FROM video_summaries vs
-        INNER JOIN videos v ON vs.video_id = v.id
-        WHERE vs.id = ${summaryId} AND v.user_id = ${user.id}
-      `;
-    });
+    // Try to get new columns first, fallback if they don't exist
+    let summaries;
+    try {
+      summaries = await executeQuery(async (sql) => {
+        return await sql`
+          SELECT 
+            vs.processing_status, 
+            vs.overall_summary,
+            COALESCE(vs.processing_progress, 0) as processing_progress,
+            COALESCE(vs.processing_stage, vs.processing_status) as processing_stage
+          FROM video_summaries vs
+          INNER JOIN videos v ON vs.video_id = v.id
+          WHERE vs.id = ${summaryId} AND v.user_id = ${user.id}
+        `;
+      });
+    } catch (columnError) {
+      // If columns don't exist, fallback to basic query
+      logger.warn('New progress columns not found, using fallback query', { error: columnError instanceof Error ? columnError.message : 'Unknown error' });
+      summaries = await executeQuery(async (sql) => {
+        return await sql`
+          SELECT 
+            vs.processing_status, 
+            vs.overall_summary
+          FROM video_summaries vs
+          INNER JOIN videos v ON vs.video_id = v.id
+          WHERE vs.id = ${summaryId} AND v.user_id = ${user.id}
+        `;
+      });
+    }
 
     if (summaries.length === 0) {
       logger.warn(`Summary not found or access denied`, { summaryId, userId: user.id });
@@ -62,10 +79,43 @@ export async function GET(
       stage = 'pending';
     }
     
+    // Calculate realistic progress if not available from database
+    let progress = summary.processing_progress || 0;
+    if (!summary.processing_progress) {
+      // Provide realistic fallback progress based on status
+      switch (summary.processing_status) {
+        case 'queued':
+        case 'pending':
+          progress = 10;
+          break;
+        case 'transcribing':
+        case 'extracting':
+          progress = 45;
+          break;
+        case 'summarizing':
+        case 'analyzing':
+          progress = 75;
+          break;
+        case 'finalizing':
+          progress = 90;
+          break;
+        case 'completed':
+        case 'complete':
+          progress = 100;
+          break;
+        case 'failed':
+        case 'error':
+          progress = 0;
+          break;
+        default:
+          progress = 10;
+      }
+    }
+    
     return NextResponse.json({
       processing_status: summary.processing_status,
       processing_stage: stage,
-      processing_progress: summary.processing_progress || 0,
+      processing_progress: progress,
       overall_summary: summary.overall_summary,
     });
 
