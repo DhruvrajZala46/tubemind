@@ -96,21 +96,32 @@ export async function processVideo(
       throw new Error('videoId is a UUID, not a YouTube ID!');
     }
     
+    // Add delay to show initial progress
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('transcribing', 30, 'Downloading video audio...');
+    
     const transcript = await getVideoTranscript(videoId);
     if (!transcript || transcript.length === 0) {
       throw new Error('Transcript is empty or could not be fetched.');
     }
     
+    // Add delay to show transcript progress
+    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
     await updateProgress('transcribing', 100, 'Transcript extraction complete');
     logStep('Transcript Fetch', 'SUCCESS', { duration: `${Date.now() - step1Time}ms`, segments: transcript.length });
     
     // === STEP 2: Process with OpenAI ===
     const step2Time = Date.now();
     logStep('AI Knowledge Extraction', 'START');
+    
+    // Add delay before starting analysis
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('summarizing', 10, 'Starting AI analysis...');
     
+    // Add delay during analysis
+    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
     await updateProgress('summarizing', 40, 'Analyzing transcript content...');
+    
     const aiResult = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
     logStep('AI Knowledge Extraction', 'SUCCESS', { duration: `${Date.now() - step2Time}ms`, mainTitle: aiResult.mainTitle });
 
@@ -119,11 +130,16 @@ export async function processVideo(
       throw new Error('Summary generation failed: missing main title or summary.');
     }
 
+    // Add delay to show analysis completion
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('summarizing', 100, 'AI analysis complete');
 
     // === STEP 3: Update the summary with results ===
     const step3Time = Date.now();
     logStep('Database Update', 'START');
+    
+    // Add delay before finalizing
+    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
     await updateProgress('finalizing', 20, 'Organizing results...');
     
     await executeQuery(async (sql) => {
@@ -151,6 +167,9 @@ export async function processVideo(
     // === STEP 4: Consume credits on success ===
     const step4Time = Date.now();
     logStep('Credit Consumption', 'START');
+    
+    // Add delay during credit processing
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('finalizing', 80, 'Processing credits...');
     
     try {
@@ -191,6 +210,9 @@ export async function processVideo(
     const step5Time = Date.now();
     if (aiResult.segments && aiResult.segments.length > 0) {
       logStep('Segment Creation', 'START', { segmentCount: aiResult.segments.length });
+      
+      // Add delay before segment creation
+      await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
       await updateProgress('finalizing', 90, 'Creating video segments...');
       
       // We already have videoDbId passed as parameter, but double-check for safety
@@ -216,6 +238,9 @@ export async function processVideo(
       logStep('Segment Creation', 'SUCCESS', { duration: `${Date.now() - step5Time}ms`, count: aiResult.segments.length });
     }
 
+    // === FINAL STEP: Complete processing ===
+    // Add final delay to let users see the completion progress
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('completed', 100, 'Processing complete');
     logStep('Job Processing', 'SUCCESS', { totalDuration: `${Date.now() - jobStartTime}ms` });
 
