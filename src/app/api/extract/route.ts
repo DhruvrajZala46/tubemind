@@ -360,7 +360,7 @@ export async function POST(request: NextRequest) {
       // The Cloud Run API service will poll this and use Cloud Tasks
       await addJobToDatabase(jobData);
       logger.info('Job added to database queue (Cloud Run will process via Cloud Tasks)');
-      
+        
       // Also call the placeholder function for consistency
       await enqueueJobToCloudTasks(jobData);
       

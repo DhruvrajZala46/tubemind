@@ -26,9 +26,9 @@ export async function processVideoInBackground(
 
         // Update progress periodically during transcription (simulated)
         await updateSummaryProgress(summaryDbId, 'transcribing', 20, 'Downloading video audio...');
-        
+
         const transcript = await getVideoTranscript(videoId);
-        
+
         // Update progress after transcript is complete
         await updateSummaryProgress(summaryDbId, 'transcribing', 100, 'Transcript extraction complete');
         
@@ -37,7 +37,7 @@ export async function processVideoInBackground(
         
         // Update progress during summarization
         await updateSummaryProgress(summaryDbId, 'summarizing', 30, 'Analyzing transcript content...');
-        
+
         const extraction = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
         
         await updateSummaryProgress(summaryDbId, 'summarizing', 100, 'Analysis complete');
@@ -49,7 +49,7 @@ export async function processVideoInBackground(
         await updateSummaryAndTakeaways(summaryDbId, videoDbId, extraction);
 
         await createVideoSegments(videoDbId, extraction.segments);
-        
+
         // Mark as completed
         await updateSummaryProgress(summaryDbId, 'completed', 100, 'Processing complete');
         

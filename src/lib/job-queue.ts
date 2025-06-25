@@ -36,26 +36,26 @@ export async function addJobToQueue(data: JobData): Promise<{ jobId: string; use
     const taskName = await enqueueJobToCloudTasks(data);
     
     logger.info('✅ Job added to Cloud Tasks successfully', { 
-      jobId: data.summaryDbId, 
-      videoId: data.videoId, 
+        jobId: data.summaryDbId, 
+        videoId: data.videoId, 
       userId: data.userId,
       taskName 
-    });
-    
+      });
+      
     // Also add to DB for tracking
-    await addJobToDbQueue(data);
+      await addJobToDbQueue(data);
     logger.info('✅ Job also added to DB for tracking', { jobId: data.summaryDbId });
     
     return { jobId: data.summaryDbId, usedCloudTasks: true };
-    
+      
   } catch (error) {
     logger.error('❌ Cloud Tasks queue failed, falling back to DB', { 
       jobId: data.summaryDbId, 
       error: error instanceof Error ? error.message : String(error) 
     });
-    
-    // Fallback to DB queue
-    const dbResult = await addJobToDbQueue(data);
+  
+  // Fallback to DB queue
+  const dbResult = await addJobToDbQueue(data);
     return { jobId: dbResult.jobId, usedCloudTasks: false };
   }
 }
