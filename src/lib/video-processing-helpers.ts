@@ -21,20 +21,38 @@ export async function processVideoInBackground(
     logger.info('Starting background video processing', { data: { videoId, videoDbId } });
 
     try {
-        await updateSummaryStatus(summaryDbId, 'transcribing');
+        // Set initial state to transcribing with 0% progress
+        await updateSummaryProgress(summaryDbId, 'transcribing', 0, 'Starting transcript extraction...');
 
+        // Update progress periodically during transcription (simulated)
+        await updateSummaryProgress(summaryDbId, 'transcribing', 20, 'Downloading video audio...');
+        
         const transcript = await getVideoTranscript(videoId);
-
-        await updateSummaryStatus(summaryDbId, 'summarizing');
-
+        
+        // Update progress after transcript is complete
+        await updateSummaryProgress(summaryDbId, 'transcribing', 100, 'Transcript extraction complete');
+        
+        // Move to summarizing stage
+        await updateSummaryProgress(summaryDbId, 'summarizing', 0, 'Starting AI analysis...');
+        
+        // Update progress during summarization
+        await updateSummaryProgress(summaryDbId, 'summarizing', 30, 'Analyzing transcript content...');
+        
         const extraction = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
+        
+        await updateSummaryProgress(summaryDbId, 'summarizing', 100, 'Analysis complete');
+        
+        // Move to finalizing stage
+        await updateSummaryProgress(summaryDbId, 'finalizing', 0, 'Organizing results...');
 
         // Atomically update summary and create takeaways
         await updateSummaryAndTakeaways(summaryDbId, videoDbId, extraction);
 
         await createVideoSegments(videoDbId, extraction.segments);
-
-        await updateSummaryStatus(summaryDbId, 'completed');
+        
+        // Mark as completed
+        await updateSummaryProgress(summaryDbId, 'completed', 100, 'Processing complete');
+        
         logger.info('Video processing completed successfully', { data: { videoId } });
 
         await trackAdditionalUsage(userId, videoId, extraction, creditsNeeded);
@@ -46,13 +64,45 @@ export async function processVideoInBackground(
                 error: error.message,
             }
         });
-        await updateSummaryStatus(summaryDbId, 'failed');
+        await updateSummaryProgress(summaryDbId, 'failed', 0, `Error: ${error.message}`);
     }
 }
 
 export async function updateSummaryStatus(summaryId: number, status: string) {
     await executeQuery(sql =>
         sql`UPDATE video_summaries SET processing_status = ${status}, updated_at = NOW() WHERE id = ${summaryId}`
+    );
+}
+
+/**
+ * Enhanced function to update both status and progress
+ */
+export async function updateSummaryProgress(
+    summaryId: number | string, 
+    status: string, 
+    progress: number = 0,
+    message: string = ''
+) {
+    // Ensure progress is between 0-100
+    const safeProgress = Math.max(0, Math.min(100, progress));
+    
+    logger.info(`Updating summary progress`, { 
+        summaryId, 
+        status, 
+        progress: safeProgress,
+        message: message.substring(0, 100) // Truncate long messages
+    });
+    
+    await executeQuery(sql =>
+        sql`
+            UPDATE video_summaries 
+            SET 
+                processing_status = ${status}, 
+                processing_stage = ${status},
+                processing_progress = ${safeProgress},
+                updated_at = NOW() 
+            WHERE id = ${summaryId}
+        `
     );
 }
 

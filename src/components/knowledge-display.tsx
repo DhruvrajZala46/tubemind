@@ -42,3 +42,90 @@ export default function KnowledgeDisplay({ data, videoTitle, thumbnailUrl, rawAI
     </div>
   );
 }
+
+// Add a new component for processing status with PerplexityLoader
+'use client';
+
+import { useState, useEffect } from 'react';
+import { PerplexityLoader, ProcessingStage } from './ui/perplexity-loader';
+
+interface ProcessingStatusDisplayProps {
+  videoId: string;
+  summaryId: string;
+  initialStatus?: string;
+}
+
+export function ProcessingStatusDisplay({ videoId, summaryId, initialStatus }: ProcessingStatusDisplayProps) {
+  const [status, setStatus] = useState<string>(initialStatus || 'pending');
+  const [stage, setStage] = useState<string>(initialStatus || 'pending');
+  const [progress, setProgress] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!summaryId) return;
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/summaries/${summaryId}/status`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch status');
+        }
+        
+        const data = await response.json();
+        
+        setStatus(data.processing_status);
+        setStage(data.processing_stage || data.processing_status);
+        setProgress(data.processing_progress || 0);
+        setIsLoading(false);
+        
+        // If still processing, continue polling
+        if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
+          setTimeout(pollStatus, 2000); // Poll every 2 seconds
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setIsLoading(false);
+      }
+    };
+
+    pollStatus();
+  }, [summaryId]);
+
+  // Map API status to component status
+  function mapApiStatusToComponentStage(status: string): ProcessingStage {
+    // Direct mapping for known statuses
+    if (status === 'transcribing' || status === 'extracting') return 'transcribing';
+    if (status === 'summarizing' || status === 'analyzing') return 'summarizing';
+    if (status === 'finalizing') return 'finalizing';
+    if (status === 'completed' || status === 'complete') return 'completed';
+    if (status === 'failed' || status === 'error') return 'failed';
+    
+    // Default to pending for any other status
+    return 'pending';
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p className="text-red-700 dark:text-red-300">Error: {error}</p>
+      </div>
+    );
+  }
+
+  // Show the loader while processing
+  if (isLoading || status !== 'completed') {
+    return (
+      <PerplexityLoader 
+        currentStage={mapApiStatusToComponentStage(stage)}
+        progress={progress}
+        showProgress={true}
+        showAnimatedText={true}
+      />
+    );
+  }
+
+  // If completed, the parent component should render the actual content
+  return null;
+}

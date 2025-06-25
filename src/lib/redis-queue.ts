@@ -50,8 +50,8 @@ export async function addJobToRedisQueue(jobData: any) {
 
 export async function getNextJobFromRedis(): Promise<any | null> {
   logger.warn('getNextJobFromRedis called - migrated to Cloud Tasks');
-  return null;
-}
+      return null;
+    }
 
 export async function markJobCompleted(jobId: string) {
   logger.warn('markJobCompleted called - migrated to Cloud Tasks');
@@ -75,13 +75,13 @@ export async function removeCompletedJobs() {
 
 export async function initializeRedisQueue() {
   logger.warn('initializeRedisQueue called - migrated to Cloud Tasks');
-  return true;
+    return true;
 }
 
 export function isRedisAvailable() {
   logger.warn('isRedisAvailable called - migrated to Cloud Tasks');
-  return false;
-}
+      return false;
+    }
 
 export async function cleanCorruptedData() {
   logger.warn('cleanCorruptedData called - migrated to Cloud Tasks');

@@ -1,8 +1,9 @@
+// This is the server component part (without 'use client')
 import { notFound, redirect } from 'next/navigation';
 import { neon } from '@neondatabase/serverless';
 import { currentUser } from '@clerk/nextjs/server';
-import VideoSummary from '../../../components/Dashboard/VideoSummary';
 import { Metadata } from 'next';
+import VideoSummaryClientPage from './client-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -279,11 +280,12 @@ export default async function VideoSummaryPage({ params }: PageProps) {
   // The API route can handle both UUID and YouTube video ID
   const pollingId = videoId; // Use the page ID for polling
 
+  // Pass the data to the client component
   return (
-    <main className="min-h-screen bg-[#0D1117] text-white">
-      <div className="container mx-auto px-4 py-8">
-        <VideoSummary summary={summary} videoId={pollingId} summaryId={String(summary.summary_id)} />
-      </div>
-    </main>
+    <VideoSummaryClientPage 
+      summary={summary} 
+      pollingId={pollingId} 
+      summaryId={String(summary.summary_id)} 
+    />
   );
 } 
