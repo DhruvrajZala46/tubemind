@@ -120,14 +120,25 @@ export default function MainContent() {
       // Stop the submission loading indicator
       stopSubmitting();
       
+      // Don't redirect immediately - show progress first
+      setProcessingStage("transcribing");
+      setProgress(10);
+      setStatusMessage("Video submitted successfully! Starting processing...");
+      
       // Show success toast
-      toast.success("Video submitted successfully! Redirecting...");
+      toast.success("Video submitted successfully! Processing...");
 
-      // Redirect to the summary page
-      if (data.data.redirectUrl) {
-          router.push(data.data.redirectUrl);
+      // Start polling for progress and redirect when complete
+      const summaryId = data.data.summaryId;
+      const redirectUrl = data.data.redirectUrl;
+      
+      if (summaryId && redirectUrl) {
+        await pollProgressAndRedirect(summaryId, redirectUrl);
       } else {
-          router.push('/dashboard'); // fallback route if no redirectUrl
+        // Fallback: redirect after 2 seconds if no polling data
+        setTimeout(() => {
+          router.push(redirectUrl || '/dashboard');
+        }, 2000);
       }
     }
     catch (err: any) {
@@ -136,6 +147,91 @@ export default function MainContent() {
       stopSubmitting();
     }
   }
+
+  // New function to poll progress and redirect when complete
+  const pollProgressAndRedirect = async (summaryId: string, redirectUrl: string) => {
+    let pollCount = 0;
+    const maxPolls = 60; // Max 3 minutes of polling (3 seconds * 60)
+    
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/summaries/${summaryId}/status`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update progress UI
+        const stage = data.processing_stage || data.processing_status || 'processing';
+        const progress = data.processing_progress || 10;
+        
+        setProcessingStage(stage as ProcessingStage);
+        setProgress(progress);
+        setStatusMessage(getStatusMessage(stage, progress));
+        
+        // Check if complete
+        if (data.processing_status === 'completed' || progress >= 100) {
+          setProcessingStage('complete');
+          setProgress(100);
+          setStatusMessage("Processing complete! Redirecting...");
+          
+          // Redirect after showing completion
+          setTimeout(() => {
+            router.push(redirectUrl);
+          }, 1500);
+          return;
+        }
+        
+        // Check if failed
+        if (data.processing_status === 'failed') {
+          setProcessingStage('error');
+          setStatusMessage("Processing failed. Please try again.");
+          setIsProcessing(false);
+          return;
+        }
+        
+        // Continue polling if not complete and under max polls
+        pollCount++;
+        if (pollCount < maxPolls) {
+          setTimeout(poll, 3000); // Poll every 3 seconds
+        } else {
+          // Max polls reached - redirect anyway
+          setStatusMessage("Taking longer than expected. Redirecting...");
+          setTimeout(() => {
+            router.push(redirectUrl);
+          }, 2000);
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error);
+        // On polling error, redirect after a delay
+        setStatusMessage("Checking status... Redirecting shortly...");
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 3000);
+      }
+    };
+    
+    // Start polling after initial delay
+    setTimeout(poll, 1000);
+  };
+
+  // Helper function to get status message
+  const getStatusMessage = (stage: string, progress: number): string => {
+    switch (stage) {
+      case 'transcribing':
+        return `Extracting transcript... ${progress}%`;
+      case 'summarizing':
+        return `Analyzing content... ${progress}%`;
+      case 'finalizing':
+        return `Finalizing summary... ${progress}%`;
+      case 'completed':
+        return "Processing complete!";
+      default:
+        return `Processing video... ${progress}%`;
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center w-full px-4 py-8 md:py-12 max-w-6xl mx-auto">
