@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { useInstantLoading } from '../../ui/instant-loading';
 import { useMainLoading } from "../../../lib/main-loading-context.tsx";
 
-type ProcessingStage = 'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error';
+type ProcessingStage = 'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error' | 'pending';
 
 export default function MainContent() {
   const { isSignedIn, isLoaded } = useUser();
@@ -120,6 +120,8 @@ export default function MainContent() {
       // Stop the submission loading indicator
       stopSubmitting();
       
+      console.log('📦 Extract API response data:', data);
+      
       // Don't redirect immediately - show progress first
       setProcessingStage("transcribing");
       setProgress(10);
@@ -132,9 +134,13 @@ export default function MainContent() {
       const summaryId = data.data.summaryId;
       const redirectUrl = data.data.redirectUrl;
       
+      console.log('🔍 Polling setup:', { summaryId, redirectUrl });
+      
       if (summaryId && redirectUrl) {
+        console.log('✅ Starting polling with valid IDs');
         await pollProgressAndRedirect(summaryId, redirectUrl);
       } else {
+        console.log('❌ Missing polling data, using fallback redirect');
         // Fallback: redirect after 2 seconds if no polling data
         setTimeout(() => {
           router.push(redirectUrl || '/dashboard');
@@ -150,21 +156,30 @@ export default function MainContent() {
 
   // New function to poll progress and redirect when complete
   const pollProgressAndRedirect = async (summaryId: string, redirectUrl: string) => {
+    console.log('🔄 Starting polling for summaryId:', summaryId);
     let pollCount = 0;
-    const maxPolls = 60; // Max 3 minutes of polling (3 seconds * 60)
+    const maxPolls = 120; // Increased to 6 minutes of polling (3 seconds * 120)
     
     const poll = async () => {
+      pollCount++;
+      console.log(`🔄 Poll attempt ${pollCount}/${maxPolls} for summaryId:`, summaryId);
+      
       try {
         const response = await fetch(`/api/summaries/${summaryId}/status`);
+        console.log(`📡 Status API response:`, response.status);
+        
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
+        console.log(`📊 Status data received:`, data);
         
         // Update progress UI
-        const stage = data.processing_stage || data.processing_status || 'processing';
+        const stage = data.processing_stage || data.processing_status || 'pending';
         const progress = data.processing_progress || 10;
+        
+        console.log(`🎯 Updating UI - Stage: ${stage}, Progress: ${progress}%`);
         
         setProcessingStage(stage as ProcessingStage);
         setProgress(progress);
@@ -172,6 +187,7 @@ export default function MainContent() {
         
         // Check if complete
         if (data.processing_status === 'completed' || progress >= 100) {
+          console.log('✅ Processing completed! Redirecting to:', redirectUrl);
           setProcessingStage('complete');
           setProgress(100);
           setStatusMessage("Processing complete! Redirecting...");
@@ -185,6 +201,7 @@ export default function MainContent() {
         
         // Check if failed
         if (data.processing_status === 'failed') {
+          console.log('❌ Processing failed');
           setProcessingStage('error');
           setStatusMessage("Processing failed. Please try again.");
           setIsProcessing(false);
@@ -192,11 +209,12 @@ export default function MainContent() {
         }
         
         // Continue polling if not complete and under max polls
-        pollCount++;
         if (pollCount < maxPolls) {
-          setTimeout(poll, 3000); // Poll every 3 seconds
+          console.log(`⏳ Scheduling next poll in 2 seconds (attempt ${pollCount + 1})`);
+          setTimeout(poll, 2000); // Poll every 2 seconds (more aggressive)
         } else {
           // Max polls reached - redirect anyway
+          console.log('⏰ Max polls reached, redirecting anyway');
           setStatusMessage("Taking longer than expected. Redirecting...");
           setTimeout(() => {
             router.push(redirectUrl);
@@ -204,8 +222,8 @@ export default function MainContent() {
         }
         
       } catch (error) {
-        console.error('Polling error:', error);
-        // On polling error, redirect after a delay
+        console.error('❌ Polling error:', error);
+        // On polling error, still try to redirect after a delay
         setStatusMessage("Checking status... Redirecting shortly...");
         setTimeout(() => {
           router.push(redirectUrl);
@@ -213,8 +231,9 @@ export default function MainContent() {
       }
     };
     
-    // Start polling after initial delay
-    setTimeout(poll, 1000);
+    // Start polling immediately (no delay)
+    console.log('🚀 Starting immediate poll');
+    poll();
   };
 
   // Helper function to get status message
