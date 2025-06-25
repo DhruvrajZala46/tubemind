@@ -58,15 +58,15 @@ app.post('/', async (req: Request, res: Response) => {
     logger.info('Processing job with new progress tracking', { 
       jobType: jobData.type || 'video-processing',
       videoId: jobData.videoId,
-      userId: jobData.userId
-    });
+        userId: jobData.userId
+      });
       
     // Process the video job using new extract-core with progress tracking
     await processVideoExtraction(jobData);
     
     const processingTime = Date.now() - startTime;
     logger.info('Job completed successfully', { 
-      videoId: jobData.videoId,
+          videoId: jobData.videoId,
       processingTimeMs: processingTime 
     });
 
