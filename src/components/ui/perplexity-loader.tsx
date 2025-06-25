@@ -30,6 +30,11 @@ const STAGES: Array<{
   description: string;
 }> = [
   {
+    id: 'pending',
+    label: 'Preparing',
+    description: 'Getting everything ready...'
+  },
+  {
     id: 'transcribing',
     label: 'Transcribing',
     description: 'Converting video to text...'
@@ -115,11 +120,24 @@ export function PerplexityLoader({
         "w-full max-w-3xl mx-auto rounded-xl p-6 bg-black/5 dark:bg-white/5 backdrop-blur-sm border border-white/10",
         className
       )}>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex flex-col items-center justify-center gap-3">
           <ElegantLoader size="sm" color={accentColor} />
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            Preparing your video...
+            Preparing your video{animatedDots}
           </p>
+          {showProgress && (
+            <div className="w-full mt-4">
+              <Progress value={10} className="h-1" />
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  10% complete
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  1/5
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -163,9 +181,9 @@ export function PerplexityLoader({
 
       {/* Processing steps */}
       <div className="space-y-4">
-        {STAGES.filter(stage => stage.id !== 'completed').map((stage, index) => {
+        {STAGES.filter(stage => stage.id !== 'completed' && stage.id !== 'pending').map((stage, index) => {
           const isActive = stage.id === currentStage;
-          const isCompleted = STAGES.findIndex(s => s.id === currentStage) > index;
+          const isCompleted = STAGES.findIndex(s => s.id === currentStage) > index + 1; // +1 to account for pending
           
           return (
             <div 

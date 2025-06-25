@@ -28,6 +28,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [shouldShow, setShouldShow] = useState(true);
 
   useEffect(() => {
     if (!summaryId) return;
@@ -41,6 +42,13 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
         const data = await response.json();
         setData(data);
         setIsLoading(false);
+        
+        // Check if we should hide the loader
+        if (data.processing_status === 'completed' && data.overall_summary && data.overall_summary.trim() !== '') {
+          setShouldShow(false);
+        } else if (data.processing_status === 'failed') {
+          setShouldShow(false);
+        }
         
         // If still processing, continue polling
         if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
@@ -63,7 +71,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     return <div className="text-red-500">Error loading status: {error.message}</div>;
   }
 
-  if (!isLoading && (!data || data.processing_status === 'completed')) {
+  if (!shouldShow || !isLoading && (!data || (data.processing_status === 'completed' && data.overall_summary && data.overall_summary.trim() !== ''))) {
     return null;
   }
 
