@@ -28,7 +28,6 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [shouldShow, setShouldShow] = useState(true);
 
   useEffect(() => {
     if (!summaryId) return;
@@ -42,13 +41,6 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
         const data = await response.json();
         setData(data);
         setIsLoading(false);
-        
-        // Check if we should hide the loader
-        if (data.processing_status === 'completed' && data.overall_summary && data.overall_summary.trim() !== '') {
-          setShouldShow(false);
-        } else if (data.processing_status === 'failed') {
-          setShouldShow(false);
-        }
         
         // If still processing, continue polling
         if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
@@ -71,23 +63,25 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     return <div className="text-red-500">Error loading status: {error.message}</div>;
   }
 
-  if (!shouldShow || !isLoading && (!data || (data.processing_status === 'completed' && data.overall_summary && data.overall_summary.trim() !== ''))) {
-    return null;
+  // Show loader while loading or while processing (not completed/failed)
+  if (isLoading || (data && data.processing_status !== 'completed' && data.processing_status !== 'failed')) {
+    return (
+      <div className="mt-8 mb-12">
+        <PerplexityLoader 
+          currentStage={data?.processing_stage ? 
+            mapApiStatusToProcessingStage(data.processing_stage) : 
+            'pending'
+          }
+          progress={data?.processing_progress || 0}
+          showProgress={true}
+          showAnimatedText={true}
+        />
+      </div>
+    );
   }
 
-  return (
-    <div className="mt-8 mb-12">
-      <PerplexityLoader 
-        currentStage={data?.processing_stage ? 
-          mapApiStatusToProcessingStage(data.processing_stage) : 
-          'pending'
-        }
-        progress={data?.processing_progress || 0}
-        showProgress={true}
-        showAnimatedText={true}
-      />
-    </div>
-  );
+  // Hide loader when completed or failed
+  return null;
 }
 
 // Main client component
