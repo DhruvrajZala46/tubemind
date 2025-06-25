@@ -18,7 +18,7 @@ interface JobData {
 }
 
 // Check if we're in a Node.js environment (server-side)
-const isServerSide = typeof window === 'undefined';
+const isServerSide = typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined';
 
 export async function enqueueJob(jobData: JobData): Promise<string> {
   // Only run on server-side (Cloud Run worker or API routes)

@@ -58,8 +58,8 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
     };
     logStep('Job Processing', 'START', { summaryDbId, videoId, creditsNeeded, totalDurationSeconds });
     const jobStartTime = Date.now();
-    // Helper function to update processing status in database
-    const updateStatus = async (status, message) => {
+    // Helper function to update processing status and progress in database
+    const updateProgress = async (stage, progress, message) => {
         if (typeof summaryDbId === 'undefined') {
             logger.error('Cannot update status for an undefined summaryId');
             return;
@@ -69,46 +69,65 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
                 await sql `
           UPDATE video_summaries 
           SET 
-            processing_status = ${status},
-            overall_summary = ${message || status},
+            processing_status = ${stage},
+            processing_stage = ${stage},
+            processing_progress = ${Math.max(0, Math.min(100, progress))},
+            overall_summary = ${message || stage},
             updated_at = NOW()
           WHERE id = ${summaryDbId}
         `;
             });
-            logger.info(`DB Status updated to: ${status}`, { summaryId: summaryDbId });
+            logger.info(`Progress updated: ${stage} (${progress}%)`, { summaryId: summaryDbId, message });
         }
         catch (e) {
-            logger.error(`Failed to update status for summary: ${e.message}`, { summaryId: summaryDbId });
+            logger.error(`Failed to update progress for summary: ${e.message}`, { summaryId: summaryDbId });
         }
     };
     try {
         // === STEP 1: Fetch transcript ===
         const step1Time = Date.now();
         logStep('Transcript Fetch', 'START');
-        await updateStatus('transcribing', 'Fetching transcript...');
+        await updateProgress('transcribing', 10, 'Starting transcript extraction...');
         // Assert videoId is not a UUID (DB ID)
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(videoId)) {
             logger.error('❌ videoId is a UUID, not a YouTube ID! This will cause SupaData 404.', { videoId, summaryDbId, userId });
             throw new Error('videoId is a UUID, not a YouTube ID!');
         }
+        // Add delay to show initial progress
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        await updateProgress('transcribing', 30, 'Downloading video audio...');
         const transcript = await getVideoTranscript(videoId);
         if (!transcript || transcript.length === 0) {
             throw new Error('Transcript is empty or could not be fetched.');
         }
+        // Add delay to show transcript progress
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+        await updateProgress('transcribing', 100, 'Transcript extraction complete');
         logStep('Transcript Fetch', 'SUCCESS', { duration: `${Date.now() - step1Time}ms`, segments: transcript.length });
         // === STEP 2: Process with OpenAI ===
         const step2Time = Date.now();
         logStep('AI Knowledge Extraction', 'START');
-        await updateStatus('summarizing', 'Generating insights with AI...');
+        // Add delay before starting analysis
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        await updateProgress('summarizing', 10, 'Starting AI analysis...');
+        // Add delay during analysis
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+        await updateProgress('summarizing', 40, 'Analyzing transcript content...');
         const aiResult = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
         logStep('AI Knowledge Extraction', 'SUCCESS', { duration: `${Date.now() - step2Time}ms`, mainTitle: aiResult.mainTitle });
         if (!aiResult.mainTitle || !aiResult.overallSummary) {
-            await updateStatus('failed', 'Summary generation failed: missing main title or summary.');
+            await updateProgress('failed', 0, 'Summary generation failed: missing main title or summary.');
             throw new Error('Summary generation failed: missing main title or summary.');
         }
+        // Add delay to show analysis completion
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        await updateProgress('summarizing', 100, 'AI analysis complete');
         // === STEP 3: Update the summary with results ===
         const step3Time = Date.now();
         logStep('Database Update', 'START');
+        // Add delay before finalizing
+        await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
+        await updateProgress('finalizing', 20, 'Organizing results...');
         await executeQuery(async (sql) => {
             await sql `
         UPDATE video_summaries 
@@ -122,7 +141,9 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
           input_cost = ${aiResult.inputCost || 0.0},
           output_cost = ${aiResult.outputCost || 0.0},
           total_cost = ${aiResult.totalCost || 0.0},
-          processing_status = 'complete',
+          processing_status = 'finalizing',
+          processing_stage = 'finalizing',
+          processing_progress = 60,
           updated_at = NOW()
         WHERE id = ${summaryDbId}
       `;
@@ -131,6 +152,9 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
         // === STEP 4: Consume credits on success ===
         const step4Time = Date.now();
         logStep('Credit Consumption', 'START');
+        // Add delay during credit processing
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        await updateProgress('finalizing', 80, 'Processing credits...');
         try {
             const creditResult = await consumeCredits(userId, creditsNeeded);
             if (!creditResult) {
@@ -166,6 +190,9 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
         const step5Time = Date.now();
         if (aiResult.segments && aiResult.segments.length > 0) {
             logStep('Segment Creation', 'START', { segmentCount: aiResult.segments.length });
+            // Add delay before segment creation
+            await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
+            await updateProgress('finalizing', 90, 'Creating video segments...');
             // We already have videoDbId passed as parameter, but double-check for safety
             if (!videoDbId) {
                 const videoIdRows = await executeQuery(async (sql) => {
@@ -186,14 +213,17 @@ async function processVideo(videoId, videoDbId, summaryDbId, userId, userEmail, 
             });
             logStep('Segment Creation', 'SUCCESS', { duration: `${Date.now() - step5Time}ms`, count: aiResult.segments.length });
         }
-        await updateStatus('complete'); // Final status update
+        // === FINAL STEP: Complete processing ===
+        // Add final delay to let users see the completion progress
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        await updateProgress('completed', 100, 'Processing complete');
         logStep('Job Processing', 'SUCCESS', { totalDuration: `${Date.now() - jobStartTime}ms` });
         return { status: 'completed', videoId, summaryId: summaryDbId };
     }
     catch (error) {
         // CRITICAL: This is the global error handler for the job.
         logStep('Job Processing', 'FAILURE', { error: error.message, totalDuration: `${Date.now() - jobStartTime}ms` });
-        await updateStatus('failed', `Processing failed: ${error.message}`);
+        await updateProgress('failed', 0, `Processing failed: ${error.message}`);
         logger.error(`Job processing failed: ${error.message}`, {
             videoId,
             summaryDbId,
