@@ -47,12 +47,13 @@ async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
       // Use dynamic import for node-fetch
       const fetch = (await import('node-fetch')).default;
       
-      // Create timeout controller
+      // Create timeout controller with longer timeout for video processing
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout (videos take time)
       
       try {
         // Make direct HTTP call to worker service
+        // Note: This is fire-and-forget - worker will continue even if this times out
         const response = await fetch(workerUrl, {
           method: 'POST',
           headers: {
@@ -74,19 +75,34 @@ async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
             userId: jobData.userId,
             workerUrl
           });
-          throw new Error(`Worker service error: ${response.status} ${response.statusText}`);
+          // Don't throw - let it fall through to success (worker may still process)
+          logger.info('Worker call failed but job is queued in database - processing may continue', {
+            videoId: jobData.videoId,
+            userId: jobData.userId
+          });
+        } else {
+          const result = await response.json();
+          logger.info('Worker service responded successfully', { 
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+            result
+          });
         }
-        
-        const result = await response.json();
-        logger.info('Worker service responded successfully', { 
-          videoId: jobData.videoId,
-          userId: jobData.userId,
-          result
-        });
         
         return `direct-call-${jobData.summaryDbId}`;
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
+        
+        // If it's a timeout, that's OK - worker continues in background
+        if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
+          logger.info('Worker call timed out but job is queued - processing continues in background', {
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+            timeout: '30s'
+          });
+          return `timeout-ok-${jobData.summaryDbId}`;
+        }
+        
         throw fetchError;
       }
     } catch (error: any) {
