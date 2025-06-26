@@ -41,8 +41,8 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
     }
   }, [pathname, isMobileMenuOpen]);
   
-  // Check if we're on the /new route (should be centered and no scroll)
-  const isNewRoute = pathname === '/dashboard/new';
+  // Allow scrolling on all routes for better mobile UX
+  const isNewRoute = false; // Changed: always allow scrolling
 
   // Function to handle sidebar collapse state changes from the Sidebar component
   const handleSidebarCollapseChange = (collapsed: boolean) => {

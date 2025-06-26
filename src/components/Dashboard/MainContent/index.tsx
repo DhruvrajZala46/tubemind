@@ -175,9 +175,53 @@ export default function MainContent() {
         const data = await response.json();
         console.log(`📊 Status data received:`, data);
         
-        // Update progress UI
+        // Update progress UI with better mapping
         const stage = data.processing_stage || data.processing_status || 'pending';
-        const progress = data.processing_progress || 10;
+        let progress = data.processing_progress || 0;
+        
+        // Ensure minimum progress for better UX and smooth transitions
+        if (progress === 0 || progress < 5) {
+          switch (stage) {
+            case 'pending':
+            case 'queued':
+              progress = Math.max(10, progress);
+              break;
+            case 'transcribing':
+            case 'extracting':
+              progress = Math.max(25, progress);
+              break;
+            case 'summarizing':
+            case 'analyzing':
+              progress = Math.max(65, progress);
+              break;
+            case 'finalizing':
+              progress = Math.max(90, progress);
+              break;
+            case 'completed':
+              progress = 100;
+              break;
+            default:
+              progress = Math.max(8, progress);
+          }
+        }
+        
+        // Ensure progress is reasonable for current stage
+        switch (stage) {
+          case 'transcribing':
+          case 'extracting':
+            progress = Math.min(Math.max(20, progress), 59);
+            break;
+          case 'summarizing':
+          case 'analyzing':
+            progress = Math.min(Math.max(60, progress), 89);
+            break;
+          case 'finalizing':
+            progress = Math.min(Math.max(90, progress), 99);
+            break;
+          case 'completed':
+            progress = 100;
+            break;
+        }
         
         console.log(`🎯 Updating UI - Stage: ${stage}, Progress: ${progress}%`);
         
@@ -253,12 +297,12 @@ export default function MainContent() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full px-4 py-8 md:py-12 max-w-6xl mx-auto">
+    <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-4 sm:py-8 md:py-12 max-w-6xl mx-auto">
       {/* Main Header with Title */}
       <MainHeader />
       
       {/* Main Content Area */}
-      <div className="w-full max-w-3xl mx-auto mt-6 mb-8">
+      <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 mb-4 sm:mb-8">
         {/* Video Input Section - Claude AI style */}
         <form className="flex flex-col items-center w-full" autoComplete="off" onSubmit={(e) => {
           e.preventDefault();
@@ -324,7 +368,7 @@ export default function MainContent() {
       
       {/* Processing Status */}
       {isProcessing && processingStage !== 'idle' && (
-        <div className="w-full max-w-3xl mx-auto mt-6">
+        <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 px-2 sm:px-0">
           <ProcessingStatus 
             stage={processingStage as 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error'}
             progress={progress}

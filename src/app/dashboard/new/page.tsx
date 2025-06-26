@@ -5,8 +5,10 @@ import { ElegantLoader } from "../../../components/ui/elegant-loader";
 
 export default function DashboardNewPage() {
   return (
-    <Suspense fallback={<div className='flex items-center justify-center min-h-screen'><ElegantLoader size="lg" /></div>}>
-      <MainContent />
+    <Suspense fallback={<div className='flex items-center justify-center min-h-screen px-4'><ElegantLoader size="lg" /></div>}>
+      <div className="w-full min-h-screen">
+        <MainContent />
+      </div>
     </Suspense>
   );
 } 

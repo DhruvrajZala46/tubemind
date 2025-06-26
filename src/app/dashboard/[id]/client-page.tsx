@@ -12,12 +12,19 @@ interface VideoSummaryClientPageProps {
 
 // Function to map API status to component status
 function mapApiStatusToProcessingStage(status: string): ProcessingStage {
+  // Normalize status to lowercase for consistent mapping
+  const normalizedStatus = status?.toLowerCase() || '';
+  
   // Direct mapping for known statuses
-  if (status === 'transcribing' || status === 'extracting') return 'transcribing';
-  if (status === 'summarizing' || status === 'analyzing') return 'summarizing';
-  if (status === 'finalizing') return 'finalizing';
-  if (status === 'completed' || status === 'complete') return 'completed';
-  if (status === 'failed' || status === 'error') return 'failed';
+  if (normalizedStatus.includes('transcrib') || normalizedStatus.includes('extract')) return 'transcribing';
+  if (normalizedStatus.includes('summari') || normalizedStatus.includes('analyz')) return 'summarizing';
+  if (normalizedStatus.includes('finaliz') || normalizedStatus.includes('polish')) return 'finalizing';
+  if (normalizedStatus.includes('complet') || normalizedStatus.includes('finish')) return 'completed';
+  if (normalizedStatus.includes('fail') || normalizedStatus.includes('error')) return 'failed';
+  if (normalizedStatus.includes('queue') || normalizedStatus.includes('pending')) return 'pending';
+  
+  // Default to transcribing if we have any processing status
+  if (normalizedStatus.includes('process')) return 'transcribing';
   
   // Default to pending for any other status
   return 'pending';
@@ -66,7 +73,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   // Show loader while loading or while processing (not completed/failed)
   if (isLoading || (data && data.processing_status !== 'completed' && data.processing_status !== 'failed')) {
     return (
-      <div className="mt-8 mb-12">
+      <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0">
         <PerplexityLoader 
           currentStage={data?.processing_stage ? 
             mapApiStatusToProcessingStage(data.processing_stage) : 
@@ -87,8 +94,8 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
 // Main client component
 export default function VideoSummaryClientPage({ summary, pollingId, summaryId }: VideoSummaryClientPageProps) {
   return (
-    <main className="min-h-screen bg-[#0D1117] text-white">
-      <div className="container mx-auto px-4 py-8">
+    <main className="min-h-screen bg-[#0D1117] text-white w-full">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 max-w-6xl">
         <VideoSummary summary={summary} videoId={pollingId} summaryId={summaryId} />
         <ProcessingStatusPoller summaryId={summaryId} />
       </div>

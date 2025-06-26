@@ -26,7 +26,7 @@ export default function ProcessingStatus({ stage, progress, message, error, onRe
 
   return (
     <PerplexityLoader
-      className="w-full max-w-2xl mx-auto"
+      className="w-full max-w-4xl mx-auto"
       currentStage={mapStageToPerplexityStage(stage)}
       progress={progress}
       showProgress={true}
