@@ -457,29 +457,63 @@ html {
   }
 }
 
-/* Mobile-specific text sizing (Claude-style) */
+/* Mobile-specific text sizing (Claude/ChatGPT-style) */
 @media (max-width: 767px) {
-  /* Optimize text for mobile readability */
+  /* Optimize text for mobile readability - ChatGPT/Claude style */
   .mobile-text-optimize {
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 16px; /* Increased from 14px for better readability */
+    line-height: 1.6; /* Improved line height */
     letter-spacing: -0.01em;
   }
   
   .mobile-text-optimize h1 {
-    font-size: 1.5rem;
+    font-size: 1.6rem; /* Increased from 1.5rem */
     line-height: 1.3;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem; /* Increased spacing */
   }
   
   .mobile-text-optimize h2 {
-    font-size: 1.25rem;
+    font-size: 1.35rem; /* Increased from 1.25rem */
+    line-height: 1.4;
+    margin-bottom: 0.75rem; /* Increased spacing */
+  }
+  
+  .mobile-text-optimize h3 {
+    font-size: 1.2rem; /* Added h3 styling */
     line-height: 1.4;
     margin-bottom: 0.5rem;
   }
   
   .mobile-text-optimize p {
-    margin-bottom: 0.875rem;
+    margin-bottom: 1rem; /* Increased from 0.875rem */
+    line-height: 1.6; /* Better line height for paragraphs */
+  }
+  
+  /* Better mobile text for summaries and content */
+  .chatgpt-markdown {
+    font-size: 16px !important; /* Increased base font size */
+    line-height: 1.6 !important;
+  }
+  
+  .chatgpt-markdown h1 {
+    font-size: 1.6rem !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .chatgpt-markdown h2 {
+    font-size: 1.35rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+  
+  .chatgpt-markdown h3 {
+    font-size: 1.2rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .chatgpt-markdown p {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    margin-bottom: 1rem !important;
   }
   
   /* Mobile card optimizations */

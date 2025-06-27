@@ -133,7 +133,7 @@ function ChatGPTMarkdown({
       <style jsx global>{`
         .chatgpt-markdown {
           font-family: var(--font-sans);
-          font-size: 0.875rem; /* Mobile-first smaller text */
+          font-size: 1rem; /* Updated base font size */
           line-height: 1.6;
           color: var(--text-primary);
           background: transparent;
@@ -144,6 +144,35 @@ function ChatGPTMarkdown({
           width: 100%;
           max-width: 100%;
           overflow-wrap: break-word;
+        }
+        
+        /* Mobile-first responsive text sizing */
+        @media (max-width: 767px) {
+          .chatgpt-markdown {
+            font-size: 16px; /* Better mobile readability */
+            line-height: 1.6;
+          }
+          
+          .chatgpt-markdown h1 {
+            font-size: 1.6rem;
+            margin-bottom: 1rem;
+          }
+          
+          .chatgpt-markdown h2 {
+            font-size: 1.35rem;
+            margin-bottom: 0.75rem;
+          }
+          
+          .chatgpt-markdown h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+          }
+          
+          .chatgpt-markdown p {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+          }
         }
         
         /* Desktop text sizes */
@@ -161,7 +190,7 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown h1 {
-          font-size: 1.5rem; /* Mobile-first smaller heading */
+          font-size: 1.75rem; /* Updated for desktop */
           font-weight: 700;
           margin-top: 1.5rem;
           margin-bottom: 1rem;
@@ -172,7 +201,7 @@ function ChatGPTMarkdown({
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           padding-bottom: 0.5rem;
           letter-spacing: -0.01em;
-          font-size: 1.25rem; /* Mobile-first smaller heading */
+          font-size: 1.4rem; /* Updated for desktop */
           font-weight: 600;
           margin-top: 1.5rem;
           margin-bottom: 0.75rem;
@@ -206,7 +235,7 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown p {
-          margin-bottom: 1em; /* Tighter spacing on mobile */
+          margin-bottom: 1.1em; /* Improved spacing */
           letter-spacing: 0.01em;
         }
         
@@ -569,8 +598,6 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
       
       <div className="mt-8">
         {renderContent()}
-        {/* DEBUG: Show the summary object for troubleshooting */}
-        <pre style={{ background: '#222', color: '#fff', padding: '1em', marginTop: '2em', borderRadius: '8px', fontSize: '0.9em', overflowX: 'auto' }}>{JSON.stringify(summary, null, 2)}</pre>
       </div>
     </div>
   );

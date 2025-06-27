@@ -334,10 +334,10 @@ export default function MainContent() {
               <button
                 type="submit"
                 className="ml-2 flex items-center justify-center h-12 px-6 rounded-2xl bg-[#DC143C] hover:bg-[#DC143C]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
-                disabled={!!error || !input.trim() || isSubmitting}
+                disabled={!!error || !input.trim() || isSubmitting || isProcessing}
                 style={{ minWidth: 0 }}
               >
-                {isSubmitting ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-white" />}
+                {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-white" />}
               </button>
             </div>
           </div>

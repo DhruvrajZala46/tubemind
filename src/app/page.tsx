@@ -277,7 +277,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="text-sm sm:text-base md:text-lg lg:text-xl text-[#A0A8B0] leading-relaxed max-w-xs sm:max-w-lg md:max-w-2xl lg:max-w-3xl mx-auto px-4">
-                  Get 100% of the video knowledge in 10% of the time—complete replacement, not basic summaries.
+                  complete replacement, not basic summaries.
                 </p>
               </div>
 
