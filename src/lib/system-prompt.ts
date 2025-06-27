@@ -141,8 +141,6 @@ Example: "AI learns fast. But here's the catch. You need to teach it right. Like
 
 ### [Powerful hook statement that creates instant curiosity]
 
-### [One sentence setting up the knowledge journey ahead]
-
 **Enhanced Segment Formula for Perfect Understanding:**
 ## **[Context-Relevant Emoji] [EXACT Time Range] | [What This Section Is About]**
 
@@ -206,8 +204,6 @@ Content Formatting Within Segments:
 # AI Productivity Secrets: Transform Your Workflow in 15 Minutes 🚀
 
 ### This video reveals game-changing AI techniques that successful entrepreneurs use to 10x their productivity and automate boring tasks.
-
-### You'll discover the exact steps to build your own AI-powered workflow system that works 24/7.
 
 ## **💡 0:00-3:30 | The Productivity Crisis Everyone Faces**
 

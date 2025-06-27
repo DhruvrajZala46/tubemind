@@ -4,10 +4,10 @@ import Link from "next/link";
 export default function NewSummaryError({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0D1117] text-white px-4">
-      <div className="max-w-lg w-full bg-[#161B22] rounded-2xl shadow-2xl p-10 flex flex-col items-center">
+      <div className="max-w-lg w-full bg-[#2D2D2D] rounded-2xl shadow-2xl p-10 flex flex-col items-center">
         <span className="text-5xl mb-4 animate-pulse">🤖</span>
         <h1 className="text-2xl font-bold mb-2">Couldn't load new summary page</h1>
-        <p className="text-lg text-[#8B949E] mb-6 text-center">Something went wrong. Try again, or return to your dashboard.</p>
+        <p className="text-lg text-[#C4C4C4] mb-6 text-center">Something went wrong. Try again, or return to your dashboard.</p>
         <div className="flex gap-4">
           <button
             onClick={() => reset()}
@@ -16,7 +16,7 @@ export default function NewSummaryError({ error, reset }: { error: Error; reset:
             Try Again
           </button>
           <Link href="/dashboard/new">
-            <button className="bg-white text-[#0D1117] font-semibold px-6 py-3 rounded-lg border border-[#30363D] hover:bg-gray-100 transition-colors">
+            <button className="bg-white text-[#0D1117] font-semibold px-6 py-3 rounded-lg border border-[#3A3A3A] hover:bg-gray-100 transition-colors">
               Go to Dashboard
             </button>
           </Link>

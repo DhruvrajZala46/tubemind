@@ -56,9 +56,9 @@ interface GlobalLoadingOverlayProps {
 const GlobalLoadingOverlay: React.FC<GlobalLoadingOverlayProps> = ({ text }) => {
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9999] flex items-center justify-center">
-      <div className="bg-[#161B22] border border-[#30363D] rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3">
+      <div className="bg-[#2D2D2D] border border-[#3A3A3A] rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3">
         <ElegantLoader size="sm" />
-        <span className="text-[#F0F6FC] font-medium">{text}</span>
+        <span className="text-[#FFFFFF] font-medium">{text}</span>
       </div>
     </div>
   );

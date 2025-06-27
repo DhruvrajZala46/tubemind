@@ -16,11 +16,11 @@ export default function PaymentSuccess() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0D1117] via-[#161B22] to-[#1A1F26] text-white px-4">
-      <div className="max-w-lg w-full bg-[#161B22] rounded-2xl shadow-2xl p-10 flex flex-col items-center animate-fade-in">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#0D1117] via-[#2D2D2D] to-[#1A1F26] text-white px-4">
+      <div className="max-w-lg w-full bg-[#2D2D2D] rounded-2xl shadow-2xl p-10 flex flex-col items-center animate-fade-in">
         <span className="text-6xl mb-4 animate-pulse">🎉</span>
         <h1 className="text-3xl font-bold mb-2 text-center">Payment Successful!</h1>
-        <p className="text-lg text-[#8B949E] mb-6 text-center">
+        <p className="text-lg text-[#C4C4C4] mb-6 text-center">
           Thank you for your purchase. Your credits and plan have been upgraded.<br />
           Enjoy your new features!
         </p>
@@ -29,7 +29,7 @@ export default function PaymentSuccess() {
             Go to Dashboard
           </button>
         </a>
-        <p className="text-sm text-[#8B949E] mt-4">
+        <p className="text-sm text-[#C4C4C4] mt-4">
           Redirecting you automatically in 5 seconds...
         </p>
       </div>

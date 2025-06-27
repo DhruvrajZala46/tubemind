@@ -30,7 +30,7 @@ export default function RootLayout({
         <head>
           <link rel="icon" href="/favicon.ico" />
         </head>
-        <body className="antialiased font-sans" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <body className="antialiased font-sans" style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
           {/* <SentryErrorBoundary> */}
             <CreditProvider>
               <PaywallProvider>

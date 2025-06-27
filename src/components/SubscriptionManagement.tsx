@@ -59,14 +59,14 @@ export default function SubscriptionManagement() {
   }
 
   return (
-    <div className="bg-[#161B22] border border-[#30363D] rounded-lg p-6 max-w-md mx-auto">
-      <h3 className="text-xl font-bold text-[#F0F6FC] mb-4">Subscription Management</h3>
+    <div className="bg-[#2D2D2D] border border-[#3A3A3A] rounded-lg p-6 max-w-md mx-auto">
+      <h3 className="text-xl font-bold text-[#FFFFFF] mb-4">Subscription Management</h3>
       
       {/* Current Plan */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-[#8B949E]">Current Plan:</span>
-          <span className="text-[#F0F6FC] font-semibold capitalize">
+          <span className="text-[#C4C4C4]">Current Plan:</span>
+          <span className="text-[#FFFFFF] font-semibold capitalize">
             {subscription.tier}
             {subscription.tier === 'basic' && ' ($9/month)'}
             {subscription.tier === 'pro' && ' ($15/month)'}
@@ -75,7 +75,7 @@ export default function SubscriptionManagement() {
         </div>
         
         <div className="flex justify-between items-center mb-2">
-          <span className="text-[#8B949E]">Status:</span>
+          <span className="text-[#C4C4C4]">Status:</span>
           <span className={`font-semibold capitalize ${
             subscription.status === 'active' ? 'text-green-400' : 'text-yellow-400'
           }`}>
@@ -87,21 +87,21 @@ export default function SubscriptionManagement() {
       {/* Credit Usage */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-[#8B949E]">Credits Used:</span>
-          <span className="text-[#F0F6FC]">
+          <span className="text-[#C4C4C4]">Credits Used:</span>
+          <span className="text-[#FFFFFF]">
             {subscription.creditsUsed}/{subscription.creditsLimit}
           </span>
         </div>
         
         {/* Progress Bar */}
-        <div className="w-full bg-[#21262D] rounded-full h-2.5 mb-2">
+        <div className="w-full bg-[#303030] rounded-full h-2.5 mb-2">
           <div 
             className="bg-[#DC143C] h-2.5 rounded-full" 
             style={{ width: `${Math.min(subscription.usagePercentage, 100)}%` }}
           ></div>
         </div>
         
-        <div className="text-[#8B949E] text-sm">
+        <div className="text-[#C4C4C4] text-sm">
           {subscription.remainingCredits} credits remaining this month
         </div>
       </div>
@@ -116,7 +116,7 @@ export default function SubscriptionManagement() {
             🔧 Manage Subscription
           </button>
           
-          <div className="text-[#8B949E] text-sm">
+          <div className="text-[#C4C4C4] text-sm">
             Click above to:
             <ul className="list-disc list-inside mt-1 ml-2">
               <li>Cancel subscription</li>
@@ -128,7 +128,7 @@ export default function SubscriptionManagement() {
         </div>
       ) : (
         <div className="text-center">
-          <p className="text-[#8B949E] mb-3">You're on the free plan</p>
+          <p className="text-[#C4C4C4] mb-3">You're on the free plan</p>
           <button
             onClick={() => window.location.href = '/#pricing'}
             className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-semibold py-2 px-4 rounded-lg transition"
@@ -139,8 +139,8 @@ export default function SubscriptionManagement() {
       )}
 
       {/* Contact Support */}
-      <div className="mt-4 pt-4 border-t border-[#30363D]">
-        <p className="text-[#8B949E] text-sm text-center">
+      <div className="mt-4 pt-4 border-t border-[#3A3A3A]">
+        <p className="text-[#C4C4C4] text-sm text-center">
                       Need help? <a href="mailto:support@tubemind.com" className="text-[#DC143C] hover:underline">Contact Support</a>
         </p>
       </div>

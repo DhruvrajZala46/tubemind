@@ -68,9 +68,9 @@ export const InstantButton: React.FC<InstantButtonProps> = ({
   
   const variantClasses = {
     primary: 'bg-[#DC143C] text-white hover:bg-[#DC143C]/90 focus:ring-[#DC143C]',
-    secondary: 'bg-[#21262D] text-[#F0F6FC] hover:bg-[#30363D] border border-[#30363D] focus:ring-[#58A6FF]',
-    outline: 'border border-[#30363D] text-[#F0F6FC] hover:bg-[#21262D] focus:ring-[#58A6FF]',
-    ghost: 'text-[#ABB2BF] hover:text-[#F0F6FC] hover:bg-[#21262D] focus:ring-[#58A6FF]'
+    secondary: 'bg-[#303030] text-[#FFFFFF] hover:bg-[#3A3A3A] border border-[#3A3A3A] focus:ring-[#58A6FF]',
+    outline: 'border border-[#3A3A3A] text-[#FFFFFF] hover:bg-[#303030] focus:ring-[#58A6FF]',
+    ghost: 'text-[#ABB2BF] hover:text-[#FFFFFF] hover:bg-[#303030] focus:ring-[#58A6FF]'
   };
 
   const sizeClasses = {
@@ -208,7 +208,7 @@ export const InstantCard: React.FC<InstantCardProps> = ({
       onClick={onClick || href ? handleClick : undefined}
       className={cn(
         'w-full text-left transition-all duration-200',
-        (onClick || href) && 'cursor-pointer hover:bg-[#21262D] focus:outline-none focus:ring-2 focus:ring-[#58A6FF]',
+        (onClick || href) && 'cursor-pointer hover:bg-[#303030] focus:outline-none focus:ring-2 focus:ring-[#58A6FF]',
         isLoading && 'cursor-wait opacity-75',
         className
       )}

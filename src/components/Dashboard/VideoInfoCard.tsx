@@ -48,7 +48,7 @@ export default function VideoInfoCard({
   };
 
   return (
-    <div className="w-full bg-[#21262D] border border-[#30363D] rounded-xl overflow-hidden shadow-lg">
+    <div className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-lg">
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-4 lg:p-6">
         {/* Thumbnail - Mobile optimized */}
         <div className="w-full lg:w-1/2 relative aspect-video">
@@ -65,10 +65,10 @@ export default function VideoInfoCard({
         {/* Content - Mobile optimized */}
         <div className="w-full lg:w-1/2 space-y-3 lg:space-y-4">
           {/* Title - Responsive sizing */}
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight">{title}</h1>
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-[var(--text-primary)] leading-tight">{title}</h1>
           
           {/* Meta info - Mobile responsive */}
-          <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm lg:text-base text-gray-400">
+          <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm lg:text-base text-[var(--text-secondary)]">
             <span className="font-medium">{channelTitle}</span>
             <span className="hidden sm:inline">•</span>
             <span>{formatViewCount(viewCount)}</span>
@@ -79,11 +79,11 @@ export default function VideoInfoCard({
           {/* Duration progress - Mobile optimized */}
           <div className="flex items-center gap-3">
             <Progress value={100} className="flex-1 h-2" />
-            <span className="text-sm text-gray-400 font-mono">{formatDuration(duration)}</span>
+            <span className="text-sm text-[var(--text-secondary)] font-mono">{formatDuration(duration)}</span>
           </div>
           
           {/* Description - Mobile responsive */}
-          <p className="text-sm lg:text-base text-gray-300 line-clamp-2 lg:line-clamp-3 leading-relaxed">{description}</p>
+          <p className="text-sm lg:text-base text-[var(--text-primary)] line-clamp-2 lg:line-clamp-3 leading-relaxed">{description}</p>
         </div>
       </div>
     </div>

@@ -112,18 +112,18 @@ function ChatGPTMarkdown({
           components={{
             h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 lg:mb-8 mt-4 sm:mt-5 lg:mt-6" {...props} />,
             h2: ({node, ...props}) => (
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 mt-6 sm:mt-8 lg:mt-10 border-b border-gray-700 pb-2" {...props} />
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 mt-6 sm:mt-8 lg:mt-10 border-b border-[var(--border-color)] pb-2" {...props} />
             ),
             h3: ({node, ...props}) => <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 mt-4 sm:mt-5 lg:mt-6" {...props} />,
             ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 my-4" {...props} />,
             ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 my-4" {...props} />,
             li: ({node, ...props}) => <li className="leading-relaxed my-1 pl-2" {...props} />,
             p: ({node, ...props}) => <p className="mb-4 leading-relaxed" {...props} />,
-            strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
-            em: ({node, ...props}) => <em className="italic text-gray-400" {...props} />,
-            code: ({node, ...props}) => <code className="bg-[#23272F] px-1 py-0.5 rounded" {...props} />,
-            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-blue-500 pl-4 py-1 my-4 text-gray-300 bg-opacity-10 bg-blue-900 rounded-r" {...props} />,
-            hr: ({node, ...props}) => <hr className="my-6 border-t border-gray-700" {...props} />,
+            strong: ({node, ...props}) => <strong className="font-bold text-[var(--text-primary)]" {...props} />,
+            em: ({node, ...props}) => <em className="italic text-[var(--text-secondary)]" {...props} />,
+            code: ({node, ...props}) => <code className="bg-[var(--bg-input)] px-1 py-0.5 rounded" {...props} />,
+            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[var(--border-color)] pl-4 py-1 my-4 text-[var(--text-primary)] bg-white/5 rounded-r" {...props} />,
+            hr: ({node, ...props}) => <hr className="my-6 border-t border-[var(--border-color)]" {...props} />,
           }}
         >
           {displayed}
@@ -257,18 +257,18 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown strong {
-          color: #ffffff;
+          color: var(--text-primary);
           font-weight: 600;
         }
         
         .chatgpt-markdown em {
-          color: #8B949E;
+          color: var(--text-secondary);
           font-style: italic;
         }
         
         .chatgpt-markdown a {
-          color: var(--chatgpt-link);
-          text-decoration: none;
+          color: var(--text-primary);
+          text-decoration: underline;
         }
         
         .chatgpt-markdown a:hover {
@@ -276,7 +276,7 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown pre {
-          background: #23272F;
+          background: var(--bg-input);
           padding: 1rem;
           border-radius: 0.5rem;
           overflow-x: auto;
@@ -284,8 +284,8 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown blockquote {
-          border-left-color: #2A8AF6;
-          background-color: rgba(42, 138, 246, 0.1);
+          border-left-color: var(--border-color);
+          background-color: rgba(255, 255, 255, 0.05);
           padding: 0.75rem 1rem;
           border-radius: 0 0.375rem 0.375rem 0;
           color: var(--text-primary);
@@ -530,18 +530,18 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
           <div className="mb-6">
             <CircularProgressWithLoader progress={fakeProgress} size={64} />
           </div>
-          <p className="text-lg font-semibold mt-6 text-white">Processing Video</p>
-          <p className="text-gray-400 mt-2">Please wait while we process your summary.</p>
+          <p className="text-lg font-semibold mt-6 text-[var(--text-primary)]">Processing Video</p>
+          <p className="text-[var(--text-secondary)] mt-2">Please wait while we process your summary.</p>
         </div>
       );
     }
 
     if (isFailed(summary.processing_status)) {
       return (
-        <div className="text-center text-red-400 bg-red-900/20 p-8 rounded-lg">
+        <div className="text-center text-[var(--text-primary)] bg-white/5 p-8 rounded-lg">
           <h3 className="text-xl font-bold mb-2">Processing Failed</h3>
           <p className="mb-4">The video processing encountered an error. This could be due to video length, content restrictions, or temporary service issues.</p>
-          <p className="mt-4 text-sm font-mono bg-red-900/30 p-4 rounded-md text-left whitespace-pre-wrap">
+          <p className="mt-4 text-sm font-mono bg-black/20 p-4 rounded-md text-left whitespace-pre-wrap">
             <strong>Error Details:</strong>
             <br />
             {summary.overall_summary || 'No specific error message was provided.'}
@@ -573,13 +573,13 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
       console.log('🔍 DEBUG: cleanOutput truthy?', !!cleanOutput);
       
       if (!cleanOutput) {
-        return <div className="text-center text-gray-400">The summary is in an unknown state.</div>;
+        return <div className="text-center text-[var(--text-secondary)]">The summary is in an unknown state.</div>;
       }
       return <ChatGPTMarkdown markdown={cleanOutput} summaryId={String(summaryId)} />;
     }
 
     // Default case for any other status
-    return <div className="text-center text-gray-400">The summary is in an unknown state.</div>;
+    return <div className="text-center text-[var(--text-secondary)]">The summary is in an unknown state.</div>;
   };
 
   return (
@@ -594,7 +594,7 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         thumbnailUrl={summary.thumbnail_url}
       />
       
-      <Separator className="my-8 bg-gray-700" />
+      <Separator className="my-8 bg-[var(--border-color)]" />
       
       <div className="mt-8">
         {renderContent()}

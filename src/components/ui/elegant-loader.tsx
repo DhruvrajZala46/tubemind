@@ -11,7 +11,7 @@ interface ElegantLoaderProps {
 export function ElegantLoader({ 
   className, 
   size = 'md', 
-  color = '#DC143C',
+  color = '#FFFFFF',
   uniqueId = 'elegant-loader'
 }: ElegantLoaderProps) {
   const sizeClasses = {
@@ -74,10 +74,10 @@ export function ElegantLoader({
       
       {/* Subtle orbiting particles */}
       <div className="absolute inset-0 animate-orbit-fast">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-[#DC143C]/40" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-[#DC143C]/40" />
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-[#DC143C]/40" />
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-[#DC143C]/40" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-white/40" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-white/40" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-white/40" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-gradient-to-r from-transparent to-white/40" />
       </div>
     </div>
   );

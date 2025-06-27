@@ -67,7 +67,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   }, [summaryId]);
 
   if (error) {
-    return <div className="text-red-500">Error loading status: {error.message}</div>;
+    return <div className="text-[var(--text-primary)]">Error loading status: {error.message}</div>;
   }
 
   // Show loader while loading or while processing (not completed/failed)
@@ -94,7 +94,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
 // Main client component
 export default function VideoSummaryClientPage({ summary, pollingId, summaryId }: VideoSummaryClientPageProps) {
   return (
-    <main className="min-h-screen bg-[#0D1117] text-white w-full">
+    <main className="min-h-screen bg-[var(--bg-dashboard)] text-[var(--text-primary)] w-full">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 max-w-6xl">
         <VideoSummary summary={summary} videoId={pollingId} summaryId={summaryId} />
         <ProcessingStatusPoller summaryId={summaryId} />

@@ -309,7 +309,7 @@ export default function MainContent() {
           if (input && !error) handleProcess(input);
         }}>
           <div className="w-full flex items-center justify-center">
-            <div className="flex w-full items-center bg-transparent border border-[#30363D] rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-[#DC143C]/20 transition-all px-3 py-2" style={{ background: 'rgba(32,34,37,0.85)' }}>
+            <div className="flex w-full items-center bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-white/10 transition-all px-3 py-2">
               <input
                 type="text"
                 value={input}
@@ -328,21 +328,21 @@ export default function MainContent() {
                 }}
                 onBlur={() => setTouched(true)}
                 placeholder="Enter YouTube video URL to summarize..."
-                className="flex-1 bg-transparent border-none outline-none px-6 py-5 text-[#F0F6FC] placeholder-[#8B949E] text-[17px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
+                className="flex-1 bg-transparent border-none outline-none px-6 py-5 text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-[17px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
                 style={{ minWidth: 0 }}
               />
               <button
                 type="submit"
-                className="ml-2 flex items-center justify-center h-12 px-6 rounded-2xl bg-[#DC143C] hover:bg-[#DC143C]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
+                className="ml-2 flex items-center justify-center h-12 px-6 rounded-2xl bg-[var(--btn-dashboard-bg)] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
                 disabled={!!error || !input.trim() || isSubmitting || isProcessing}
                 style={{ minWidth: 0 }}
               >
-                {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-white" />}
+                {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-[var(--btn-primary-text)]" />}
               </button>
             </div>
           </div>
           {error && touched && (
-            <div className="text-[#DC143C] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
+            <div className="text-[var(--text-primary)] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
               {error}
             </div>
           )}
@@ -350,7 +350,7 @@ export default function MainContent() {
         
         {/* Video Thumbnail Preview */}
         {thumbnailUrl && !error && (
-          <div className="mt-4 p-4 bg-[#21262D] rounded-[8px] border border-[#30363D] flex flex-col items-center">
+          <div className="mt-4 p-4 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center">
             <img src={thumbnailUrl} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
           </div>
         )}

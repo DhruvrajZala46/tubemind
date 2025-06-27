@@ -354,9 +354,9 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
         }}
       >
         {/* Sidebar Header - Claude Style */}
-        <div className="flex items-center px-4 py-3 border-b border-[#30363D] justify-between flex-shrink-0">
+        <div className="flex items-center px-4 py-3 border-b border-[#3A3A3A] justify-between flex-shrink-0">
           {!isCollapsed && (
-            <Link href="/" className="text-[#F0F6FC] text-xl font-bold font-sans truncate hover:text-white transition-colors cursor-pointer">TubeMind</Link>
+            <Link href="/" className="text-[#FFFFFF] text-xl font-bold font-sans truncate hover:text-white transition-colors cursor-pointer">TubeMind</Link>
           )}
           <button 
             onClick={toggleCollapse}
@@ -384,7 +384,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
             return () => clearTimeout(failsafeTimer);
           }}
           className={cn(
-            "flex items-center justify-center bg-[#DC143C] text-white rounded-lg hover:bg-[#DC143C]/90 text-sm font-medium btn-instant instant-feedback cursor-pointer",
+            "flex items-center justify-center bg-white text-black rounded-lg hover:bg-white/90 text-sm font-medium btn-instant instant-feedback cursor-pointer",
             isCollapsed ? "w-10 h-10 p-0" : "w-full px-4 py-2"
           )}
         >
@@ -397,11 +397,11 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
         
         {isLoading && !isCollapsed && (
           <div className="px-4 py-2 space-y-1">
-            <h3 className="text-[#8B949E] text-xs font-semibold uppercase mb-2">Loading...</h3>
+            <h3 className="text-[#C4C4C4] text-xs font-semibold uppercase mb-2">Loading...</h3>
             {[...Array(6)].map((_, i) => (
               <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg">
-                <div className="h-4 bg-[#21262D] rounded w-3/4 animate-pulse"></div>
-                <div className="h-4 w-4 bg-[#21262D] rounded animate-pulse"></div>
+                <div className="h-4 bg-[#303030] rounded w-3/4 animate-pulse"></div>
+                <div className="h-4 w-4 bg-[#303030] rounded animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -410,13 +410,13 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
 
         {!isLoading && !error && summaries && summaries.length > 0 && !isCollapsed ? (
           <div className="px-4 py-2 space-y-1">
-            <h3 className="text-[#8B949E] text-xs font-semibold uppercase mb-2">Recents</h3>
+            <h3 className="text-[#C4C4C4] text-xs font-semibold uppercase mb-2">Recents</h3>
             {summaries.map((summary) => (
               <div key={summary.id} className="relative">
                 {deletingId === summary.id ? (
                   <div className={cn(
                     "flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 cursor-not-allowed group",
-                    "bg-[#21262D] opacity-60"
+                    "bg-[#303030] opacity-60"
                   )}>
                     <span className="truncate text-sm flex items-center min-w-0">
                       <LucideLoader2 size={14} className="mr-2 animate-spin text-red-400 flex-shrink-0" />
@@ -425,7 +425,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                     <button
                       onClick={(e) => toggleMenu(summary.id, e)}
                       disabled={true}
-                      className="text-[#8B949E] opacity-50 cursor-not-allowed transition-colors flex-shrink-0"
+                      className="text-[#C4C4C4] opacity-50 cursor-not-allowed transition-colors flex-shrink-0"
                       aria-label="More options"
                     >
                       <LucideMoreVertical size={16} />
@@ -436,14 +436,14 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                     onClick={() => {
                       navigateWithLoading(`/dashboard/${summary.id}`, 'Loading summary...');
                     }}
-                    className="flex items-center justify-between px-3 py-2 text-[#ABB2BF] hover:bg-[#21262D] rounded-lg cursor-pointer group instant-transition instant-feedback"
+                    className="flex items-center justify-between px-3 py-2 text-[#ABB2BF] hover:bg-[#303030] rounded-lg cursor-pointer group instant-transition instant-feedback"
                   >
                     <span className="truncate text-sm min-w-0">
                       {summary.main_title || summary.title}
                     </span>
                     <button
                       onClick={(e) => toggleMenu(summary.id, e)}
-                      className="text-[#8B949E] hover:text-white transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 flex-shrink-0"
+                      className="text-[#C4C4C4] hover:text-white transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100 flex-shrink-0"
                       aria-label="More options"
                     >
                       <LucideMoreVertical size={16} />
@@ -466,7 +466,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                         "flex items-center w-full px-3 py-2 text-sm transition-all duration-200 first:rounded-t-lg last:rounded-b-lg",
                         deletingId === summary.id 
                           ? "bg-[#2A2A2A] cursor-not-allowed opacity-70" 
-                          : "text-[#F0F6FC] hover:bg-[#2A2A2A]"
+                          : "text-[#FFFFFF] hover:bg-[#2A2A2A]"
                       )}
                     >
                       {deletingId === summary.id ? (
@@ -487,7 +487,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
             ))}
           </div>
         ) : !isLoading && !error && !isCollapsed && (
-          <div className="p-4 text-center text-[#8B949E] text-sm space-y-3">
+          <div className="p-4 text-center text-[#C4C4C4] text-sm space-y-3">
             <p>No summaries yet.</p>
             <p>Analyze your first video to get started!</p>
           </div>
@@ -496,7 +496,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
       
       {/* User Profile / Sign Up / Sign In Section */}
       <div className={cn(
-        "px-6 py-4 border-t border-[#30363D] flex items-center bg-[#161B22] flex-shrink-0 relative",
+        "px-6 py-4 border-t border-[#3A3A3A] flex items-center bg-[#000000] flex-shrink-0 relative",
         isCollapsed ? "justify-center px-3" : "justify-between gap-2"
       )}>
         {isSignedIn ? (
@@ -509,11 +509,11 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                 className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={handleProfileClick}
               >
-                <div className="text-[#F0F6FC] font-medium text-[14px] leading-tight font-sans truncate">{user?.firstName} {user?.lastName}</div>
+                <div className="text-[#FFFFFF] font-medium text-[14px] leading-tight font-sans truncate">{user?.firstName} {user?.lastName}</div>
                 {isLoadingPlan ? (
-                  <div className="h-3 w-16 bg-[#21262D] rounded animate-pulse mt-1"></div>
+                  <div className="h-3 w-16 bg-[#303030] rounded animate-pulse mt-1"></div>
                 ) : (
-                  <div className="text-[#8B949E] text-xs font-normal leading-tight font-sans capitalize">
+                  <div className="text-[#C4C4C4] text-xs font-normal leading-tight font-sans capitalize">
                     {planInfo?.plan || 'Free'} plan
                   </div>
                 )}
@@ -524,14 +524,14 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
           <div className="flex gap-2 w-full">
             <SignUpButton mode="modal">
               <div className="w-full">
-                <button className="flex items-center gap-2 bg-[#21262D] hover:bg-[#30363D] text-[#F0F6FC] hover:text-white border border-[#30363D] hover:border-[#404040] font-medium transition-all text-sm px-4 py-1.5 rounded-lg justify-center w-full">
+                <button className="flex items-center gap-2 bg-[#303030] hover:bg-[#3A3A3A] text-[#FFFFFF] hover:text-white border border-[#3A3A3A] hover:border-[#404040] font-medium transition-all text-sm px-4 py-1.5 rounded-lg justify-center w-full">
                   Sign up
                 </button>
               </div>
             </SignUpButton>
             <SignInButton mode="modal">
               <div className="w-full">
-                <button className="flex items-center gap-2 bg-[#21262D] hover:bg-[#30363D] text-[#F0F6FC] hover:text-white border border-[#30363D] hover:border-[#404040] font-medium transition-all text-sm px-4 py-1.5 rounded-lg justify-center w-full">
+                <button className="flex items-center gap-2 bg-[#303030] hover:bg-[#3A3A3A] text-[#FFFFFF] hover:text-white border border-[#3A3A3A] hover:border-[#404040] font-medium transition-all text-sm px-4 py-1.5 rounded-lg justify-center w-full">
                   Sign in
                 </button>
               </div>
@@ -543,7 +543,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
         {showCreditPopup && !isCollapsed && detailedPlanInfo && (
           <div 
             ref={creditPopupRef}
-            className={`absolute bottom-full left-4 right-4 mb-2 bg-[#161B22] border border-[#30363D] rounded-xl px-6 py-4 shadow-xl z-50 ${
+            className={`absolute bottom-full left-4 right-4 mb-2 bg-[#000000] border border-[#3A3A3A] rounded-xl px-6 py-4 shadow-xl z-50 ${
               isClosingPopup ? 'animate-slide-out-down' : 'animate-slide-in-up'
             }`}
             style={{
@@ -554,7 +554,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
             {/* Close button */}
             <button
               onClick={handleClosePopup}
-              className="absolute top-2 right-2 text-[#8B949E] hover:text-[#F0F6FC] transition-colors duration-200 p-1 rounded-md hover:bg-[#21262D]"
+              className="absolute top-2 right-2 text-[#C4C4C4] hover:text-[#FFFFFF] transition-colors duration-200 p-1 rounded-md hover:bg-[#303030]"
               aria-label="Close popup"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -565,15 +565,15 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
 
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[#F0F6FC] font-semibold text-base capitalize">{detailedPlanInfo.plan} plan</span>
-                <span className="text-xs text-[#8B949E]">({detailedPlanInfo.status})</span>
+                <span className="text-[#FFFFFF] font-semibold text-base capitalize">{detailedPlanInfo.plan} plan</span>
+                <span className="text-xs text-[#C4C4C4]">({detailedPlanInfo.status})</span>
               </div>
               <div className="w-full flex flex-col items-center">
-                <div className="w-full flex justify-between text-xs text-[#8B949E] mb-1">
+                <div className="w-full flex justify-between text-xs text-[#C4C4C4] mb-1">
                   <span>{formatCreditsTime(detailedPlanInfo.usage)} used</span>
                   <span>{formatCreditsTime(detailedPlanInfo.remaining || (detailedPlanInfo.limit - detailedPlanInfo.usage))} left</span>
                 </div>
-                <div className="w-full h-3 bg-[#21262D] rounded-full overflow-hidden mb-1">
+                <div className="w-full h-3 bg-[#303030] rounded-full overflow-hidden mb-1">
                   <div 
                     style={{ width: `${Math.min(100, Math.round((detailedPlanInfo.usage / detailedPlanInfo.limit) * 100))}%` }} 
                     className="h-full bg-[#DC143C] transition-all duration-500 ease-out"
@@ -595,9 +595,9 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                   </div>
                 )}
               </div>
-              <div className="mt-3 pt-3 border-t border-[#30363D] w-full text-center">
-                <div className="text-xs text-[#8B949E]">
-                  <span className="capitalize text-[#F0F6FC] font-medium">{detailedPlanInfo.plan} Plan</span>
+              <div className="mt-3 pt-3 border-t border-[#3A3A3A] w-full text-center">
+                <div className="text-xs text-[#C4C4C4]">
+                  <span className="capitalize text-[#FFFFFF] font-medium">{detailedPlanInfo.plan} Plan</span>
                   <span className="mx-1">•</span>
                   {detailedPlanInfo.plan === 'free' ? (
                     <a href="/#pricing" className="text-[#58A6FF] hover:text-[#58A6FF]/80 font-medium underline transition-colors">

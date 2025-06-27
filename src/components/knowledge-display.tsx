@@ -16,16 +16,16 @@ export default function KnowledgeDisplay({ data, videoTitle, thumbnailUrl, rawAI
   return (
     <div className="w-full max-w-2xl mx-auto space-y-8">
       {/* Video Header */}
-      <div className="flex gap-4 items-center bg-[#21262D] border border-[#30363D] rounded-lg p-6">
+      <div className="flex gap-4 items-center bg-[#303030] border border-[#3A3A3A] rounded-lg p-6">
         <img 
           src={thumbnailUrl} 
           alt={videoTitle}
-          className="w-28 h-20 object-cover rounded-lg border border-[#30363D]"
+          className="w-28 h-20 object-cover rounded-lg border border-[#3A3A3A]"
         />
         <div className="flex-1">
-          <h1 className="text-xl font-medium text-[#F0F6FC] mb-1 font-sans">{data.mainTitle}</h1>
-          <p className="text-sm text-[#8B949E] font-sans mb-2">{data.overallSummary}</p>
-          <span className="inline-flex items-center gap-1 text-xs text-[#8B949E] bg-[#161B22] border border-[#30363D] rounded-full px-3 py-1 font-medium">
+          <h1 className="text-xl font-medium text-[#FFFFFF] mb-1 font-sans">{data.mainTitle}</h1>
+          <p className="text-sm text-[#C4C4C4] font-sans mb-2">{data.overallSummary}</p>
+          <span className="inline-flex items-center gap-1 text-xs text-[#C4C4C4] bg-[#2D2D2D] border border-[#3A3A3A] rounded-full px-3 py-1 font-medium">
             <Clock className="w-4 h-4 mr-1" />
             {/* Segments count removed as it's not needed for raw summary */}
           </span>
@@ -33,7 +33,7 @@ export default function KnowledgeDisplay({ data, videoTitle, thumbnailUrl, rawAI
       </div>
       {/* Raw AI Output as Main Summary */}
       {rawAIOutput && (
-        <div className="bg-[#21262D] border border-[#30363D] text-[#F0F6FC] rounded-lg p-6 w-full text-sm">
+        <div className="bg-[#303030] border border-[#3A3A3A] text-[#FFFFFF] rounded-lg p-6 w-full text-sm">
           <Suspense fallback={<div>Loading...</div>}>
             <ReactMarkdown>{rawAIOutput}</ReactMarkdown>
           </Suspense>

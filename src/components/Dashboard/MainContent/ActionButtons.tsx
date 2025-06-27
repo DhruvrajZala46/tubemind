@@ -28,12 +28,12 @@ export default function ActionButtons() {
             px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium text-[14px] sm:text-[15px] transition-all duration-200
             ${btn.primary 
               ? "bg-[#DC143C] hover:bg-[#DC143C]/90 text-white shadow-sm hover:shadow-md" 
-              : "bg-[#2F2F2F] hover:bg-[#404040] text-[#F0F6FC] border border-[#404040] hover:border-[#525252]"}
+              : "bg-[#2F2F2F] hover:bg-[#404040] text-[#FFFFFF] border border-[#404040] hover:border-[#525252]"}
             disabled:opacity-50 disabled:cursor-not-allowed btn-instant relative ${styles.actionButton}
           `}
           style={{
             minWidth: '110px',
-            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+            fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
           }}
           onClick={() => handleClick(index)}
           disabled={loadingIndex !== null}

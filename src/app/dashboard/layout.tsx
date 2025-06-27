@@ -57,11 +57,11 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
   };
 
   return (
-    <div className="flex h-screen bg-[#0D1117] overflow-hidden font-sans">
+    <div className="flex h-screen bg-[var(--bg-dashboard)] overflow-hidden font-sans">
       {/* Desktop Sidebar - Only visible on lg+ screens */}
       <aside
         className={cn(
-          "hidden lg:flex h-full bg-[#161B22] border-r border-[#30363D] flex-shrink-0 overflow-y-auto z-40 transition-all duration-300 ease-in-out",
+          "hidden lg:flex h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] flex-shrink-0 overflow-y-auto z-40 transition-all duration-300 ease-in-out",
           isSidebarCollapsed ? "w-16" : "w-[280px]"
         )}
       >
@@ -75,7 +75,7 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
       {/* Mobile Sidebar Overlay - Premium Native Animation */}
       {isMobileMenuOpen && (
         <aside 
-          className="lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] h-full bg-[#161B22] border-r border-[#30363D] overflow-y-auto shadow-2xl"
+          className="lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] overflow-y-auto shadow-2xl"
           style={{
             transform: 'translateX(0)',
             transition: 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
@@ -97,7 +97,7 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
             console.log('Mobile menu button clicked!');
             setIsMobileMenuOpen(true);
           }}
-          className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-[#161B22] hover:bg-[#21262D] text-[#F0F6FC] rounded-lg shadow-lg border border-[#30363D] backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
+          className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-[var(--bg-sidebar)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] rounded-lg shadow-lg border border-[var(--border-color)] backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
           style={{
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)',
             WebkitBackdropFilter: 'blur(8px)',
@@ -130,7 +130,7 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
       {/* Main Content - Full width on mobile, with desktop margin */}
       <main 
         className={cn(
-          "flex-1 h-screen bg-[#0D1117] transition-all duration-300 ease-in-out relative",
+          "flex-1 h-screen bg-[var(--bg-dashboard)] transition-all duration-300 ease-in-out relative",
           isNewRoute ? "flex items-center justify-center overflow-hidden" : "overflow-y-auto",
           // Mobile: Full width always, Desktop: Respect sidebar collapse
           "w-full",

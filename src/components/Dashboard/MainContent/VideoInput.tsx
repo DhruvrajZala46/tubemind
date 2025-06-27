@@ -37,7 +37,7 @@ export default function DashboardVideoInput() {
             onChange={handleChange}
             onBlur={() => setTouched(true)}
             placeholder="Enter YouTube video URL to summarize..."
-            className="w-full bg-[#21262D] border border-[#30363D] rounded-[8px] px-4 py-3 text-[#F0F6FC] placeholder-[#8B949E] focus:border-[#58A6FF] focus:ring-2 focus:ring-[#58A6FF]/30 transition-colors text-[16px] font-normal font-sans outline-none"
+            className="w-full bg-[#303030] border border-[#3A3A3A] rounded-[8px] px-4 py-3 text-[#FFFFFF] placeholder-[#C4C4C4] focus:border-[#58A6FF] focus:ring-2 focus:ring-[#58A6FF]/30 transition-colors text-[16px] font-normal font-sans outline-none"
           />
           <button
             type="submit"
@@ -54,7 +54,7 @@ export default function DashboardVideoInput() {
         )}
       </form>
       {thumbnail && !error && (
-        <div className="mt-4 p-4 bg-[#21262D] rounded-[8px] border border-[#30363D] flex flex-col items-center">
+        <div className="mt-4 p-4 bg-[#303030] rounded-[8px] border border-[#3A3A3A] flex flex-col items-center">
           <img src={thumbnail} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
         </div>
       )}

@@ -62,7 +62,7 @@ export default function MainHeader() {
               }`}>
                 {planInfo?.plan || 'Free'} plan
               </span>
-              <span className="mx-1.5 text-[#8B949E]">•</span>
+              <span className="mx-1.5 text-[#C4C4C4]">•</span>
               {planInfo?.plan === 'free' ? (
                 <a href="/#pricing" className="text-[#58A6FF] hover:text-[#58A6FF]/80 font-medium underline">
                   Upgrade
@@ -76,7 +76,7 @@ export default function MainHeader() {
           )}
         </div>
         
-        <h1 className="text-[2.2rem] font-medium leading-tight text-[#F0F6FC] tracking-[-0.01em]" style={{ fontFamily: 'system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif' }}>
+        <h1 className="text-[2.2rem] font-medium leading-tight text-[#FFFFFF] tracking-[-0.01em]" style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
           Watch Less, Learn More
         </h1>
       </div>
@@ -95,7 +95,7 @@ export default function MainHeader() {
               }`}>
                 {planInfo?.plan || 'Free'} plan
               </span>
-              <span className="mx-1.5 text-[#8B949E]">•</span>
+              <span className="mx-1.5 text-[#C4C4C4]">•</span>
               {planInfo?.plan === 'free' ? (
                 <a href="/#pricing" className="text-[#58A6FF] hover:text-[#58A6FF]/80 font-medium underline">
                   Upgrade
@@ -109,7 +109,7 @@ export default function MainHeader() {
           )}
         </div>
         
-        <h1 className="text-[2.2rem] sm:text-[2.6rem] md:text-[2.8rem] lg:text-[3rem] font-medium leading-tight text-[#F0F6FC] mb-6 sm:mb-8 tracking-[-0.01em] flex items-center justify-center" style={{ fontFamily: 'system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif' }}>
+        <h1 className="text-[2.2rem] sm:text-[2.6rem] md:text-[2.8rem] lg:text-[3rem] font-medium leading-tight text-[#FFFFFF] mb-6 sm:mb-8 tracking-[-0.01em] flex items-center justify-center" style={{ fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }}>
           <a href="/" className="inline-block mr-2 align-middle">
             <img src="/logo.svg" alt="TubeMind Logo" className={`${styles.asteriskIcon} w-16 h-16 inline-block animate-spin-slow`} style={{ verticalAlign: 'middle' }} />
           </a>
