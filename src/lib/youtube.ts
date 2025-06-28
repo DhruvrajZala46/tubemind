@@ -227,15 +227,43 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
       logger.info('[Transcript] SupaData.ai response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
       if (response.data && typeof response.data.content === 'string' && response.data.content.length > 0) {
         logger.info(`[Transcript] ✅ SUCCESS with SupaData.ai API on attempt ${attempt + 1}`);
-        // Split transcript into segments by line or sentence for downstream compatibility
-        const transcript: TranscriptItem[] = response.data.content
-          .split(/(?<=[.!?])\s+/)
-          .filter(Boolean)
-          .map((text: string, idx: number) => ({
-            text: text.trim(),
-            start: idx * 3, // Estimate 3s per segment (no timing info in plain text)
-            duration: 3
-          }));
+        
+        // Calculate the number of segments needed to cover the video duration
+        const targetSegments = totalDurationSeconds ? Math.max(Math.ceil(totalDurationSeconds / 3), 50) : 50;
+        
+        // Split transcript more intelligently to ensure full coverage
+        let textSegments: string[];
+        const content = response.data.content;
+        
+        // First try splitting by sentences
+        const sentenceSplit = content.split(/(?<=[.!?])\s+/).filter(Boolean);
+        
+        if (sentenceSplit.length >= targetSegments) {
+          // We have enough sentences
+          textSegments = sentenceSplit;
+        } else {
+          // Not enough sentences, split by words to get more segments
+          const words = content.split(/\s+/).filter(Boolean);
+          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 10);
+          
+          textSegments = [];
+          for (let i = 0; i < words.length; i += wordsPerSegment) {
+            const segment = words.slice(i, i + wordsPerSegment).join(' ');
+            if (segment.trim()) {
+              textSegments.push(segment.trim());
+            }
+          }
+        }
+        
+        logger.info(`[Transcript] Created ${textSegments.length} segments for ${totalDurationSeconds}s video (target: ${targetSegments})`);
+        
+        // Create transcript items with proper timing
+        const transcript: TranscriptItem[] = textSegments.map((text: string, idx: number) => ({
+          text: text.trim(),
+          start: totalDurationSeconds ? Math.floor((idx / textSegments.length) * totalDurationSeconds) : idx * 3,
+          duration: totalDurationSeconds ? Math.floor(totalDurationSeconds / textSegments.length) : 3
+        }));
+        
         // Cache the result using the central CacheManager
         if (TRANSCRIPT_CONFIG.cacheEnabled) {
           cacheManager.cacheYouTubeTranscript(videoId, transcript);
