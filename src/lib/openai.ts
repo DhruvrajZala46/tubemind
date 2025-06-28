@@ -3,7 +3,16 @@ import { formatTranscriptByMinutes } from './youtube';
 import { SYSTEM_PROMPT } from './system-prompt';
 import { createLogger } from './logger';
 import { timeToSeconds } from './utils';
+
 const logger = createLogger('openai');
+
+// 🔍 STARTUP VERIFICATION: Log system prompt loading
+logger.info(`\n🚀 ===== SYSTEM PROMPT LOADING VERIFICATION =====`);
+logger.info(`📌 SYSTEM_PROMPT LENGTH: ${SYSTEM_PROMPT.length} characters`);
+logger.info(`📌 SYSTEM_PROMPT PREVIEW: ${SYSTEM_PROMPT.substring(0, 100)}...`);
+logger.info(`📌 IS NEW FORMAT: ${SYSTEM_PROMPT.includes('Video-to-Story Transformation System') ? 'YES ✅' : 'NO ❌'}`);
+logger.info(`📌 IS OLD FORMAT: ${SYSTEM_PROMPT.includes('Ultimate Fast-Flow Video Summary System') ? 'YES ⚠️' : 'NO ✅'}`);
+logger.info(`==============================================`);
 
 // --- LAZY-INITIALIZED SINGLETON FOR OPENAI CLIENT ---
 let openAIClient: OpenAI | null = null;
@@ -532,11 +541,44 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       }
     ];
 
+    // 🔍 CRITICAL VERIFICATION LOGS FOR PRODUCTION DEBUGGING
+    const MODEL_BEING_USED = 'gpt-4.1-mini';
+    
+    // Safely extract content strings
+    const systemContent = typeof messages[0]?.content === 'string' ? messages[0].content : 'N/A';
+    const userContent = typeof messages[1]?.content === 'string' ? messages[1].content : 'N/A';
+    
+    logger.info(`\n🚀 ===== OPENAI API CALL VERIFICATION =====`);
+    logger.info(`📌 MODEL BEING USED: ${MODEL_BEING_USED}`);
+    logger.info(`📌 SYSTEM PROMPT LENGTH: ${systemContent.length} characters`);
+    logger.info(`📌 SYSTEM PROMPT PREVIEW: ${systemContent.substring(0, 100)}...`);
+    logger.info(`📌 USER PROMPT LENGTH: ${userContent.length} characters`);
+    logger.info(`📌 VIDEO TITLE: ${videoTitle}`);
+    logger.info(`📌 VIDEO DURATION: ${formatTime(totalDuration)} (${totalDuration}s)`);
+    logger.info(`📌 TRANSCRIPT CHUNKS: ${transcript.length}`);
+    
+    // Check if we're using the new system prompt
+    const isNewSystemPrompt = systemContent.includes('Video-to-Story Transformation System');
+    const isOldSystemPrompt = systemContent.includes('Ultimate Fast-Flow Video Summary System');
+    
+    logger.info(`\n🔍 SYSTEM PROMPT VERIFICATION:`);
+    logger.info(`✅ Using NEW system prompt (Video-to-Story): ${isNewSystemPrompt ? 'YES ✅' : 'NO ❌'}`);
+    logger.info(`❌ Using OLD system prompt (Fast-Flow): ${isOldSystemPrompt ? 'YES ⚠️' : 'NO ✅'}`);
+    
+    if (isNewSystemPrompt) {
+      logger.info(`🎉 CONFIRMED: Production is using the UPDATED system prompt!`);
+    } else if (isOldSystemPrompt) {
+      logger.info(`⚠️ WARNING: Production is still using the OLD system prompt!`);
+    } else {
+      logger.info(`❓ UNKNOWN: Cannot determine which system prompt is being used`);
+    }
+    
+    logger.info(`\n📊 Sending request to OpenAI API with ${MODEL_BEING_USED}...`);
+    
     // Make the API call with retry logic
-    logger.info(`\n📊 Sending request to OpenAI API...`);
     const response = await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4.1-mini',
+        model: MODEL_BEING_USED,
         messages,
         max_tokens: 4000,
         temperature: 0.7,
@@ -544,6 +586,12 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       });
     }, 'OpenAI knowledge extraction');
 
+    // 🎉 OPENAI API RESPONSE VERIFICATION
+    logger.info(`\n✅ ===== OPENAI API RESPONSE RECEIVED =====`);
+    logger.info(`📌 RESPONSE MODEL: ${response.model || 'unknown'}`);
+    logger.info(`📌 RESPONSE ID: ${response.id || 'unknown'}`);
+    logger.info(`📌 CHOICES COUNT: ${response.choices?.length || 0}`);
+    
     // Extract token usage and cost
     let promptTokens = 0, completionTokens = 0, totalTokens = 0;
     let inputCost = 0, outputCost = 0, totalCost = 0;
@@ -552,11 +600,15 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       completionTokens = response.usage.completion_tokens;
       totalTokens = response.usage.total_tokens;
       
+      logger.info(`📌 TOKEN USAGE: Input=${promptTokens}, Output=${completionTokens}, Total=${totalTokens}`);
+      
       // 💰 USE NEW BULLETPROOF COST TRACKING SYSTEM
       const costResult = calculateExactCost('gpt-4o-mini', promptTokens, completionTokens, 'Knowledge Extraction');
       inputCost = costResult.inputCostUSD;
       outputCost = costResult.outputCostUSD;
       totalCost = costResult.totalCostUSD;
+      
+      logger.info(`💰 COST: Input=$${inputCost.toFixed(4)}, Output=$${outputCost.toFixed(4)}, Total=$${totalCost.toFixed(4)}`);
     }
 
     const rawOutput = response.choices[0]?.message?.content || '';
@@ -937,18 +989,26 @@ Focus only on this specific time segment and maintain the engaging, conversation
 
 // Health check function
 export async function checkOpenAIHealth(): Promise<boolean> {
+  const HEALTH_CHECK_MODEL = 'gpt-4.1-mini';
+  
+  logger.info(`\n🏥 ===== OPENAI HEALTH CHECK VERIFICATION =====`);
+  logger.info(`📌 HEALTH CHECK MODEL: ${HEALTH_CHECK_MODEL}`);
+  
   try {
-    await retryWithBackoff(async () => {
+    const response = await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: HEALTH_CHECK_MODEL,
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 5,
       });
     }, 'OpenAI health check');
     
+    logger.info(`✅ OpenAI health check SUCCESS with model: ${response.model || HEALTH_CHECK_MODEL}`);
+    logger.info(`📌 Response ID: ${response.id || 'unknown'}`);
+    
     return true;
   } catch (error) {
-    logger.error(`OpenAI health check failed: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(`❌ OpenAI health check FAILED with model ${HEALTH_CHECK_MODEL}: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
