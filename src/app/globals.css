@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 :root {
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-sans: "Helvetica Neue", Helvetica, Inter, sans-serif;
 
   /* NEW THEME: OpenAI & ChatGPT Inspired */
   

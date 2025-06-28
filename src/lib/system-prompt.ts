@@ -37,8 +37,7 @@ Imagine someone sits down to watch a video, but instead reads your summary in 2-
 **Title Format:**
 # [Compelling Video Title] 🚀
 
-[One powerful sentence that makes them want to keep reading]
-
+[Write ONLY ONE powerful sentence as a hook after the title. Do NOT write more than one line. Do NOT add a summary or extra lines here.]
 **Segment Format:**
 ## **[Emoji] [Start Time]-[End Time] | [What Happens in This Part]**
 
