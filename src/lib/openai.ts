@@ -490,7 +490,7 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('\n📋 OPENAI EXTRACTION START');
   logger.info(`📌 Video: "${videoTitle.substring(0, 60)}${videoTitle.length > 60 ? '...' : ''}"`);
   logger.info(`📌 Duration: ${formatTime(totalDuration)} (${totalDuration}s)`);
-  logger.info(`📌 Model: gpt-4.1-mini`);
+  logger.info(`📌 Model: gpt-4o-mini`);
   logger.info(`📌 Transcript segments: ${transcript.length}`);
 
   if (!transcript || transcript.length === 0) {
@@ -535,11 +535,9 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       return await getOpenAIClient().chat.completions.create({
         model: 'gpt-4.1-mini',
         messages,
-        max_tokens: 6000, // Increased for longer videos
+        max_tokens: 4000,
         temperature: 0.7,
         top_p: 0.95,
-        frequency_penalty: 0,
-        presence_penalty: 0
       });
     }, 'OpenAI knowledge extraction');
 
@@ -552,7 +550,7 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       totalTokens = response.usage.total_tokens;
       
       // 💰 USE NEW BULLETPROOF COST TRACKING SYSTEM
-      const costResult = calculateExactCost('gpt-4.1-mini', promptTokens, completionTokens, 'Knowledge Extraction');
+      const costResult = calculateExactCost('gpt-4o-mini', promptTokens, completionTokens, 'Knowledge Extraction');
       inputCost = costResult.inputCostUSD;
       outputCost = costResult.outputCostUSD;
       totalCost = costResult.totalCostUSD;
@@ -853,7 +851,7 @@ export async function checkOpenAIHealth(): Promise<boolean> {
   try {
     await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 5,
       });
