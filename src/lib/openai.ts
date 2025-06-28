@@ -637,16 +637,31 @@ function parseOpenAIResponse(
     const titleMatch = text.match(/^#?\s*\*\*(.+?)\*\*|^#?\s*(.+?)$/m);
     const mainTitle = titleMatch ? (titleMatch[1] || titleMatch[2])?.trim() : videoTitle;
     
-    // Extract segments using various patterns
-    const segmentRegex = /##\s+(.+?)\s*\|\s*(.+?)\n🔥(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    // Extract segments using various patterns - IMPROVED REGEX to capture all segments
+    // This new pattern is more flexible and captures segments with different emoji patterns and formats
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️🗜️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌦️🌧️🌨️🌩️🌪️🌫️🌬️🌀🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    
+    // If the above regex fails, use a simpler fallback pattern that will match most common formats
+    const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    
     const segments: VideoSegment[] = [];
     let match;
     
+    // Try the primary regex first
     while ((match = segmentRegex.exec(text)) !== null) {
-      const [_, timeRange, title, hook, content] = match;
+      const [_, timeRange, title, content] = match;
+      
+      // Extract hook from content if present
+      const hookMatch = content.match(/^(?:🔥|💡|⚡|🎯|✨)\s*(.+?)(?:\n|$)/);
+      const hook = hookMatch ? hookMatch[1].trim() : "Key insights from this segment";
+      
+      // Clean content by removing the hook if it was found
+      const cleanContent = hookMatch 
+        ? content.substring(hookMatch[0].length).trim() 
+        : content.trim();
       
       // Parse time range
-      const timeMatch = timeRange.match(/(\d+:\d+:\d+|\d+:\d+)(?:\s*[–-]\s*(\d+:\d+:\d+|\d+:\d+))?/);
+      const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?))?/);
       const startTimeStr = timeMatch?.[1] || '0:00';
       const endTimeStr = timeMatch?.[2] || formatTime(totalDuration);
       
@@ -656,20 +671,80 @@ function parseOpenAIResponse(
         endTime: timeToSeconds(endTimeStr),
         timestamp: `${startTimeStr}–${endTimeStr}`,
         hook: hook.trim(),
-        narratorSummary: content.trim()
+        narratorSummary: cleanContent
       });
     }
     
+    // If no segments were found with the primary regex, try the simpler pattern
+    if (segments.length === 0) {
+      let simpleMatch;
+      while ((simpleMatch = simpleSegmentRegex.exec(text)) !== null) {
+        const [_, timeRange, title, content] = simpleMatch;
+        
+        // Extract hook from content if present
+        const hookMatch = content.match(/^(?:🔥|💡|⚡|🎯|✨)\s*(.+?)(?:\n|$)/);
+        const hook = hookMatch ? hookMatch[1].trim() : "Key insights from this segment";
+        
+        // Clean content by removing the hook if it was found
+        const cleanContent = hookMatch 
+          ? content.substring(hookMatch[0].length).trim() 
+          : content.trim();
+        
+        // Parse time range
+        const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?))?/);
+        const startTimeStr = timeMatch?.[1] || '0:00';
+        const endTimeStr = timeMatch?.[2] || formatTime(totalDuration);
+        
+        segments.push({
+          title: title.trim(),
+          startTime: timeToSeconds(startTimeStr),
+          endTime: timeToSeconds(endTimeStr),
+          timestamp: `${startTimeStr}–${endTimeStr}`,
+          hook: hook.trim(),
+          narratorSummary: cleanContent
+        });
+      }
+    }
+    
+    // If still no segments found, try a last-resort fallback pattern
+    if (segments.length === 0) {
+      const fallbackRegex = /##\s+.*?(\d+:\d+).*?\|\s*(.*?)[\r\n]+([\s\S]+?)(?=##|🔑|$)/g;
+      let fallbackMatch;
+      
+      while ((fallbackMatch = fallbackRegex.exec(text)) !== null) {
+        const [_, startTime, title, content] = fallbackMatch;
+        
+        // Get next start time or video end
+        const nextMatchIndex = text.indexOf('##', fallbackMatch.index + 2);
+        const nextTimeMatch = nextMatchIndex > -1 
+          ? text.substring(nextMatchIndex).match(/(\d+:\d+)/) 
+          : null;
+        const endTimeStr = nextTimeMatch?.[1] || formatTime(totalDuration);
+        
+        segments.push({
+          title: title.trim(),
+          startTime: timeToSeconds(startTime),
+          endTime: timeToSeconds(endTimeStr),
+          timestamp: `${startTime}–${endTimeStr}`,
+          hook: "Key insights from this segment",
+          narratorSummary: content.trim()
+        });
+      }
+    }
+    
+    // Sort segments by start time to ensure chronological order
+    segments.sort((a, b) => a.startTime - b.startTime);
+    
     // Deduplicate segments by checking for very similar titles or hooks
     const uniqueSegments = deduplicateSegments(segments);
-    logger.info(`🧹 Deduplicated segments: ${segments.length} → ${uniqueSegments.length}`);
+    logger.info(`🧹 Processed segments: ${segments.length} → ${uniqueSegments.length}`);
     
     // Extract key takeaways
-    const takeawaysMatch = text.match(/🔑\s*Key Takeaways[\s\S]*?\n((?:\s*[-*]\s*.+\n?)+)/);
+    const takeawaysMatch = text.match(/🔑\s*(?:Everything You Just Learned|Key Takeaways)[\s\S]*?\n((?:\s*[-*•]\s*.+\n?)+)/i);
     const keyTakeaways = takeawaysMatch
       ? takeawaysMatch[1]
           .split('\n')
-          .map(line => line.replace(/^\s*[-*]\s*/, '').trim())
+          .map(line => line.replace(/^\s*[-*•]\s*/, '').trim())
           .filter(line => line.length > 0)
       : ['Analysis completed successfully'];
     
@@ -679,8 +754,9 @@ function parseOpenAIResponse(
     // Extract overall summary from the content
     const overallSummary = mainTitle || 'Video analysis completed';
     
-    // If no segments found, create a single segment
+    // If no segments found, create segments covering the entire video duration
     if (uniqueSegments.length === 0) {
+      logger.warn(`⚠️ No segments found in OpenAI response, creating fallback segment`);
       const endTimeStr = formatTime(totalDuration);
       uniqueSegments.push({
         title: 'Complete Video Analysis',
@@ -692,11 +768,21 @@ function parseOpenAIResponse(
       });
     }
     
+    // Ensure the last segment ends at the video's end time
+    if (uniqueSegments.length > 0) {
+      const lastSegment = uniqueSegments[uniqueSegments.length - 1];
+      if (lastSegment.endTime < totalDuration) {
+        logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
+        lastSegment.endTime = totalDuration;
+        lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
+      }
+    }
+    
     return {
       mainTitle,
       overallSummary,
-      segments: uniqueSegments.slice(0, 12), // Limit to 12 segments max
-      keyTakeaways: uniqueTakeaways.slice(0, 10) // Limit to 10 takeaways max
+      segments: uniqueSegments, // CRITICAL FIX: Remove the slice limit to include ALL segments
+      keyTakeaways: uniqueTakeaways
     };
     
   } catch (error) {

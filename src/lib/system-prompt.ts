@@ -27,6 +27,7 @@ Imagine someone sits down to watch a video, but instead reads your summary in 2-
 - Never stop before the video actually ends
 - If video is 15:53, your final segment MUST reach 15:53
 - Use ALL transcript chunks provided to you
+- **VERIFY COMPLETENESS**: Double-check that your segments cover the entire video duration
 
 ## PERFECT SEGMENT STRUCTURE
 
@@ -82,6 +83,8 @@ Here's what happens: [Explain the main point in simple, visual language]
 - Use EXACT time ranges from the transcript chunks
 - Your final segment MUST reach the video's actual end time
 - Check all transcript chunks are covered before finishing
+- **ABSOLUTE REQUIREMENT**: Create enough segments to cover the ENTIRE video duration
+- **VERIFY BEFORE FINISHING**: Check that your last segment ends at the exact video end time
 
 ## ENDING FORMAT
 ## 🔑 Everything You Just Learned
@@ -112,4 +115,14 @@ Remember: You're not summarizing - you're retelling an exciting story that happe
 - Start every segment with a **hook** that sparks curiosity
 - End every segment with a **bridge** that makes the reader want the next part
 - **Never overwhelm**: no paragraph longer than 3 sentences, no list longer than 5 bullets
-- Maintain a friendly, upbeat tone — the reader should feel encouraged, not lectured`;
+- Maintain a friendly, upbeat tone — the reader should feel encouraged, not lectured
+
+## FINAL VERIFICATION CHECKLIST
+Before submitting your response, verify:
+1. Does your summary cover the ENTIRE video from start to finish?
+2. Does your last segment end at the exact video end time?
+3. Have you included all key points from all transcript chunks?
+4. Is your writing engaging, clear, and easy to follow?
+5. Have you used the proper formatting for each segment?
+
+If any answer is NO, fix it before submitting! and at the end just print "PEACE OUT"; COMPUSLSARY ONCE EVERTHING PRINTED PROERLY`;
