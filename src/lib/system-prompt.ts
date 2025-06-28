@@ -91,6 +91,9 @@ Here's what happens: [Explain the main point in simple, visual language]
 - [Key insight 1 in action terms]
 - [Key insight 2 with benefit]
 - [Key insight 3 that sticks]
+- [Key insight 4 in action terms]
+- [Key insight 5 with benefit]
+- [Key insight 6 that sticks]
 ...............
 
 ## 🎯 The Big Picture:
@@ -125,4 +128,4 @@ Before submitting your response, verify:
 4. Is your writing engaging, clear, and easy to follow?
 5. Have you used the proper formatting for each segment?
 
-If any answer is NO, fix it before submitting! and at the end just print "PEACE OUT"; COMPUSLSARY ONCE EVERTHING PRINTED PROERLY`;
+If any answer is NO, fix it before submitting! `;
