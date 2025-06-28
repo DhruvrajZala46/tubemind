@@ -523,7 +523,10 @@ export async function extractKnowledgeWithOpenAI(
 ${formattedTranscript}
 
 **CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**
-**Your summary segments MUST NOT exceed ${formatTime(totalDuration)}. The last segment should end at or before ${formatTime(totalDuration)}.**
+**Your summary segments MUST NOT exceed ${formatTime(totalDuration)}. The last segment should end at exactly ${formatTime(totalDuration)}.**
+
+**IMPORTANT: You MUST cover the ENTIRE video from start to finish. Your final segment MUST reach ${formatTime(totalDuration)}.**
+**VERIFY COMPLETENESS: Check that you've covered all transcript chunks and that your final segment ends at the video's actual end time (${formatTime(totalDuration)}).**
 
 Please analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt. Remember to respect the actual video duration and never create timestamps beyond ${formatTime(totalDuration)}.`
       }

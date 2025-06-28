@@ -273,6 +273,7 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
   logger.debug(`[Transcript] Formatting ${transcript.length} segments into ${chunkDuration}s chunks`);
   logger.debug(`[Transcript] Video duration: ${totalDurationSeconds ? `${totalDurationSeconds}s` : 'unknown'}`);
   logger.debug(`[Transcript] First few segments: ${JSON.stringify(transcript.slice(0, 3).map(item => `[${item.start}s] ${item.text.substring(0, 50)}...`))}`);
+  logger.debug(`[Transcript] Last few segments: ${JSON.stringify(transcript.slice(-3).map(item => `[${item.start}s] ${item.text.substring(0, 50)}...`))}`);
 
   // If we have total duration, fix transcript timestamps to not exceed video length
   let processedTranscript = transcript;
@@ -295,6 +296,18 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
       
       logger.debug(`[Transcript] Fixed timestamps to fit within ${totalDurationSeconds}s duration`);
     }
+    
+    // Ensure the last segment is properly placed near the end of the video
+    if (processedTranscript.length > 0) {
+      const lastItem = processedTranscript[processedTranscript.length - 1];
+      if (lastItem.start < totalDurationSeconds - 60) {
+        logger.warn(`[Transcript] Last segment timestamp (${lastItem.start}s) is far from video end (${totalDurationSeconds}s). Adjusting...`);
+        processedTranscript[processedTranscript.length - 1] = {
+          ...lastItem,
+          start: Math.max(totalDurationSeconds - 30, 0) // Place last segment 30 seconds before end
+        };
+      }
+    }
   }
 
   // Group transcript text by chunk intervals (default: 60s)
@@ -310,6 +323,19 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
 
   // Calculate max chunk index based on actual video duration
   const maxChunkIndex = totalDurationSeconds ? Math.ceil(totalDurationSeconds / chunkDuration) - 1 : undefined;
+  
+  // If we're missing the last chunk but have video duration, add an empty chunk for the last minute
+  if (totalDurationSeconds && maxChunkIndex !== undefined) {
+    const lastChunkIndex = Math.max(...Object.keys(chunks).map(k => parseInt(k, 10)));
+    if (lastChunkIndex < maxChunkIndex) {
+      logger.warn(`[Transcript] Missing final chunks. Adding placeholder for complete coverage up to ${totalDurationSeconds}s`);
+      for (let i = lastChunkIndex + 1; i <= maxChunkIndex; i++) {
+        if (!chunks[i]) {
+          chunks[i] = ["[End of video content]"];
+        }
+      }
+    }
+  }
 
   // Format and print each chunk nicely
   const formattedBlocks = Object.entries(chunks)
@@ -324,13 +350,7 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
       
       return `=== Transcript from ${startMin} to ${actualEndMin} minutes ===\n${texts.join(' ')}`;
     })
-    .filter(([index]) => {
-      // Filter out chunks that exceed video duration
-      if (maxChunkIndex !== undefined) {
-        return parseInt(index) <= maxChunkIndex;
-      }
-      return true;
-    })
+    .filter(block => block !== undefined)
     .sort((a, b) => {
       // Sort by the numeric chunk index
       const aIdx = parseInt(a.match(/from (\d+) to/)?.[1] || '0', 10);
@@ -339,5 +359,15 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
     });
 
   logger.debug(`[Transcript] Final formatted blocks: ${formattedBlocks.length} chunks`);
+  
+  // Verify we have all chunks up to the video duration
+  if (totalDurationSeconds) {
+    const expectedChunks = Math.ceil(totalDurationSeconds / 60);
+    const actualChunks = formattedBlocks.length;
+    if (actualChunks < expectedChunks) {
+      logger.warn(`[Transcript] Missing chunks: expected ${expectedChunks}, got ${actualChunks}. This may cause incomplete summaries.`);
+    }
+  }
+  
   return formattedBlocks.join('\n\n');
 }
