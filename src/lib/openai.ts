@@ -549,31 +549,46 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
     const userContent = typeof messages[1]?.content === 'string' ? messages[1].content : 'N/A';
     
     logger.info(`\n🚀 ===== OPENAI API CALL VERIFICATION =====`);
+    console.log(`\n🚀 ===== OPENAI API CALL VERIFICATION =====`);
     logger.info(`📌 MODEL BEING USED: ${MODEL_BEING_USED}`);
+    console.log(`📌 MODEL BEING USED: ${MODEL_BEING_USED}`);
     logger.info(`📌 SYSTEM PROMPT LENGTH: ${systemContent.length} characters`);
+    console.log(`📌 SYSTEM PROMPT LENGTH: ${systemContent.length} characters`);
     logger.info(`📌 SYSTEM PROMPT PREVIEW: ${systemContent.substring(0, 100)}...`);
+    console.log(`📌 SYSTEM PROMPT PREVIEW: ${systemContent.substring(0, 100)}...`);
     logger.info(`📌 USER PROMPT LENGTH: ${userContent.length} characters`);
+    console.log(`📌 USER PROMPT LENGTH: ${userContent.length} characters`);
     logger.info(`📌 VIDEO TITLE: ${videoTitle}`);
+    console.log(`📌 VIDEO TITLE: ${videoTitle}`);
     logger.info(`📌 VIDEO DURATION: ${formatTime(totalDuration)} (${totalDuration}s)`);
+    console.log(`📌 VIDEO DURATION: ${formatTime(totalDuration)} (${totalDuration}s)`);
     logger.info(`📌 TRANSCRIPT CHUNKS: ${transcript.length}`);
+    console.log(`📌 TRANSCRIPT CHUNKS: ${transcript.length}`);
     
     // Check if we're using the new system prompt
     const isNewSystemPrompt = systemContent.includes('Video-to-Story Transformation System');
     const isOldSystemPrompt = systemContent.includes('Ultimate Fast-Flow Video Summary System');
     
     logger.info(`\n🔍 SYSTEM PROMPT VERIFICATION:`);
+    console.log(`\n🔍 SYSTEM PROMPT VERIFICATION:`);
     logger.info(`✅ Using NEW system prompt (Video-to-Story): ${isNewSystemPrompt ? 'YES ✅' : 'NO ❌'}`);
+    console.log(`✅ Using NEW system prompt (Video-to-Story): ${isNewSystemPrompt ? 'YES ✅' : 'NO ❌'}`);
     logger.info(`❌ Using OLD system prompt (Fast-Flow): ${isOldSystemPrompt ? 'YES ⚠️' : 'NO ✅'}`);
+    console.log(`❌ Using OLD system prompt (Fast-Flow): ${isOldSystemPrompt ? 'YES ⚠️' : 'NO ✅'}`);
     
     if (isNewSystemPrompt) {
       logger.info(`🎉 CONFIRMED: Production is using the UPDATED system prompt!`);
+      console.log(`🎉🎉🎉 CONFIRMED: Production is using the UPDATED system prompt! 🎉🎉🎉`);
     } else if (isOldSystemPrompt) {
       logger.info(`⚠️ WARNING: Production is still using the OLD system prompt!`);
+      console.log(`⚠️⚠️⚠️ WARNING: Production is still using the OLD system prompt! ⚠️⚠️⚠️`);
     } else {
       logger.info(`❓ UNKNOWN: Cannot determine which system prompt is being used`);
+      console.log(`❓❓❓ UNKNOWN: Cannot determine which system prompt is being used ❓❓❓`);
     }
     
     logger.info(`\n📊 Sending request to OpenAI API with ${MODEL_BEING_USED}...`);
+    console.log(`\n📊 Sending request to OpenAI API with ${MODEL_BEING_USED}...`);
     
     // Make the API call with retry logic
     const response = await retryWithBackoff(async () => {
