@@ -295,6 +295,8 @@ function ChatGPTMarkdown({
   );
 }
 
+export { ChatGPTMarkdown };
+
 interface VideoSummaryProps {
   summary: {
     title: string;

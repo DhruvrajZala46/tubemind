@@ -4,6 +4,7 @@ import React, { Suspense } from 'react';
 import { KnowledgeExtraction } from '../lib/openai';
 import { Clock } from 'lucide-react';
 const ReactMarkdown = React.lazy(() => import('react-markdown'));
+import { ChatGPTMarkdown } from './Dashboard/VideoSummary';
 
 interface KnowledgeDisplayProps {
   data: KnowledgeExtraction;
@@ -34,9 +35,7 @@ export default function KnowledgeDisplay({ data, videoTitle, thumbnailUrl, rawAI
       {/* Raw AI Output as Main Summary */}
       {rawAIOutput && (
         <div className="bg-[#303030] border border-[#3A3A3A] text-[#FFFFFF] rounded-lg p-6 w-full text-sm">
-          <Suspense fallback={<div>Loading...</div>}>
-            <ReactMarkdown>{rawAIOutput}</ReactMarkdown>
-          </Suspense>
+          <ChatGPTMarkdown markdown={rawAIOutput} />
         </div>
       )}
     </div>

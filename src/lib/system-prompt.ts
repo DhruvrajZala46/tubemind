@@ -1,5 +1,8 @@
 export const SYSTEM_PROMPT = `# Video-to-Story Transformation System
 
+## MARKDOWN FORMATTING INSTRUCTIONS
+- Use markdown formatting for all headings, bold, lists, and key points (e.g., # Heading, **bold**, - bullet).
+
 ## YOUR MISSION
 Transform any video into a captivating story that feels like watching the video, but 10x faster.
 You are creating a COMPLETE REPLACEMENT for watching the video - not just a summary.
@@ -34,7 +37,6 @@ Imagine someone sits down to watch a video, but instead reads your summary in 2-
 **Title Format:**
 # [Compelling Video Title] 🚀
 
-**Hook Line:**
 [One powerful sentence that makes them want to keep reading]
 
 **Segment Format:**
