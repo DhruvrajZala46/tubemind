@@ -127,15 +127,20 @@ function getRetryDelay(attempt: number): number {
 }
 
 // After fetching transcript items, ensure all have valid numeric start
-const fixTranscript = (items: TranscriptItem[]): TranscriptItem[] =>
+const fixTranscript = (items: TranscriptItem[], totalDurationSeconds?: number): TranscriptItem[] =>
   items.map((item, index) => {
     // Preserve original start time if it's valid, otherwise estimate based on index
     let start = typeof item.start === 'number' && !isNaN(item.start) ? item.start : 0;
     
-    // If start is 0 but this isn't the first item, estimate based on previous items
+    // If start is 0 but this isn't the first item, estimate based on position in transcript
     if (start === 0 && index > 0) {
-      // Estimate 3 seconds per transcript segment if start time is missing
-      start = index * 3;
+      if (totalDurationSeconds && items.length > 0) {
+        // Distribute segments evenly across actual video duration
+        start = Math.floor((index / items.length) * totalDurationSeconds);
+      } else {
+        // Fallback: Estimate 3 seconds per transcript segment if no duration info
+        start = index * 3;
+      }
     }
     
     return {
@@ -160,7 +165,7 @@ function isAxiosError(error: any): error is { message: string; response?: { stat
 }
 
 // Production-ready transcript fetching using SupaData.ai API
-export async function getVideoTranscript(videoId: string): Promise<TranscriptItem[]> {
+export async function getVideoTranscript(videoId: string, totalDurationSeconds?: number): Promise<TranscriptItem[]> {
   logger.info(`[Transcript] Starting transcript fetch for video: ${videoId}`);
   if (!TRANSCRIPT_CONFIG.supadataApiKey) {
     throw new Error('SUPADATA_API_KEY is not configured in environment variables.');
@@ -171,7 +176,7 @@ export async function getVideoTranscript(videoId: string): Promise<TranscriptIte
     const cached = cacheManager.getCachedYouTubeTranscript(videoId);
     if (cached) {
       logger.info(`[Transcript] ✅ Central Cache hit for video: ${videoId}`);
-      return fixTranscript(cached);
+      return fixTranscript(cached, totalDurationSeconds);
     }
   }
 
@@ -235,7 +240,7 @@ export async function getVideoTranscript(videoId: string): Promise<TranscriptIte
         if (TRANSCRIPT_CONFIG.cacheEnabled) {
           cacheManager.cacheYouTubeTranscript(videoId, transcript);
         }
-        return fixTranscript(transcript);
+        return fixTranscript(transcript, totalDurationSeconds);
       }
       lastError = new Error(response.data?.error || 'No transcript returned from SupaData.ai service');
       logger.error('[Transcript] SupaData.ai API error response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
@@ -262,15 +267,39 @@ export async function getVideoTranscript(videoId: string): Promise<TranscriptIte
   throw new Error(errorMessage);
 }
 
-export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDuration: number = 60): string {
+export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDuration: number = 60, totalDurationSeconds?: number): string {
   if (!transcript || transcript.length === 0) return '';
 
   logger.debug(`[Transcript] Formatting ${transcript.length} segments into ${chunkDuration}s chunks`);
+  logger.debug(`[Transcript] Video duration: ${totalDurationSeconds ? `${totalDurationSeconds}s` : 'unknown'}`);
   logger.debug(`[Transcript] First few segments: ${JSON.stringify(transcript.slice(0, 3).map(item => `[${item.start}s] ${item.text.substring(0, 50)}...`))}`);
+
+  // If we have total duration, fix transcript timestamps to not exceed video length
+  let processedTranscript = transcript;
+  if (totalDurationSeconds && transcript.length > 0) {
+    // Calculate proper time distribution
+    const maxTimestamp = Math.max(...transcript.map(item => item.start || 0));
+    
+    // If timestamps exceed video duration, redistribute them proportionally
+    if (maxTimestamp > totalDurationSeconds) {
+      logger.warn(`[Transcript] Timestamps exceed video duration (${maxTimestamp}s > ${totalDurationSeconds}s). Redistributing...`);
+      
+      processedTranscript = transcript.map((item, index) => {
+        // Distribute segments evenly across actual video duration
+        const normalizedTime = (index / transcript.length) * totalDurationSeconds;
+        return {
+          ...item,
+          start: Math.floor(normalizedTime)
+        };
+      });
+      
+      logger.debug(`[Transcript] Fixed timestamps to fit within ${totalDurationSeconds}s duration`);
+    }
+  }
 
   // Group transcript text by chunk intervals (default: 60s)
   const chunks: Record<number, string[]> = {};
-  for (const item of transcript) {
+  for (const item of processedTranscript) {
     const start = typeof item.start === 'number' && !isNaN(item.start) ? item.start : 0;
     const chunkIndex = Math.floor(start / chunkDuration);
     if (!chunks[chunkIndex]) chunks[chunkIndex] = [];
@@ -279,12 +308,28 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
 
   logger.debug(`[Transcript] Created ${Object.keys(chunks).length} chunks: ${JSON.stringify(Object.keys(chunks).map(key => `chunk ${key}: ${chunks[parseInt(key)].length} segments`))}`);
 
+  // Calculate max chunk index based on actual video duration
+  const maxChunkIndex = totalDurationSeconds ? Math.ceil(totalDurationSeconds / chunkDuration) - 1 : undefined;
+
   // Format and print each chunk nicely
   const formattedBlocks = Object.entries(chunks)
     .map(([index, texts]) => {
       const startMin = parseInt(index, 10);
       const endMin = startMin + 1;
-      return `=== Transcript from ${startMin} to ${endMin} minutes ===\n${texts.join(' ')}`;
+      
+      // If we have total duration, ensure we don't exceed it in the display
+      const actualEndMin = totalDurationSeconds ? 
+        Math.min(endMin, Math.ceil(totalDurationSeconds / 60)) : 
+        endMin;
+      
+      return `=== Transcript from ${startMin} to ${actualEndMin} minutes ===\n${texts.join(' ')}`;
+    })
+    .filter(([index]) => {
+      // Filter out chunks that exceed video duration
+      if (maxChunkIndex !== undefined) {
+        return parseInt(index) <= maxChunkIndex;
+      }
+      return true;
     })
     .sort((a, b) => {
       // Sort by the numeric chunk index

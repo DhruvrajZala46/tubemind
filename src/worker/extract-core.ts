@@ -100,7 +100,7 @@ export async function processVideo(
     await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('transcribing', 30, 'Downloading video audio...');
     
-    const transcript = await getVideoTranscript(videoId);
+    const transcript = await getVideoTranscript(videoId, totalDurationSeconds);
     if (!transcript || transcript.length === 0) {
       throw new Error('Transcript is empty or could not be fetched.');
     }

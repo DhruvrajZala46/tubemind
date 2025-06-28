@@ -381,11 +381,14 @@ Emotional Connectors (every few sentences):
 - Explain significance: "This is important because..."
 
 ## CRITICAL TIMING ACCURACY
-- Never extend beyond actual video length
-- Use EXACT timestamps from transcript/video
-- If video is 24:00, summary ends at 24:00 maximum
-- Each segment must match real timeframes
-- No artificial extensions or rounded-up times
+- **NEVER extend beyond actual video length**
+- Use EXACT timestamps from transcript/video only
+- If video is 18:00, summary MUST end at 18:00 maximum (not 36:00 or any other inflated time)
+- Each segment must match real timeframes from the provided transcript chunks
+- If transcript shows "from 0 to 18 minutes", your segments cannot go beyond 18 minutes
+- **ABSOLUTE RULE**: Total summary duration = actual video duration, never more
+- When you see transcript chunks ending at minute X, that's the maximum time for your segments
+- Double-check all timestamps against the transcript chunk headers before finalizing
 
 ## MAGNETIC STORY STRUCTURE
 **Opening Hook (Must grab in 2 seconds):**

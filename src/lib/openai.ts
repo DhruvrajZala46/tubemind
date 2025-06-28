@@ -504,7 +504,7 @@ export async function extractKnowledgeWithOpenAI(
 
   try {
     // Format transcript by minutes (same as Gemini implementation)
-    const formattedTranscript = formatTranscriptByMinutes(transcript, 60);
+    const formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
     
     // Log the full transcript sent to OpenAI
     logger.info('\n📝 FULL TRANSCRIPT SENT TO OPENAI:');
@@ -518,7 +518,14 @@ export async function extractKnowledgeWithOpenAI(
       },
       {
         role: 'user',
-        content: `Here is the full transcript, chunked by minute for your reference:\n\n${formattedTranscript}\n\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`
+        content: `Here is the full transcript, chunked by minute for your reference:
+
+${formattedTranscript}
+
+**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**
+**Your summary segments MUST NOT exceed ${formatTime(totalDuration)}. The last segment should end at or before ${formatTime(totalDuration)}.**
+
+Please analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt. Remember to respect the actual video duration and never create timestamps beyond ${formatTime(totalDuration)}.`
       }
     ];
 
