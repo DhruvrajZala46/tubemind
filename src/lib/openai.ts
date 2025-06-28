@@ -490,7 +490,7 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('\n📋 OPENAI EXTRACTION START');
   logger.info(`📌 Video: "${videoTitle.substring(0, 60)}${videoTitle.length > 60 ? '...' : ''}"`);
   logger.info(`📌 Duration: ${formatTime(totalDuration)} (${totalDuration}s)`);
-  logger.info(`📌 Model: gpt-4o-mini`);
+  logger.info(`📌 Model: gpt-4.1-mini`);
   logger.info(`📌 Transcript segments: ${transcript.length}`);
 
   if (!transcript || transcript.length === 0) {
@@ -533,7 +533,7 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
     logger.info(`\n📊 Sending request to OpenAI API...`);
     const response = await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages,
         max_tokens: 6000, // Increased for longer videos
         temperature: 0.7,
@@ -552,7 +552,7 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       totalTokens = response.usage.total_tokens;
       
       // 💰 USE NEW BULLETPROOF COST TRACKING SYSTEM
-      const costResult = calculateExactCost('gpt-4o-mini', promptTokens, completionTokens, 'Knowledge Extraction');
+      const costResult = calculateExactCost('gpt-4.1-mini', promptTokens, completionTokens, 'Knowledge Extraction');
       inputCost = costResult.inputCostUSD;
       outputCost = costResult.outputCostUSD;
       totalCost = costResult.totalCostUSD;
@@ -831,7 +831,7 @@ Focus only on this specific time segment and maintain the engaging, conversation
   try {
     const response = await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages,
         max_tokens: 1500,
         temperature: 0.7,
@@ -853,7 +853,7 @@ export async function checkOpenAIHealth(): Promise<boolean> {
   try {
     await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 5,
       });
