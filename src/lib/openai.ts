@@ -43,6 +43,23 @@ const RATE_LIMIT_CONFIG = {
 // 💰 OFFICIAL OPENAI PRICING (Verified Dec 2024)
 // Source: https://openai.com/api/pricing/ and official OpenAI documentation
 const OFFICIAL_OPENAI_PRICING = {
+  'gpt-4.1-mini': {
+    inputPricePerMillionTokens: 0.15,
+    outputPricePerMillionTokens: 0.60,
+    inputPricePerToken: 0.15 / 1000000,
+    outputPricePerToken: 0.60 / 1000000,
+    maxContextTokens: 128000,
+    maxCompletionTokens: 16384,
+  },
+  'gpt-4.1-mini-2025-04-14': {
+    // Same pricing as gpt-4.1-mini (dated version)
+    inputPricePerMillionTokens: 0.15,
+    outputPricePerMillionTokens: 0.60,
+    inputPricePerToken: 0.15 / 1000000,
+    outputPricePerToken: 0.60 / 1000000,
+    maxContextTokens: 128000,
+    maxCompletionTokens: 16384,
+  },
   'gpt-4o-mini': {
     // ✅ VERIFIED OFFICIAL PRICING as of December 2024
     inputPricePerMillionTokens: 0.15,   // $0.15 per 1M input tokens
@@ -453,7 +470,7 @@ async function retryWithBackoff<T>(
 
       // Calculate delay with jitter
       const delayWithJitter = RATE_LIMIT_CONFIG.jitter 
-        ? calculateJitter(delay)
+        ? calculateJitter(delay) 
         : delay;
       
       const actualDelay = Math.min(delayWithJitter, RATE_LIMIT_CONFIG.maxDelay);
@@ -640,7 +657,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️🗜️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌦️🌧️🌨️🌩️🌪️🌫️🌬️🌀🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️🗜️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
