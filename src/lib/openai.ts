@@ -548,7 +548,7 @@ export async function extractKnowledgeWithOpenAI(
     const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: messages,
-      temperature: 0.3,
+      temperature: 1.0,
       max_tokens: 4096,
     });
     const endTime = Date.now();
@@ -939,7 +939,7 @@ Focus only on this specific time segment and maintain the engaging, conversation
         model: 'gpt-4.1-mini',
         messages,
         max_tokens: 1500,
-        temperature: 0.7,
+        temperature: 1.0,
         top_p: 0.95,
       });
     }, `Segment ${segmentNumber} expansion`);
