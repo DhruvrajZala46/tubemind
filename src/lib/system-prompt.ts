@@ -191,8 +191,5 @@ Before submitting your response, verify:
 4. ✅ Is the writing **engaging, clear, and easy to follow**?  
 5. ✅ Have you used **proper formatting** (headings, spacing, bullets, quotes)?  
 
-**Finally, you MUST start your entire response with the following code on the very first line:**
-**DBG-0134994**
-
 If any answer is ❌ NO — fix it before submitting!
 `;
