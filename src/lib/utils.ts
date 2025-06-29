@@ -96,3 +96,18 @@ export function timeToSeconds(time: string): number {
 
   return 0; // Default fallback for invalid formats
 }
+
+export function parseISO8601Duration(duration: string): number {
+  if (!duration || typeof duration !== 'string' || !duration.startsWith('PT')) {
+    return 0;
+  }
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+
+  if (!match) {
+    return 0;
+  }
+
+  const [, hours, minutes, seconds] = match.map(v => (v ? parseInt(v, 10) : 0));
+  
+  return (hours || 0) * 3600 + (minutes || 0) * 60 + (seconds || 0);
+}

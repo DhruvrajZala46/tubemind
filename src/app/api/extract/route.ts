@@ -181,20 +181,6 @@ async function addJobToDatabase(jobData: JobData): Promise<void> {
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
 
-function parseDurationToSeconds(durationStr: any) {
-  if (typeof durationStr === 'number') return durationStr;
-  if (!durationStr || typeof durationStr !== 'string') return 0;
-  const parts = durationStr.split(':').map(Number);
-  if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  } else if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  } else if (parts.length === 1) {
-    return Number(parts[0]);
-  }
-  return 0;
-}
-
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   logger.info('🎬 Video extraction API request received', { userId: null, email: null });
@@ -252,7 +238,7 @@ export async function POST(request: NextRequest) {
       console.log(`⚡ Cache HIT for metadata: ${videoId}`);
     }
 
-    const totalDurationSeconds = parseDurationToSeconds(metadata.duration);
+    const totalDurationSeconds = metadata.durationInSeconds || 0;
     const creditsNeeded = calculateVideoCredits(totalDurationSeconds);
     
     // Check if user has enough credits with improved validation

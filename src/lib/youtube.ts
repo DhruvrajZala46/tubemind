@@ -2,6 +2,7 @@ import axios from 'axios';
 import { TRANSCRIPT_CONFIG } from './transcript-config';
 import { createLogger } from './logger';
 import { getCacheManager } from './cache';
+import { parseISO8601Duration, formatDuration } from './utils';
 const logger = createLogger('youtube');
 const cacheManager = getCacheManager();
 
@@ -10,6 +11,7 @@ export interface VideoMetadata {
   title: string;
   description: string;
   duration: string;
+  durationInSeconds: number;
   thumbnailUrl: string;
   channelTitle: string;
   viewCount: string;
@@ -60,20 +62,15 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
         const statistics = video.statistics;
 
         // Convert ISO 8601 duration to readable format
-        const duration = contentDetails.duration
-          .replace('PT', '')
-          .replace('H', ':')
-          .replace('M', ':')
-          .replace('S', '')
-          .split(':')
-          .map((part: string) => part.padStart(2, '0'))
-          .join(':');
+        const durationInSeconds = parseISO8601Duration(contentDetails.duration);
+        const duration = formatDuration(durationInSeconds);
 
         return {
           videoId,
           title: snippet.title,
           description: snippet.description,
           duration,
+          durationInSeconds,
           thumbnailUrl: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url,
           channelTitle: snippet.channelTitle,
           viewCount: statistics.viewCount,
@@ -104,6 +101,7 @@ export async function getVideoMetadata(videoId: string): Promise<VideoMetadata> 
       title,
       description,
       duration: 'Unknown',
+      durationInSeconds: 0,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       channelTitle,
       viewCount: 'Unknown',
