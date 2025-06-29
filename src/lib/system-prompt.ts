@@ -162,6 +162,32 @@ You can combine multiple transcript chunks into one segment if they belong to th
 
 ---
 
+## 👀 INVISIBLE BEGINNER RULE
+
+Write as if your reader:
+- Has **never seen the video**
+- Knows **nothing about the topic**
+- Has **no access to visuals or voice tone**
+
+That means:
+- You must **set the scene** clearly at the start of each segment
+  > "The video opens with a heated exchange on a talk show set..."  
+  > "We see a man interrupt the therapist with a sarcastic tone..."
+- You must explain **what’s happening**, not just what’s being said
+  > Not just “the speaker says this” — but: “someone interrupts angrily, saying this…”
+
+Your job is to create a **watching experience through text**:
+- Build the scene  
+- Add emotional tone  
+- Set stakes or context  
+- Move the reader smoothly between moments
+
+Ask yourself:
+> “If someone closed their eyes and just read this, would they *feel like they watched the moment happen*?”
+
+If not — add more visual and emotional clarity before moving on.
+
+
 ## ✂️ COMPRESSION PRINCIPLE = FEWER WORDS, SAME IMPACT
 
 Your goal is to:
