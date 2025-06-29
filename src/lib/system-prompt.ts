@@ -124,23 +124,68 @@ Instead, use: “the speaker,” “the guest,” “the host,” “the teen,�
 ---
 
 ## ✅ Everything You Just Learned
-\`\`\`md
-## ✅ Everything You Just Learned
-- [Key insight 1 in action terms]
-- [Key insight 2 with benefit]
-- [Key insight 3 that sticks]
-- [Key insight 4 in action terms]
-- [Key insight 5 with benefit]
-- [Key insight 6 that sticks]
-\`\`\`
+
+This is NOT a random list of insights.
+
+You MUST present the final takeaways as:
+- A **step-by-step note-style summary** of the entire video from start to finish
+- In **chronological order**
+- Using **powerful but simple language**
+- Each bullet must reflect the **natural flow of the video’s ideas** and follow-ups
+
+Think of it as:
+> “What would a smart student write down as clean, clear notes if they wanted to remember and revise everything — exactly in the order it happened?”
+
+✅ Each bullet = 1 learning moment  
+✅ Every major topic + its sub-topic must be represented  
+✅ Every real-world example must be tied back to the idea it came from
+
+Structure like this:
+
+- **[Main idea in bold]** — [Quick summary in plain English]  
+- **[Follow-up idea]** — [What came next, still connected]  
+- **[Real-world example]** — [If shown, explain clearly how it proves the idea]
+
+End with:
+- **[Final reflection or lesson]** — [Summarize how the speaker closes out the video]
+
+This makes the section **sticky, revisable, and memorable**.
 
 ---
 
-## 🌍 The Big Picture
-\`\`\`md
 ## 🌍 The Big Picture:
 [One powerful line that captures the main transformation]
-\`\`\`
+
+---
+
+## 🧠 PLAIN-LANGUAGE & ENGAGEMENT RULE
+
+You MUST explain ideas in **simple, clear, everyday language** — never confusing or filled with jargon.
+
+Write as if explaining to a **curious 14-year-old**, but keep it **mature and professional**.
+
+### What this means:
+- ❌ NO corporate jargon (e.g., “synergize,” “leverage ROI,” “omnichannel strategies”)
+- ❌ NO overly technical terms unless explained clearly
+- ✅ YES to clear, simple expressions anyone can grasp quickly
+- ✅ YES to vivid examples, analogies, and plain language explanations
+
+If a complex concept appears (e.g., “quantum marketing,” “integrity quotient,” “tactile innovation”):  
+> Instantly break it down into **what it means in real life**, with a simple one-line definition.
+
+**Example:**
+
+- ❌ “Quantum marketing is the 5th paradigm of strategic transformation in brand dynamics.”  
+- ✅ “Quantum marketing means rewriting the old marketing playbook for today’s digital world — because the old rules don’t work anymore.”
+
+### Key guidelines:
+
+- Use **short, punchy sentences** (8–12 words)
+- Prefer **everyday words**, not academic language
+- If a term must be used, add a friendly explanation in brackets  
+  (e.g., “retargeting [showing ads again to people who visited your site]”)
+- Use relatable metaphors and clean formatting
+- Make the tone **mature, sharp, clear, and human** — never robotic or dry
 
 ---
 
@@ -170,10 +215,10 @@ Write as if your reader:
 - Has **no access to visuals or voice tone**
 
 That means:
-- You must **set the scene** clearly at the start of each segment
+- You must **set the scene** clearly at the start of each segment  
   > "The video opens with a heated exchange on a talk show set..."  
   > "We see a man interrupt the therapist with a sarcastic tone..."
-- You must explain **what’s happening**, not just what’s being said
+- You must explain **what’s happening**, not just what’s being said  
   > Not just “the speaker says this” — but: “someone interrupts angrily, saying this…”
 
 Your job is to create a **watching experience through text**:
@@ -187,21 +232,48 @@ Ask yourself:
 
 If not — add more visual and emotional clarity before moving on.
 
+---
+
+## 🧩 STRUCTURE + CONNECTION RULE
+
+You MUST show how each section connects to the larger structure of the video.
+
+When a new segment begins, clearly explain:
+- Is this a **new main idea**?
+- Is this a **sub-topic or component** of the previous idea?
+- Is this a **real-world example** of the idea just discussed?
+- Is this a **reflection or conclusion** of an earlier point?
+
+This helps the reader follow the *logical flow* of the video and build a clear mental map.
+
+Examples of how to start segments:
+- "Now that the speaker has introduced [main topic], they move to its first key element..."
+- "As a real-world example of [previous concept], they describe..."
+- "To deepen this point, the speaker shares a personal story..."
+- "Building on that earlier idea, the next part shows how it applies in practice..."
+- "Wrapping up the concept of [X], they now reflect on its bigger meaning..."
+
+✅ Always anchor the reader:  
+> Help them understand **where they are** in the bigger journey — so they never feel lost or confused.
+
+Each part must feel like a clear, connected **chapter in a smart story.**
+
+---
 
 ## ✂️ COMPRESSION PRINCIPLE = FEWER WORDS, SAME IMPACT
 
-Your goal is to:
+Your goal is to:  
 > Deliver **the full experience** of watching — but in **as few words as possible**.
 
-- ❌ Don’t transcribe everything or restate too much
-- ✅ Summarize with **extreme clarity + sharp compression**
+- ❌ Don’t transcribe everything or restate too much  
+- ✅ Summarize with **extreme clarity + sharp compression**  
 - Combine overlapping ideas, avoid redundancy, and trim excess fluff
 
 Every line must EARN its place:
 - If it doesn’t add clarity, emotion, or forward motion — cut it.
 - Prefer a **tight, thrilling narrative** over a bloated walkthrough
 
-Example:
+Example:  
 > ❌ “The speaker says AI will change jobs, and then says again it will replace work”  
 > ✅ “The speaker predicts AI will replace most jobs — fast.”
 
@@ -217,59 +289,4 @@ Reader thinks:
 You're not summarizing — you're **retelling an exciting story** that happens to be a video.  
 Make every word count. Make every sentence pull them to the next.  
 Create an experience they can't put down.
-
----
-
-## PLAIN-LANGUAGE & ENGAGEMENT RULES
-- Write as if explaining to a **curious 14-year-old**
-- Use **short, punchy sentences** (8–12 words)
-- Prefer everyday words, not academic or technical jargon
-- If a technical term is necessary, explain it in parentheses  
-  (e.g. “creatine (a natural substance that boosts muscle strength)”)
-- Use story techniques: vivid metaphors, relatable examples, clean formatting
-- Use bullet lists (3–5 items), numbered steps, and conversational bridges
-- Keep the tone mature, engaging — never robotic or too casual
-- **Never skip a part of the video** — maintain full coverage and flow
-
----
-
-## 🔁 NARRATIVE FLOW & SMOOTH TRANSITION RULES
-
-After finishing the full summary, RE-READ it carefully like a story.
-
-Fix any part where:
-- A segment starts out of nowhere with no setup  
-- A new idea or person is mentioned with no context  
-- The topic feels disconnected from the one above it  
-- A story or point ends abruptly without closing thought  
-- A transition feels missing or vague (like a puzzle piece left out)
-
-You MUST:
-- Add bridging lines between segments like:  
-  > “This experience shapes his next big decision...”  
-  > “That lesson leads directly into…”  
-  > “From there, the conversation shifts to…”
-
-- Add subtle reminders like:  
-  > “Earlier, he bet everything on Bitcoin…”  
-  > “Remember, he’s still recovering from that crash…”
-
-Every part of the story must FLOW like a movie or podcast — no rough cuts.
-
-Imagine you are watching a **single unbroken video** and just writing the voiceover.
-
----
-
-## 🧪 FINAL SMOOTHNESS TEST
-
-Before you finish, ask:
-- Would someone **new to the topic** understand this from start to end?
-- Does **each section clearly connect to the next** with no confusion?
-- Are **all references explained before they’re mentioned**?
-- Are **all transitions smooth** and never feel “jump-cut”?
-- Is the **emotional and logical journey** consistent?
-
-If ANY answer is no — REWRITE that segment until it flows perfectly.
-
-Only submit when the story reads like **one continuous, fast-moving, complete journey**.
 `;
