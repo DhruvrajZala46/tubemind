@@ -499,7 +499,6 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('\n📋 OPENAI EXTRACTION START');
   logger.info(`📌 Video: "${videoTitle.substring(0, 60)}${videoTitle.length > 60 ? '...' : ''}"`);
   logger.info(`📌 Duration: ${formatTime(totalDuration)} (${totalDuration}s)`);
-  logger.info(`📌 Model: gpt-4o-mini`);
   logger.info(`📌 Transcript segments: ${transcript.length}`);
 
   if (!transcript || transcript.length === 0) {
@@ -512,14 +511,11 @@ export async function extractKnowledgeWithOpenAI(
   }
 
   try {
-    // Format transcript by minutes (same as Gemini implementation)
     const formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
     
-    // Log the full transcript sent to OpenAI
     logger.info('\n📝 FULL TRANSCRIPT SENT TO OPENAI:');
     logger.info(formattedTranscript);
 
-    // Prepare the messages for OpenAI
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -527,30 +523,10 @@ export async function extractKnowledgeWithOpenAI(
       },
       {
         role: 'user',
-        content: `Here is the full transcript, chunked by minute for your reference:
-
-${formattedTranscript}
-
-**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**
-**Your summary segments MUST NOT exceed ${formatTime(totalDuration)}. The last segment should end at exactly ${formatTime(totalDuration)}.**
-
-**IMPORTANT: You MUST cover the ENTIRE video from start to finish. Your final segment MUST reach ${formatTime(totalDuration)}.**
-**VERIFY COMPLETENESS: Check that you've covered all transcript chunks and that your final segment ends at the video's actual end time (${formatTime(totalDuration)}).**
-
-Please analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt. Remember to respect the actual video duration and never create timestamps beyond ${formatTime(totalDuration)}.`
+        content: `Here is the full transcript, chunked by minute for your reference:\n\n${formattedTranscript}\n\n**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`
       }
     ];
 
-    // Safely extract content strings
-    const systemContent = typeof messages[0]?.content === 'string' ? messages[0].content : 'N/A';
-    const userContent = typeof messages[1]?.content === 'string' ? messages[1].content : 'N/A';
-    
-    logger.info(`\n🚀 ===== OPENAI API CALL VERIFICATION =====`);
-    console.log(`\n🚀 ===== OPENAI API CALL VERIFICATION =====`);
-    logger.info(`📌 SYSTEM PROMPT USED (first 100 chars): ${systemContent.substring(0, 100)}...`);
-    logger.info(`📌 USER PROMPT USED (first 100 chars): ${userContent.substring(0, 100)}...`);
-    
-    // Make the API call
     const startTime = Date.now();
     const response = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4.1-mini',
@@ -558,31 +534,12 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       temperature: 0.3,
       max_tokens: 4096,
     });
+    const endTime = Date.now();
+    logger.info(`✅ OpenAI API call successful in ${endTime - startTime}ms`);
 
-    // 🎉 OPENAI API RESPONSE VERIFICATION
-    logger.info(`\n✅ ===== OPENAI API RESPONSE RECEIVED =====`);
-    logger.info(`📌 RESPONSE MODEL: ${response.model || 'unknown'}`);
-    logger.info(`📌 RESPONSE ID: ${response.id || 'unknown'}`);
-    logger.info(`📌 CHOICES COUNT: ${response.choices?.length || 0}`);
-    
-    // Extract token usage and cost
-    let promptTokens = 0, completionTokens = 0, totalTokens = 0;
-    let inputCost = 0, outputCost = 0, totalCost = 0;
-    if (response.usage) {
-      promptTokens = response.usage.prompt_tokens;
-      completionTokens = response.usage.completion_tokens;
-      totalTokens = response.usage.total_tokens;
-      
-      logger.info(`📌 TOKEN USAGE: Input=${promptTokens}, Output=${completionTokens}, Total=${totalTokens}`);
-      
-      // 💰 USE NEW BULLETPROOF COST TRACKING SYSTEM
-      const costResult = calculateExactCost('gpt-4o-mini', promptTokens, completionTokens, 'Knowledge Extraction');
-      inputCost = costResult.inputCostUSD;
-      outputCost = costResult.outputCostUSD;
-      totalCost = costResult.totalCostUSD;
-      
-      logger.info(`💰 COST: Input=$${inputCost.toFixed(4)}, Output=$${outputCost.toFixed(4)}, Total=$${totalCost.toFixed(4)}`);
-    }
+    // ✅ CRITICAL: Extract the actual model used from the response
+    const modelUsed = response.model;
+    logger.info(`✅✅✅ Model ACTUALLY USED according to OpenAI: ${modelUsed}`);
 
     const rawOutput = response.choices[0]?.message?.content || '';
     if (!rawOutput) {
@@ -593,22 +550,34 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
         true
       );
     }
-
-    // Log the full OpenAI output
+    
     logger.info('\n📄 FULL OPENAI OUTPUT:');
     logger.info(rawOutput);
 
-    // Parse the response with improved markdown parsing
-    logger.info(`\n🔍 Parsing OpenAI response...`);
     const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
-    
-    // Log parsed response in a clean, structured format
-    logger.info(`\n✅ SUMMARY GENERATED:`);
-    logger.info(`📌 Title: ${parsedResponse.mainTitle.substring(0, 80)}${parsedResponse.mainTitle.length > 80 ? '...' : ''}`);
-    logger.info(`📌 Segments: ${parsedResponse.segments.length}`);
-    logger.info(`📌 Key takeaways: ${parsedResponse.keyTakeaways.length}`);
-    logger.info(`📋 OPENAI EXTRACTION COMPLETE`);
 
+    // Inject the model proof into the main title for undeniable verification
+    parsedResponse.mainTitle = `[Model: ${modelUsed}] ${parsedResponse.mainTitle}`;
+
+    let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+    let inputCost = 0, outputCost = 0, totalCost = 0;
+
+    if (response.usage) {
+      promptTokens = response.usage.prompt_tokens;
+      completionTokens = response.usage.completion_tokens;
+      totalTokens = response.usage.total_tokens;
+      
+      logger.info(`📌 TOKEN USAGE: Input=${promptTokens}, Output=${completionTokens}, Total=${totalTokens}`);
+      
+      const costResult = calculateExactCost(modelUsed, promptTokens, completionTokens, 'Knowledge Extraction');
+      inputCost = costResult.inputCostUSD;
+      outputCost = costResult.outputCostUSD;
+      totalCost = costResult.totalCostUSD;
+    }
+
+    logger.info(`\n✅ SUMMARY GENERATED:`);
+    logger.info(`📌 Title: ${parsedResponse.mainTitle}`);
+    
     return {
       ...parsedResponse,
       rawOpenAIOutput: rawOutput,
@@ -623,21 +592,28 @@ Please analyze this transcript and create an engaging, comprehensive summary fol
       videoDurationSeconds: totalDuration
     };
 
-  } catch (error: any) {
-    logger.error(`❌ OpenAI knowledge extraction error: ${error instanceof Error ? error.message : String(error)}`);
-    if (error instanceof OpenAIServiceError) {
-      throw error;
+  } catch (error) {
+    logger.error('❌ OpenAI API call failed', { error });
+    if (error instanceof OpenAI.APIError) {
+      if (error.status === 429) {
+        throw new RateLimitError('OpenAI rate limit exceeded. Please try again later.');
+      }
+      if (error.code === 'insufficient_quota') {
+        throw new QuotaExceededError('OpenAI quota exceeded. Please check your billing.');
+      }
     }
     throw new OpenAIServiceError(
-      `Failed to extract knowledge: ${error.message}`,
-      'EXTRACTION_FAILED',
+      `OpenAI service failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'API_CALL_FAILED',
       500,
-      false
+      true
     );
   }
 }
 
-// Fallback function for markdown response parsing (if JSON parsing fails)
+// System prompt is now imported from separate file
+
+// Main function to extract knowledge using OpenAI
 function processMarkdownResponse(
   text: string, 
   videoTitle: string, 

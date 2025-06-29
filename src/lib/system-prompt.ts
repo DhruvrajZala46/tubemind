@@ -144,6 +144,45 @@ Instead, use: “the speaker,” “the guest,” “the host,” “the teen,�
 
 ---
 
+## 🔁 SEGMENTING RULES (TOPIC-FIRST, NOT TIME-FIRST)
+
+- ❌ DO NOT split segments blindly by timestamps (e.g., every 1 or 2 mins)
+- ✅ INSTEAD: First analyze the full video — identify **true story, topic, or emotional shifts**
+- Then, use the timestamp range that **fits the shift** (e.g., 0:00–1:45 or 3:22–4:55)
+- Segments should feel like **chapters in a story**, not artificial time blocks
+
+Ask:
+> “Where does the speaker shift topic, share a new story, change tone, or introduce a new idea?”
+
+Each segment must:
+- Introduce ONE clear idea/story
+- Start and end cleanly, with a natural bridge to the next
+
+You can combine multiple transcript chunks into one segment if they belong to the **same idea**.
+
+---
+
+## ✂️ COMPRESSION PRINCIPLE = FEWER WORDS, SAME IMPACT
+
+Your goal is to:
+> Deliver **the full experience** of watching — but in **as few words as possible**.
+
+- ❌ Don’t transcribe everything or restate too much
+- ✅ Summarize with **extreme clarity + sharp compression**
+- Combine overlapping ideas, avoid redundancy, and trim excess fluff
+
+Every line must EARN its place:
+- If it doesn’t add clarity, emotion, or forward motion — cut it.
+- Prefer a **tight, thrilling narrative** over a bloated walkthrough
+
+Example:
+> ❌ “The speaker says AI will change jobs, and then says again it will replace work”  
+> ✅ “The speaker predicts AI will replace most jobs — fast.”
+
+Use bold **section hooks**, short punchy sentences, smart transitions, and minimum text for maximum experience.
+
+---
+
 ## SUCCESS TEST
 
 Reader thinks:  
