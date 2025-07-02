@@ -64,8 +64,18 @@ export function ProcessingStatusDisplay({ videoId, summaryId, initialStatus }: P
   useEffect(() => {
     if (!summaryId) return;
 
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true; // Track if component is still mounted
+
     const pollStatus = async () => {
+      // Don't poll if component has been unmounted
+      if (!isMounted) {
+        console.log('🛑 ProcessingStatusDisplay: Component unmounted, stopping poll');
+        return;
+      }
+
       try {
+        console.log('🔄 ProcessingStatusDisplay: Polling status for summaryId:', summaryId);
         const response = await fetch(`/api/summaries/${summaryId}/status`);
         
         if (!response.ok) {
@@ -74,22 +84,42 @@ export function ProcessingStatusDisplay({ videoId, summaryId, initialStatus }: P
         
         const data = await response.json();
         
-        setStatus(data.processing_status);
-        setStage(data.processing_stage || data.processing_status);
-        setProgress(data.processing_progress || 0);
-        setIsLoading(false);
-        
-        // If still processing, continue polling
-        if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
-          setTimeout(pollStatus, 2000); // Poll every 2 seconds
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setStatus(data.processing_status);
+          setStage(data.processing_stage || data.processing_status);
+          setProgress(data.processing_progress || 0);
+          setIsLoading(false);
+          
+          // CRITICAL: Only continue polling if still processing AND component is mounted
+          if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
+            console.log('🔄 ProcessingStatusDisplay: Scheduling next poll in 2s, status:', data.processing_status);
+            timeoutId = setTimeout(pollStatus, 2000);
+          } else {
+            console.log('✅ ProcessingStatusDisplay: Processing complete, stopping polls. Status:', data.processing_status);
+          }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setIsLoading(false);
+        if (isMounted) {
+          console.error('❌ ProcessingStatusDisplay: Error polling status:', err);
+          setError(err instanceof Error ? err.message : 'Unknown error');
+          setIsLoading(false);
+        }
       }
     };
 
+    // Start initial poll
     pollStatus();
+
+    // CRITICAL: Cleanup function
+    return () => {
+      console.log('🧹 ProcessingStatusDisplay: Cleaning up - clearing timeout and marking unmounted');
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
   }, [summaryId]);
 
   // Map API status to component status

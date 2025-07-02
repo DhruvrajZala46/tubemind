@@ -389,16 +389,30 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
   // OPTIMIZED: More frequent and responsive polling during processing
   useEffect(() => {
+    // CRITICAL: Clear any existing polling interval first
+    if (pollingInterval.current) {
+      console.log('🧹 VideoSummary: Clearing existing polling interval before setup');
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+
     if (!isProcessing(summary.processing_status)) {
-      console.log('🔍 DEBUG: Not processing, skipping polling setup. Status:', summary.processing_status);
+      console.log('🔍 VideoSummary: Not processing, skipping polling setup. Status:', summary.processing_status);
       return;
     }
 
-    console.log('🔍 DEBUG: Setting up polling for processing status:', summary.processing_status);
+    // CRITICAL: Check if this is a client-side page that already has ProcessingStatusPoller
+    // If so, let that handle the polling instead to avoid duplication
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/dashboard/')) {
+      console.log('🔍 VideoSummary: On dashboard page - ProcessingStatusPoller will handle polling');
+      return;
+    }
+
+    console.log('🔍 VideoSummary: Setting up polling for processing status:', summary.processing_status);
 
     const pollSummaryStatus = async () => {
       try {
-        console.log('🔄 Polling summary status for summaryId:', summaryId);
+        console.log('🔄 VideoSummary: Polling summary status for summaryId:', summaryId);
         const response = await fetch(`/api/summaries/${summaryId}/status`);
         
         if (!response.ok) {
@@ -406,7 +420,7 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         }
 
         const data = await response.json();
-        console.log('📊 Summary status data:', data);
+        console.log('📊 VideoSummary: Summary status data:', data);
 
         // OPTIMIZED: Use actual progress from backend
         const updatedSummary = {
@@ -422,24 +436,27 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         setSummary(updatedSummary);
         previousSummary.current = updatedSummary;
 
-        // OPTIMIZED: Stop polling immediately when completed or failed
+        // CRITICAL: Stop polling immediately when completed or failed
         if (!isProcessing(data.processing_status)) {
-          console.log('✅ Processing finished, stopping polling. Final status:', data.processing_status);
+          console.log('✅ VideoSummary: Processing finished, stopping polling. Final status:', data.processing_status);
           if (pollingInterval.current) {
             clearInterval(pollingInterval.current);
             pollingInterval.current = null;
           }
+          return; // Exit polling function
         }
 
       } catch (error) {
-        console.error('❌ Error polling summary status:', error);
+        console.error('❌ VideoSummary: Error polling summary status:', error);
         setError('Failed to check processing status');
         
-        // OPTIMIZED: Stop polling on persistent errors
+        // CRITICAL: Stop polling on persistent errors
         if (pollingInterval.current) {
+          console.log('🛑 VideoSummary: Stopping polling due to error');
           clearInterval(pollingInterval.current);
           pollingInterval.current = null;
         }
+        return; // Exit polling function
       }
     };
 
@@ -463,20 +480,36 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
     // Set up interval with dynamic frequency
     const interval = getPollingInterval(summary.processing_status);
+    console.log(`🔄 VideoSummary: Setting up polling interval: ${interval}ms for status: ${summary.processing_status}`);
     pollingInterval.current = setInterval(pollSummaryStatus, interval);
 
+    // CRITICAL: Cleanup function that always runs
     return () => {
+      console.log('🧹 VideoSummary useEffect cleanup - clearing polling interval');
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
         pollingInterval.current = null;
       }
     };
-  }, [summaryId, summary.processing_status]); // React to status changes for dynamic polling
+  }, [summaryId]); // FIXED: Only depend on summaryId, not processing status to avoid re-creating intervals
 
+  // CRITICAL: Separate effect to handle status changes without recreating polling
+  useEffect(() => {
+    // If status changes to non-processing, stop polling
+    if (!isProcessing(summary.processing_status) && pollingInterval.current) {
+      console.log('🛑 Status changed to non-processing, stopping polling. Status:', summary.processing_status);
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
+  }, [summary.processing_status]);
+
+  // CRITICAL: Cleanup on component unmount
   useEffect(() => {
     return () => {
+      console.log('🧹 VideoSummary component unmounting - final cleanup');
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
+        pollingInterval.current = null;
       }
     };
   }, []);

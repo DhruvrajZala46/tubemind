@@ -39,30 +39,57 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   useEffect(() => {
     if (!summaryId) return;
 
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true; // Track if component is still mounted
+
     const pollStatus = async () => {
+      // Don't poll if component has been unmounted
+      if (!isMounted) {
+        console.log('🛑 ProcessingStatusPoller: Component unmounted, stopping poll');
+        return;
+      }
+
       try {
+        console.log('🔄 ProcessingStatusPoller: Polling status for summaryId:', summaryId);
         const response = await fetch(`/api/summaries/${summaryId}/status`);
         if (!response.ok) {
           throw new Error('Failed to fetch status');
         }
         const data = await response.json();
-        setData(data);
-        setIsLoading(false);
         
-        // If still processing, continue polling
-        if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
-          setTimeout(pollStatus, 2000); // Poll every 2 seconds
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setData(data);
+          setIsLoading(false);
+          
+          // CRITICAL: Only continue polling if still processing AND component is mounted
+          if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
+            console.log('🔄 ProcessingStatusPoller: Scheduling next poll in 2s, status:', data.processing_status);
+            timeoutId = setTimeout(pollStatus, 2000);
+          } else {
+            console.log('✅ ProcessingStatusPoller: Processing complete, stopping polls. Status:', data.processing_status);
+          }
         }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Unknown error'));
-        setIsLoading(false);
+        if (isMounted) {
+          console.error('❌ ProcessingStatusPoller: Error polling status:', err);
+          setError(err instanceof Error ? err : new Error('Unknown error'));
+          setIsLoading(false);
+        }
       }
     };
 
+    // Start initial poll
     pollStatus();
     
+    // CRITICAL: Cleanup function
     return () => {
-      // Cleanup if needed
+      console.log('🧹 ProcessingStatusPoller: Cleaning up - clearing timeout and marking unmounted');
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
     };
   }, [summaryId]);
 
