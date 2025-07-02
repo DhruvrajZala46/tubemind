@@ -88,7 +88,7 @@ export async function processVideo(
     // === STEP 1: Fetch transcript ===
     const step1Time = Date.now();
     logStep('Transcript Fetch', 'START');
-    await updateProgress('transcribing', 10, 'Starting transcript extraction...');
+    await updateProgress('transcribing', 5, 'Starting transcript extraction...');
     
     // Assert videoId is not a UUID (DB ID)
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(videoId)) {
@@ -96,17 +96,15 @@ export async function processVideo(
       throw new Error('videoId is a UUID, not a YouTube ID!');
     }
     
-    // Add delay to show initial progress
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-    await updateProgress('transcribing', 30, 'Downloading video audio...');
+    // OPTIMIZED: No artificial delays - immediate progress update
+    await updateProgress('transcribing', 20, 'Downloading video audio...');
     
     const transcript = await getVideoTranscript(videoId, totalDurationSeconds);
     if (!transcript || transcript.length === 0) {
       throw new Error('Transcript is empty or could not be fetched.');
     }
     
-    // Add delay to show transcript progress
-    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+    // OPTIMIZED: Immediate completion update
     await updateProgress('transcribing', 100, 'Transcript extraction complete');
     logStep('Transcript Fetch', 'SUCCESS', { duration: `${Date.now() - step1Time}ms`, segments: transcript.length });
     
@@ -114,13 +112,11 @@ export async function processVideo(
     const step2Time = Date.now();
     logStep('AI Knowledge Extraction', 'START');
     
-    // Add delay before starting analysis
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-    await updateProgress('summarizing', 10, 'Starting AI analysis...');
+    // OPTIMIZED: No artificial delays - immediate start
+    await updateProgress('summarizing', 5, 'Starting AI analysis...');
     
-    // Add delay during analysis
-    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
-    await updateProgress('summarizing', 40, 'Analyzing transcript content...');
+    // OPTIMIZED: Quick progress update during AI processing
+    await updateProgress('summarizing', 15, 'Analyzing transcript content...');
     
     const aiResult = await extractKnowledgeWithOpenAI(transcript, metadata.title, totalDurationSeconds);
     logStep('AI Knowledge Extraction', 'SUCCESS', { duration: `${Date.now() - step2Time}ms`, mainTitle: aiResult.mainTitle });
@@ -130,19 +126,18 @@ export async function processVideo(
       throw new Error('Summary generation failed: missing main title or summary.');
     }
 
-    // Add delay to show analysis completion
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    // OPTIMIZED: Immediate completion update
     await updateProgress('summarizing', 100, 'AI analysis complete');
 
-    // === STEP 3: Update the summary with results ===
+    // === STEP 3: Batch Database Operations for Speed ===
     const step3Time = Date.now();
     logStep('Database Update', 'START');
     
-    // Add delay before finalizing
-    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
     await updateProgress('finalizing', 20, 'Organizing results...');
     
+    // OPTIMIZED: Single database transaction for all operations
     await executeQuery(async (sql) => {
+      // Update main summary
       await sql`
         UPDATE video_summaries 
         SET 
@@ -161,15 +156,24 @@ export async function processVideo(
           updated_at = NOW()
         WHERE id = ${summaryDbId}
       `;
+      
+      // OPTIMIZED: Batch insert video segments if they exist
+      if (aiResult.segments && aiResult.segments.length > 0) {
+        for (const [index, segment] of aiResult.segments.entries()) {
+          await sql`
+            INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary) 
+            VALUES (${videoDbId}, ${index + 1}, ${segment.startTime}, ${segment.endTime}, ${segment.title}, ${segment.narratorSummary})
+          `;
+        }
+      }
     });
+    
     logStep('Database Update', 'SUCCESS', { duration: `${Date.now() - step3Time}ms` });
 
-    // === STEP 4: Consume credits on success ===
+    // === STEP 4: Process Credits ===
     const step4Time = Date.now();
     logStep('Credit Consumption', 'START');
     
-    // Add delay during credit processing
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
     await updateProgress('finalizing', 80, 'Processing credits...');
     
     try {
@@ -206,41 +210,8 @@ export async function processVideo(
       // Continue processing despite credit error - we'll log but not fail the job
     }
 
-    // === STEP 5: Create video segments ===
-    const step5Time = Date.now();
-    if (aiResult.segments && aiResult.segments.length > 0) {
-      logStep('Segment Creation', 'START', { segmentCount: aiResult.segments.length });
-      
-      // Add delay before segment creation
-      await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 second delay
-      await updateProgress('finalizing', 90, 'Creating video segments...');
-      
-      // We already have videoDbId passed as parameter, but double-check for safety
-      if (!videoDbId) {
-        const videoIdRows = await executeQuery(async (sql) => {
-          return await sql`SELECT video_id FROM video_summaries WHERE id = ${summaryDbId}`;
-        });
-  
-        if (!videoIdRows || videoIdRows.length === 0 || !videoIdRows[0].video_id) {
-          throw new Error(`Could not find video_id for summary ${summaryDbId}`);
-        }
-        videoDbId = videoIdRows[0].video_id;
-      }
-      
-      await executeQuery(async (sql) => {
-        for (const [index, segment] of aiResult.segments.entries()) {
-          await sql`
-            INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary) 
-            VALUES (${videoDbId}, ${index + 1}, ${segment.startTime}, ${segment.endTime}, ${segment.title}, ${segment.narratorSummary})
-          `;
-        }
-      });
-      logStep('Segment Creation', 'SUCCESS', { duration: `${Date.now() - step5Time}ms`, count: aiResult.segments.length });
-    }
-
     // === FINAL STEP: Complete processing ===
-    // Add final delay to let users see the completion progress
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    // OPTIMIZED: Immediate completion - no artificial delays
     await updateProgress('completed', 100, 'Processing complete');
     logStep('Job Processing', 'SUCCESS', { totalDuration: `${Date.now() - jobStartTime}ms` });
 

@@ -7,6 +7,7 @@ import { LoadingState } from '../ui/loading-states';
 import { useMainLoading } from '../../lib/main-loading-context.tsx';
 import { ElegantLoader } from '../ui/elegant-loader';
 import { CircularProgressWithLoader } from '../ui/CircularProgressWithLoader';
+import Link from 'next/link';
 
 // ChatGPT-style markdown renderer with typewriter effect
 function ChatGPTMarkdown({ 
@@ -151,6 +152,7 @@ function ChatGPTMarkdown({
           .chatgpt-markdown {
             font-size: 16px; /* Better mobile readability */
             line-height: 1.6;
+            font-family: var(--font-sans);
           }
           
           .chatgpt-markdown h1 {
@@ -172,6 +174,11 @@ function ChatGPTMarkdown({
             font-size: 16px;
             line-height: 1.6;
             margin-bottom: 1rem;
+          }
+          .chatgpt-markdown strong, .chatgpt-markdown b {
+            font-family: 'Poppins', sans-serif !important;
+            font-weight: bold;
+            letter-spacing: 0.01em;
           }
         }
         
@@ -319,6 +326,8 @@ interface VideoSummaryProps {
     segments: any[];
     key_takeaways: any[];
     final_thought: string;
+    processing_progress?: number;
+    processing_stage?: string;
   };
   videoId?: string;
   summaryId?: string | number;
@@ -344,9 +353,10 @@ function unescapeString(str: string) {
 
 // Map status to progress
 const statusToProgress: Record<string, number> = {
-  queued: 10,
-  transcribing: 40,
-  summarizing: 80,
+  queued: 5,
+  transcribing: 30,
+  summarizing: 70,
+  finalizing: 90,
   completed: 100,
 };
 
@@ -360,7 +370,7 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
   // Keep track of the previous summary to avoid flicker
   const previousSummary = useRef(initialSummary);
 
-  const isProcessing = (status: string) => ['processing', 'queued', 'transcribing', 'summarizing'].includes(status);
+  const isProcessing = (status: string) => ['processing', 'queued', 'transcribing', 'summarizing', 'finalizing'].includes(status);
   const isFailed = (status: string) => status === 'failed';
   const isComplete = (status: string) => {
     const result = status === 'completed';
@@ -368,109 +378,181 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
     return result;
   };
 
-  const [displayedProgress, setDisplayedProgress] = useState(statusToProgress[initialSummary.processing_status] || 10);
-  const [targetProgress, setTargetProgress] = useState(statusToProgress[initialSummary.processing_status] || 10);
-  const progressAnimationRef = useRef<NodeJS.Timeout | null>(null);
+  // OPTIMIZED: Use real progress instead of fake progress animations
+  const [displayedProgress, setDisplayedProgress] = useState(initialSummary.processing_progress || statusToProgress[initialSummary.processing_status] || 5);
 
-  // When backend status changes, update targetProgress
+  // OPTIMIZED: Update progress immediately when backend status changes
   useEffect(() => {
-    setTargetProgress(statusToProgress[initialSummary.processing_status] || 10);
-  }, [initialSummary.processing_status]);
+    const newProgress = summary.processing_progress || statusToProgress[summary.processing_status] || 5;
+    setDisplayedProgress(newProgress);
+  }, [summary.processing_status, summary.processing_progress]);
 
-  // Animate displayedProgress toward targetProgress
+  // OPTIMIZED: More frequent and responsive polling during processing
   useEffect(() => {
-    if (displayedProgress === targetProgress) return;
-    if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
-    // Fast at first, then slow as it approaches target
-    progressAnimationRef.current = setInterval(() => {
-      setDisplayedProgress(prev => {
-        if (prev === targetProgress) {
-          if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
-          return prev;
-        }
-        // Move faster if far, slower if close
-        const diff = Math.abs(targetProgress - prev);
-        const step = diff > 20 ? 3 : diff > 10 ? 2 : 1;
-        if (prev < targetProgress) {
-          return Math.min(prev + step, targetProgress);
-        } else {
-          return Math.max(prev - step, targetProgress);
-        }
-      });
-    }, 30);
-    return () => {
-      if (progressAnimationRef.current) clearInterval(progressAnimationRef.current);
-    };
-  }, [targetProgress, displayedProgress]);
-
-  useEffect(() => {
-    // Only show the main page loader on the initial load, not on navigation
-    if (!previousSummary.current || previousSummary.current.raw_ai_output !== initialSummary.raw_ai_output) {
-      if (isProcessing(initialSummary.processing_status)) {
-        showMainLoading('Loading summary...');
-      } else {
-        hideMainLoading();
-      }
-    }
-    
-    setSummary(initialSummary);
-    setError(null);
-    
-    // Clear any previous polling interval when the summary changes
-    if (pollingInterval.current) {
-      clearInterval(pollingInterval.current);
-      pollingInterval.current = null;
+    if (!isProcessing(summary.processing_status)) {
+      console.log('🔍 DEBUG: Not processing, skipping polling setup. Status:', summary.processing_status);
+      return;
     }
 
-    // If the new summary is processing, start polling
-    if (summaryId && isProcessing(initialSummary.processing_status)) {
-      const pollStatus = async () => {
-        try {
-          const response = await fetch(`/api/summaries/${summaryId}/status`);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json();
+    console.log('🔍 DEBUG: Setting up polling for processing status:', summary.processing_status);
 
-          if (!isProcessing(data.processing_status)) {
-            // Stop polling
-            if (pollingInterval.current) {
-              clearInterval(pollingInterval.current);
-              pollingInterval.current = null;
-            }
-            // Reload the page to get the final, complete summary data
-            // This is the most reliable way to ensure all data is fresh
-            window.location.reload(); 
-          } else {
-            // While processing, just update the status message
-            setSummary(prev => ({ ...prev, ...data }));
-          }
+    const pollSummaryStatus = async () => {
+      try {
+        console.log('🔄 Polling summary status for summaryId:', summaryId);
+        const response = await fetch(`/api/summaries/${summaryId}/status`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-        } catch (err) {
-          console.error('Failed to fetch summary status:', err);
-          setError('Could not retrieve status.');
+        const data = await response.json();
+        console.log('📊 Summary status data:', data);
+
+        // OPTIMIZED: Use actual progress from backend
+        const updatedSummary = {
+          ...summary,
+          processing_status: data.processing_status,
+          processing_stage: data.processing_stage || data.processing_status,
+          processing_progress: data.processing_progress || statusToProgress[data.processing_status] || summary.processing_progress,
+          main_title: data.main_title || summary.main_title,
+          overall_summary: data.overall_summary || summary.overall_summary,
+          raw_ai_output: data.raw_ai_output || summary.raw_ai_output,
+        };
+
+        setSummary(updatedSummary);
+        previousSummary.current = updatedSummary;
+
+        // OPTIMIZED: Stop polling immediately when completed or failed
+        if (!isProcessing(data.processing_status)) {
+          console.log('✅ Processing finished, stopping polling. Final status:', data.processing_status);
           if (pollingInterval.current) {
             clearInterval(pollingInterval.current);
             pollingInterval.current = null;
           }
         }
-      };
 
-      pollStatus(); // Initial check
-      pollingInterval.current = setInterval(pollStatus, 3000); // Poll every 3 seconds
-    }
+      } catch (error) {
+        console.error('❌ Error polling summary status:', error);
+        setError('Failed to check processing status');
+        
+        // OPTIMIZED: Stop polling on persistent errors
+        if (pollingInterval.current) {
+          clearInterval(pollingInterval.current);
+          pollingInterval.current = null;
+        }
+      }
+    };
 
-    // Update the previous summary ref
-    previousSummary.current = initialSummary;
+    // OPTIMIZED: Dynamic polling frequency based on processing stage
+    const getPollingInterval = (status: string) => {
+      switch (status) {
+        case 'queued':
+          return 3000; // 3 seconds for queued items
+        case 'transcribing':
+        case 'summarizing':
+          return 1000; // 1 second during active processing
+        case 'finalizing':
+          return 1500; // 1.5 seconds during finalizing
+        default:
+          return 2000; // 2 seconds default
+      }
+    };
 
-    // Cleanup function
+    // Start immediate poll
+    pollSummaryStatus();
+
+    // Set up interval with dynamic frequency
+    const interval = getPollingInterval(summary.processing_status);
+    pollingInterval.current = setInterval(pollSummaryStatus, interval);
+
+    return () => {
+      if (pollingInterval.current) {
+        clearInterval(pollingInterval.current);
+        pollingInterval.current = null;
+      }
+    };
+  }, [summaryId, summary.processing_status]); // React to status changes for dynamic polling
+
+  useEffect(() => {
     return () => {
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
       }
-      hideMainLoading(); // Ensure loader is hidden on unmount
     };
-  }, [initialSummary, summaryId, showMainLoading, hideMainLoading]);
+  }, []);
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-red-500 text-xl mb-4">⚠️ Error</div>
+          <div className="text-[var(--text-secondary)] mb-4">{error}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-[var(--btn-dashboard-bg)] text-[var(--btn-primary-text)] rounded-lg"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show failed state
+  if (isFailed(summary.processing_status)) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-red-500 text-xl mb-4">❌ Processing Failed</div>
+          <div className="text-[var(--text-secondary)] mb-4">
+            Sorry, we couldn't process your video. Please try again.
+          </div>
+          <Link href="/dashboard/new" className="px-4 py-2 bg-[var(--btn-dashboard-bg)] text-[var(--btn-primary-text)] rounded-lg">
+            Try Another Video
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // OPTIMIZED: Real-time processing state with accurate progress
+  if (isProcessing(summary.processing_status)) {
+    console.log('🔍 DEBUG: Taking processing path');
+    
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="text-center p-8 max-w-md w-full">
+          <div className="text-2xl mb-4">🎬 Processing Video</div>
+          
+          {/* OPTIMIZED: Real progress bar */}
+          <div className="w-full bg-gray-700 rounded-full h-3 mb-6">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${displayedProgress}%` }}
+            />
+          </div>
+          
+          {/* OPTIMIZED: Accurate progress percentage and stage */}
+          <div className="text-lg font-medium mb-2">
+            {displayedProgress}% Complete
+          </div>
+          
+          {/* OPTIMIZED: Clear stage messaging */}
+          <div className="text-[var(--text-secondary)] mb-4">
+            {summary.processing_stage === 'transcribing' && 'Extracting video transcript...'}
+            {summary.processing_stage === 'summarizing' && 'Analyzing content with AI...'}
+            {summary.processing_stage === 'finalizing' && 'Finalizing your summary...'}
+            {!summary.processing_stage && 'Preparing to process video...'}
+          </div>
+          
+          <div className="text-sm text-[var(--text-secondary)]">
+            This usually takes 1-2 minutes
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const {
     title,

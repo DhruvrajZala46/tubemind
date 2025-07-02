@@ -186,15 +186,20 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
   };
   const headers = {
     'x-api-key': TRANSCRIPT_CONFIG.supadataApiKey,
-            'User-Agent': 'TubeMind/1.0',
+    'User-Agent': 'TubeMind/1.0',
     'Accept': 'application/json',
   };
   const maskedKey = TRANSCRIPT_CONFIG.supadataApiKey ? TRANSCRIPT_CONFIG.supadataApiKey.slice(0, 2) + '***' + TRANSCRIPT_CONFIG.supadataApiKey.slice(-2) : undefined;
   const url = `https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true`;
 
-  for (let attempt = 0; attempt < TRANSCRIPT_CONFIG.maxRetries; attempt++) {
+  // OPTIMIZED: Reduce max retries for faster failure handling
+  const maxRetries = Math.min(TRANSCRIPT_CONFIG.maxRetries, 2); // Max 2 retries instead of 3
+  // OPTIMIZED: Reduce timeout for faster response
+  const optimizedTimeout = Math.min(TRANSCRIPT_CONFIG.timeoutMs, 15000); // Max 15 seconds
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      logger.info(`[Transcript] SupaData.ai API attempt ${attempt + 1}/${TRANSCRIPT_CONFIG.maxRetries}`);
+      logger.info(`[Transcript] SupaData.ai API attempt ${attempt + 1}/${maxRetries}`);
       logger.info('[Transcript] SupaData.ai request details', {
         endpoint: 'https://api.supadata.ai/v1/youtube/transcript',
         params,
@@ -202,15 +207,18 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
         videoId,
         youtubeUrl
       });
-      logger.info('[Transcript] SupaData.ai full request URL', { url });
+
+      // OPTIMIZED: Use Promise.race with shorter timeout for faster processing
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), TRANSCRIPT_CONFIG.timeoutMs)
+        setTimeout(() => reject(new Error('Request timeout')), optimizedTimeout)
       );
+      
       const fetchPromise = axios.get('https://api.supadata.ai/v1/youtube/transcript', {
         params,
         headers,
-        timeout: TRANSCRIPT_CONFIG.timeoutMs,
+        timeout: optimizedTimeout,
       });
+
       let response;
       try {
         response = await Promise.race([fetchPromise, timeoutPromise]) as any;
@@ -222,27 +230,28 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
         });
         throw err;
       }
+
       logger.info('[Transcript] SupaData.ai response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+      
       if (response.data && typeof response.data.content === 'string' && response.data.content.length > 0) {
         logger.info(`[Transcript] ✅ SUCCESS with SupaData.ai API on attempt ${attempt + 1}`);
         
-        // Calculate the number of segments needed to cover the video duration
+        // OPTIMIZED: More efficient transcript segmentation
         const targetSegments = totalDurationSeconds ? Math.max(Math.ceil(totalDurationSeconds / 3), 50) : 50;
-        
-        // Split transcript more intelligently to ensure full coverage
-        let textSegments: string[];
         const content = response.data.content;
         
-        // First try splitting by sentences
+        // OPTIMIZED: Smart segmentation based on content structure
+        let textSegments: string[];
+        
+        // Try sentence-based segmentation first (most natural)
         const sentenceSplit = content.split(/(?<=[.!?])\s+/).filter(Boolean);
         
         if (sentenceSplit.length >= targetSegments) {
-          // We have enough sentences
           textSegments = sentenceSplit;
         } else {
-          // Not enough sentences, split by words to get more segments
+          // Fallback to word-based segmentation with optimal chunk size
           const words = content.split(/\s+/).filter(Boolean);
-          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 10);
+          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 8); // Min 8 words per segment
           
           textSegments = [];
           for (let i = 0; i < words.length; i += wordsPerSegment) {
@@ -255,21 +264,29 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
         
         logger.info(`[Transcript] Created ${textSegments.length} segments for ${totalDurationSeconds}s video (target: ${targetSegments})`);
         
-        // Create transcript items with proper timing
-        const transcript: TranscriptItem[] = textSegments.map((text: string, idx: number) => ({
-          text: text.trim(),
-          start: totalDurationSeconds ? Math.floor((idx / textSegments.length) * totalDurationSeconds) : idx * 3,
-          duration: totalDurationSeconds ? Math.floor(totalDurationSeconds / textSegments.length) : 3
-        }));
+        // OPTIMIZED: More efficient transcript item creation
+        const transcript: TranscriptItem[] = textSegments.map((text: string, idx: number) => {
+          const segmentDuration = totalDurationSeconds ? Math.floor(totalDurationSeconds / textSegments.length) : 3;
+          const startTime = totalDurationSeconds ? Math.floor((idx / textSegments.length) * totalDurationSeconds) : idx * 3;
+          
+          return {
+            text: text.trim(),
+            start: startTime,
+            duration: segmentDuration
+          };
+        });
         
         // Cache the result using the central CacheManager
         if (TRANSCRIPT_CONFIG.cacheEnabled) {
           cacheManager.cacheYouTubeTranscript(videoId, transcript);
         }
+        
         return fixTranscript(transcript, totalDurationSeconds);
       }
+      
       lastError = new Error(response.data?.error || 'No transcript returned from SupaData.ai service');
       logger.error('[Transcript] SupaData.ai API error response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+      
     } catch (error) {
       lastError = error;
       if (isAxiosError(error)) {
@@ -280,15 +297,18 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
       } else {
         logger.warn(`[Transcript] SupaData.ai API failed (attempt ${attempt + 1}):`, { error: String(error), request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
       }
-      if (attempt < TRANSCRIPT_CONFIG.maxRetries - 1) {
-        const delay = getRetryDelay(attempt);
+      
+      // OPTIMIZED: Faster retry with exponential backoff but shorter delays
+      if (attempt < maxRetries - 1) {
+        const delay = Math.min(500 * Math.pow(2, attempt), 2000); // Cap at 2 seconds instead of longer delays
         logger.info(`[Transcript] Retrying in ${delay}ms...`, { delay });
         await sleep(delay);
       }
     }
   }
+  
   // If all attempts fail, provide a clear error message
-  const errorMessage = `Failed to fetch video transcript after ${TRANSCRIPT_CONFIG.maxRetries} attempts. Error: ${lastError?.message || 'Unknown error'}`;
+  const errorMessage = `Failed to fetch video transcript after ${maxRetries} attempts. Error: ${lastError?.message || 'Unknown error'}`;
   logger.error('[Transcript] Complete failure:', { data: { errorMessage } });
   throw new Error(errorMessage);
 }

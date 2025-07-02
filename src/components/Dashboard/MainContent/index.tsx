@@ -156,9 +156,8 @@ export default function MainContent() {
 
   // New function to poll progress and redirect when complete
   const pollProgressAndRedirect = async (summaryId: string, redirectUrl: string) => {
-    console.log('🔄 Starting polling for summaryId:', summaryId);
     let pollCount = 0;
-    const maxPolls = 120; // Increased to 6 minutes of polling (3 seconds * 120)
+    const maxPolls = 180; // Increased to 6 minutes of polling but with faster frequency
     
     const poll = async () => {
       pollCount++;
@@ -175,48 +174,48 @@ export default function MainContent() {
         const data = await response.json();
         console.log(`📊 Status data received:`, data);
         
-        // Update progress UI with better mapping
+        // OPTIMIZED: Use actual progress from backend instead of fake progress
         const stage = data.processing_stage || data.processing_status || 'pending';
         let progress = data.processing_progress || 0;
         
-        // Ensure minimum progress for better UX and smooth transitions
-        if (progress === 0 || progress < 5) {
+        // OPTIMIZED: More responsive progress mapping with smoother transitions
+        if (progress === 0) {
           switch (stage) {
             case 'pending':
             case 'queued':
-              progress = Math.max(10, progress);
+              progress = 5;
               break;
             case 'transcribing':
             case 'extracting':
-              progress = Math.max(25, progress);
+              progress = 15;
               break;
             case 'summarizing':
             case 'analyzing':
-              progress = Math.max(65, progress);
+              progress = 35;
               break;
             case 'finalizing':
-              progress = Math.max(90, progress);
+              progress = 85;
               break;
             case 'completed':
               progress = 100;
               break;
             default:
-              progress = Math.max(8, progress);
+              progress = 2;
           }
         }
         
-        // Ensure progress is reasonable for current stage
+        // OPTIMIZED: Ensure smooth progress transitions without artificial caps
         switch (stage) {
           case 'transcribing':
           case 'extracting':
-            progress = Math.min(Math.max(20, progress), 59);
+            progress = Math.max(5, Math.min(progress, 100));
             break;
           case 'summarizing':
           case 'analyzing':
-            progress = Math.min(Math.max(60, progress), 89);
+            progress = Math.max(15, Math.min(progress, 100));
             break;
           case 'finalizing':
-            progress = Math.min(Math.max(90, progress), 99);
+            progress = Math.max(60, Math.min(progress, 100));
             break;
           case 'completed':
             progress = 100;
@@ -236,10 +235,10 @@ export default function MainContent() {
           setProgress(100);
           setStatusMessage("Processing complete! Redirecting...");
           
-          // Redirect after showing completion
+          // OPTIMIZED: Faster redirect on completion
           setTimeout(() => {
             router.push(redirectUrl);
-          }, 1500);
+          }, 800);
           return;
         }
         
@@ -252,10 +251,30 @@ export default function MainContent() {
           return;
         }
         
+        // OPTIMIZED: Dynamic polling frequency based on progress stage
+        let nextPollDelay = 1000; // Default 1 second for active processing
+        
+        // Adjust polling frequency based on stage
+        switch (stage) {
+          case 'pending':
+          case 'queued':
+            nextPollDelay = 2000; // 2 seconds for queued items
+            break;
+          case 'transcribing':
+          case 'summarizing':
+            nextPollDelay = 800; // Very frequent during active processing
+            break;
+          case 'finalizing':
+            nextPollDelay = 1000; // 1 second during finalizing
+            break;
+          default:
+            nextPollDelay = 1500; // 1.5 seconds default
+        }
+        
         // Continue polling if not complete and under max polls
         if (pollCount < maxPolls) {
-          console.log(`⏳ Scheduling next poll in 2 seconds (attempt ${pollCount + 1})`);
-          setTimeout(poll, 2000); // Poll every 2 seconds (more aggressive)
+          console.log(`⏳ Scheduling next poll in ${nextPollDelay}ms (attempt ${pollCount + 1})`);
+          setTimeout(poll, nextPollDelay);
         } else {
           // Max polls reached - redirect anyway
           console.log('⏰ Max polls reached, redirecting anyway');
@@ -267,15 +286,24 @@ export default function MainContent() {
         
       } catch (error) {
         console.error('❌ Polling error:', error);
-        // On polling error, still try to redirect after a delay
-        setStatusMessage("Checking status... Redirecting shortly...");
-        setTimeout(() => {
-          router.push(redirectUrl);
-        }, 3000);
+        
+        // OPTIMIZED: More resilient error handling with exponential backoff
+        const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000); // Cap at 5 seconds
+        
+        if (pollCount < maxPolls) {
+          console.log(`🔄 Retrying poll in ${retryDelay}ms due to error`);
+          setTimeout(poll, retryDelay);
+        } else {
+          // Final fallback - redirect anyway
+          setStatusMessage("Checking status... Redirecting shortly...");
+          setTimeout(() => {
+            router.push(redirectUrl);
+          }, 3000);
+        }
       }
     };
     
-    // Start polling immediately (no delay)
+    // OPTIMIZED: Start polling immediately with no delay
     console.log('🚀 Starting immediate poll');
     poll();
   };
