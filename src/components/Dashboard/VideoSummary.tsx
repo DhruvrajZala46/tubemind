@@ -135,7 +135,7 @@ function ChatGPTMarkdown({
           font-family: var(--font-sans);
           font-size: 1rem; /* Updated base font size */
           line-height: 1.6;
-          color: var(--text-primary);
+          color: #e6e6e6;
           background: transparent;
           border: 0;
           border-radius: 0;
@@ -185,7 +185,13 @@ function ChatGPTMarkdown({
         
         @media (min-width: 1024px) {
           .chatgpt-markdown {
-            font-size: 1.05rem;
+            font-size: 1.15rem;
+            line-height: 1.8;
+          }
+          .chatgpt-markdown strong, .chatgpt-markdown b {
+            font-family: 'Poppins', sans-serif !important;
+            font-weight: bold;
+            letter-spacing: 0.01em;
           }
         }
         
