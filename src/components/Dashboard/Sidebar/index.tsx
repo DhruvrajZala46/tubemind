@@ -420,7 +420,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                   )}>
                     <span className="truncate text-sm flex items-center min-w-0">
                       <LucideLoader2 size={14} className="mr-2 animate-spin text-red-400 flex-shrink-0" />
-                      <span className="truncate">{summary.main_title || summary.title}</span>
+                      <span className="truncate">{summary.title || summary.main_title}</span>
                     </span>
                     <button
                       onClick={(e) => toggleMenu(summary.id, e)}
@@ -439,7 +439,7 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
                     className="flex items-center justify-between px-3 py-2 text-[#ABB2BF] hover:bg-[#303030] rounded-lg cursor-pointer group instant-transition instant-feedback"
                   >
                     <span className="truncate text-sm min-w-0">
-                      {summary.main_title || summary.title}
+                      {summary.title || summary.main_title}
                     </span>
                     <button
                       onClick={(e) => toggleMenu(summary.id, e)}

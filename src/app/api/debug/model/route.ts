@@ -3,7 +3,7 @@ import { SYSTEM_PROMPT } from '../../../../lib/system-prompt';
 
 export async function GET(req: NextRequest) {
   // The model used in src/lib/openai.ts
-  const model = 'gpt-4.1-mini';
+  const model = 'gpt-4.1-nano-2025-04-14';
   const systemPrompt = SYSTEM_PROMPT;
   const isNewPrompt = systemPrompt.includes('Video-to-Story Transformation System');
   const isOldPrompt = systemPrompt.includes('Ultimate Fast-Flow Video Summary System');

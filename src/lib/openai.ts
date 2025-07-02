@@ -60,6 +60,26 @@ const OFFICIAL_OPENAI_PRICING = {
     maxContextTokens: 128000,
     maxCompletionTokens: 16384,
   },
+  'gpt-4.1-nano': {
+    // ✅ VERIFIED OFFICIAL PRICING as of April 2025
+    inputPricePerMillionTokens: 0.10,   // $0.10 per 1M input tokens
+    outputPricePerMillionTokens: 0.25,  // $0.25 per 1M output tokens
+    // Convert to per-token pricing for calculations
+    inputPricePerToken: 0.10 / 1000000,   // $0.00000010 per token
+    outputPricePerToken: 0.25 / 1000000,  // $0.00000025 per token
+    maxContextTokens: 128000,
+    maxCompletionTokens: 16384,
+  },
+  'gpt-4.1-nano-2025-04-14': {
+    // ✅ VERIFIED OFFICIAL PRICING as of April 2025
+    inputPricePerMillionTokens: 0.10,   // $0.10 per 1M input tokens
+    outputPricePerMillionTokens: 0.25,  // $0.25 per 1M output tokens
+    // Convert to per-token pricing for calculations
+    inputPricePerToken: 0.10 / 1000000,   // $0.00000010 per token
+    outputPricePerToken: 0.25 / 1000000,  // $0.00000025 per token
+    maxContextTokens: 128000,
+    maxCompletionTokens: 16384,
+  },
   'gpt-4o-mini': {
     // ✅ VERIFIED OFFICIAL PRICING as of December 2024
     inputPricePerMillionTokens: 0.15,   // $0.15 per 1M input tokens
@@ -546,7 +566,7 @@ export async function extractKnowledgeWithOpenAI(
 
     const startTime = Date.now();
     const response = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-4.1-nano-2025-04-14',
       messages: messages,
       temperature: 1.0,
       max_tokens: 4096,
@@ -936,7 +956,7 @@ Focus only on this specific time segment and maintain the engaging, conversation
   try {
     const response = await retryWithBackoff(async () => {
       return await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4.1-nano-2025-04-14',
         messages,
         max_tokens: 1500,
         temperature: 1.0,
@@ -955,7 +975,7 @@ Focus only on this specific time segment and maintain the engaging, conversation
 
 // Health check function
 export async function checkOpenAIHealth(): Promise<boolean> {
-  const HEALTH_CHECK_MODEL = 'gpt-4.1-mini';
+  const HEALTH_CHECK_MODEL = 'gpt-4.1-nano-2025-04-14';
   
   logger.info(`\n🏥 ===== OPENAI HEALTH CHECK VERIFICATION =====`);
   logger.info(`📌 HEALTH CHECK MODEL: ${HEALTH_CHECK_MODEL}`);
@@ -966,6 +986,7 @@ export async function checkOpenAIHealth(): Promise<boolean> {
         model: HEALTH_CHECK_MODEL,
         messages: [{ role: 'user', content: 'Hello' }],
         max_tokens: 5,
+        temperature: 1.0,
       });
     }, 'OpenAI health check');
     
