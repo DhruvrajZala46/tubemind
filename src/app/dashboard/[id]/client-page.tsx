@@ -59,11 +59,11 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
         
         // Only update state if component is still mounted
         if (isMounted) {
-          setData(data);
-          setIsLoading(false);
-          
+        setData(data);
+        setIsLoading(false);
+        
           // CRITICAL: Only continue polling if still processing AND component is mounted
-          if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
+        if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
             console.log('🔄 ProcessingStatusPoller: Scheduling next poll in 2s, status:', data.processing_status);
             timeoutId = setTimeout(pollStatus, 2000);
           } else {
@@ -73,8 +73,8 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
       } catch (err) {
         if (isMounted) {
           console.error('❌ ProcessingStatusPoller: Error polling status:', err);
-          setError(err instanceof Error ? err : new Error('Unknown error'));
-          setIsLoading(false);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
+        setIsLoading(false);
         }
       }
     };

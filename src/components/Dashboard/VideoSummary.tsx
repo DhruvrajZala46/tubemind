@@ -411,15 +411,15 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
     console.log('🔍 VideoSummary: Setting up polling for processing status:', summary.processing_status);
 
     const pollSummaryStatus = async () => {
-      try {
+        try {
         console.log('🔄 VideoSummary: Polling summary status for summaryId:', summaryId);
-        const response = await fetch(`/api/summaries/${summaryId}/status`);
+          const response = await fetch(`/api/summaries/${summaryId}/status`);
         
-        if (!response.ok) {
+          if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+          }
 
-        const data = await response.json();
+          const data = await response.json();
         console.log('📊 VideoSummary: Summary status data:', data);
 
         // OPTIMIZED: Use actual progress from backend
@@ -437,7 +437,7 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         previousSummary.current = updatedSummary;
 
         // CRITICAL: Stop polling immediately when completed or failed
-        if (!isProcessing(data.processing_status)) {
+          if (!isProcessing(data.processing_status)) {
           console.log('✅ VideoSummary: Processing finished, stopping polling. Final status:', data.processing_status);
           if (pollingInterval.current) {
             clearInterval(pollingInterval.current);

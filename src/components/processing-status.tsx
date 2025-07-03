@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { PerplexityLoader, ProcessingStage } from './ui/perplexity-loader';
 
 interface ProcessingStatusProps {
@@ -23,15 +23,32 @@ export default function ProcessingStatus({ stage, progress, message, error, onRe
       default: return 'pending';
     }
   };
+  
+  // Track previous progress to prevent flickering
+  const prevProgressRef = useRef(progress);
+  
+  // Ensure progress never goes backwards for smoother UX
+  useEffect(() => {
+    if (progress < prevProgressRef.current && stage !== 'error' && stage !== 'complete') {
+      console.log('Preventing progress regression:', progress, 'previous:', prevProgressRef.current);
+      // Don't update prevProgressRef in this case
+    } else {
+      prevProgressRef.current = progress;
+    }
+  }, [progress, stage]);
+
+  // Use the higher value between current and previous progress
+  const displayProgress = Math.max(progress, prevProgressRef.current);
 
   return (
     <PerplexityLoader
       className="w-full max-w-4xl mx-auto"
       currentStage={mapStageToPerplexityStage(stage)}
-      progress={progress}
+      progress={displayProgress}
       showProgress={true}
       showAnimatedText={true}
       accentColor="#DC143C"
+      fastAnimation={true} // OPTIMIZED: Enable faster animations
       onComplete={stage === 'complete' ? () => console.log('Processing completed') : undefined}
     />
   );

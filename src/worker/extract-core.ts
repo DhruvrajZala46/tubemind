@@ -96,10 +96,33 @@ export async function processVideo(
       throw new Error('videoId is a UUID, not a YouTube ID!');
     }
     
-    // OPTIMIZED: No artificial delays - immediate progress update
+    // OPTIMIZED: Immediate progress update
     await updateProgress('transcribing', 20, 'Downloading video audio...');
     
-    const transcript = await getVideoTranscript(videoId, totalDurationSeconds);
+    // OPTIMIZED: Parallel processing when possible
+    const transcriptPromise = getVideoTranscript(videoId, totalDurationSeconds);
+    
+    // While transcript is being fetched, prepare database
+    const prepDbPromise = executeQuery(async (sql) => {
+      await sql`
+        UPDATE video_summaries 
+        SET 
+          processing_status = 'transcribing',
+          processing_stage = 'transcribing',
+          processing_progress = 25,
+          updated_at = NOW()
+        WHERE id = ${summaryDbId}
+      `;
+    }).catch(err => {
+      logger.warn('Non-critical error during DB preparation:', err);
+      // Non-critical error, continue processing
+    });
+    
+    // Wait for transcript
+    const transcript = await transcriptPromise;
+    // Wait for DB prep (non-blocking)
+    await Promise.allSettled([prepDbPromise]);
+    
     if (!transcript || transcript.length === 0) {
       throw new Error('Transcript is empty or could not be fetched.');
     }
@@ -112,7 +135,7 @@ export async function processVideo(
     const step2Time = Date.now();
     logStep('AI Knowledge Extraction', 'START');
     
-    // OPTIMIZED: No artificial delays - immediate start
+    // OPTIMIZED: Immediate start
     await updateProgress('summarizing', 5, 'Starting AI analysis...');
     
     // OPTIMIZED: Quick progress update during AI processing
@@ -137,35 +160,53 @@ export async function processVideo(
     
     // OPTIMIZED: Single database transaction for all operations
     await executeQuery(async (sql) => {
-      // Update main summary
-      await sql`
-        UPDATE video_summaries 
-        SET 
-          main_title = ${aiResult.mainTitle},
-          overall_summary = ${aiResult.overallSummary},
-          raw_ai_output = ${aiResult.rawOpenAIOutput || aiResult.openaiOutput || 'No content available'},
-          prompt_tokens = ${aiResult.promptTokens || 0},
-          completion_tokens = ${aiResult.completionTokens || 0},
-          total_tokens = ${aiResult.totalTokens || 0},
-          input_cost = ${aiResult.inputCost || 0.0},
-          output_cost = ${aiResult.outputCost || 0.0},
-          total_cost = ${aiResult.totalCost || 0.0},
-          processing_status = 'finalizing',
-          processing_stage = 'finalizing',
-          processing_progress = 60,
-          updated_at = NOW()
-        WHERE id = ${summaryDbId}
-      `;
+      // Prepare segment data for batch insert
+      const segments = aiResult.segments && aiResult.segments.length > 0 
+        ? aiResult.segments.map((segment, index) => ({
+            video_id: videoDbId,
+            segment_number: index + 1,
+            start_time: segment.startTime,
+            end_time: segment.endTime,
+            title: segment.title,
+            summary: segment.narratorSummary
+          }))
+        : [];
       
-      // OPTIMIZED: Batch insert video segments if they exist
-      if (aiResult.segments && aiResult.segments.length > 0) {
-        for (const [index, segment] of aiResult.segments.entries()) {
-          await sql`
-            INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary) 
-            VALUES (${videoDbId}, ${index + 1}, ${segment.startTime}, ${segment.endTime}, ${segment.title}, ${segment.narratorSummary})
-          `;
+      // OPTIMIZED: Use a transaction for atomicity and performance
+      await sql.begin(async (transaction) => {
+        // Update main summary
+        await transaction`
+          UPDATE video_summaries 
+          SET 
+            main_title = ${aiResult.mainTitle},
+            overall_summary = ${aiResult.overallSummary},
+            raw_ai_output = ${aiResult.rawOpenAIOutput || aiResult.openaiOutput || 'No content available'},
+            prompt_tokens = ${aiResult.promptTokens || 0},
+            completion_tokens = ${aiResult.completionTokens || 0},
+            total_tokens = ${aiResult.totalTokens || 0},
+            input_cost = ${aiResult.inputCost || 0.0},
+            output_cost = ${aiResult.outputCost || 0.0},
+            total_cost = ${aiResult.totalCost || 0.0},
+            processing_status = 'finalizing',
+            processing_stage = 'finalizing',
+            processing_progress = 60,
+            updated_at = NOW()
+          WHERE id = ${summaryDbId}
+        `;
+        
+        // OPTIMIZED: Batch insert video segments if they exist
+        if (segments.length > 0) {
+          // Use batch insert for better performance
+          const segmentValues = segments.map(s => 
+            `(${s.video_id}, ${s.segment_number}, ${s.start_time}, ${s.end_time}, ${sql(s.title)}, ${sql(s.summary)})`
+          ).join(', ');
+          
+          await transaction.unsafe(`
+            INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary)
+            VALUES ${segmentValues}
+          `);
         }
-      }
+      });
     });
     
     logStep('Database Update', 'SUCCESS', { duration: `${Date.now() - step3Time}ms` });
@@ -177,7 +218,19 @@ export async function processVideo(
     await updateProgress('finalizing', 80, 'Processing credits...');
     
     try {
-      const creditResult = await consumeCredits(userId, creditsNeeded);
+      // OPTIMIZED: Process credits in parallel with cache invalidation
+      const creditPromise = consumeCredits(userId, creditsNeeded);
+      
+      // Force cache invalidation to ensure UI updates
+      const { getCacheManager } = await import('../lib/cache');
+      const cacheInvalidationPromise = getCacheManager().invalidateUserSubscription(userId);
+      
+      // Wait for both operations
+      const [creditResult] = await Promise.all([
+        creditPromise,
+        cacheInvalidationPromise
+      ]);
+      
       if (!creditResult) {
         logger.warn('Credit consumption may have failed - returned false', { 
           userId, 
@@ -186,10 +239,6 @@ export async function processVideo(
           summaryDbId
         });
       }
-      
-      // Force cache invalidation to ensure UI updates
-      const { getCacheManager } = await import('../lib/cache');
-      getCacheManager().invalidateUserSubscription(userId);
       
       logger.info('Credits consumed and cache invalidated', { 
         userId, 

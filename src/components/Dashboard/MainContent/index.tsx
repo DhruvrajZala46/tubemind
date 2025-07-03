@@ -88,13 +88,21 @@ export default function MainContent() {
     setStatusMessage("Fetching video metadata...");
 
     try {
+      // OPTIMIZED: Use AbortController for timeout management
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('/api/extract', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Priority': 'high' // Add priority header
         },
         body: JSON.stringify({ url }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -158,13 +166,34 @@ export default function MainContent() {
   const pollProgressAndRedirect = async (summaryId: string, redirectUrl: string) => {
     let pollCount = 0;
     const maxPolls = 180; // Increased to 6 minutes of polling but with faster frequency
+    let isMounted = true; // Track component mount state
+    
+    // OPTIMIZED: Cleanup function to prevent memory leaks and stale polling
+    const cleanup = () => {
+      isMounted = false;
+    };
     
     const poll = async () => {
+      if (!isMounted) return; // Skip if component unmounted
+      
       pollCount++;
       console.log(`🔄 Poll attempt ${pollCount}/${maxPolls} for summaryId:`, summaryId);
       
       try {
-        const response = await fetch(`/api/summaries/${summaryId}/status`);
+        // OPTIMIZED: Use AbortController for timeout management
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(`/api/summaries/${summaryId}/status`, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Priority': 'high'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
         console.log(`📡 Status API response:`, response.status);
         
         if (!response.ok) {
@@ -222,6 +251,8 @@ export default function MainContent() {
             break;
         }
         
+        if (!isMounted) return; // Skip UI updates if unmounted
+        
         console.log(`🎯 Updating UI - Stage: ${stage}, Progress: ${progress}%`);
         
         setProcessingStage(stage as ProcessingStage);
@@ -237,7 +268,9 @@ export default function MainContent() {
           
           // OPTIMIZED: Faster redirect on completion
           setTimeout(() => {
-            router.push(redirectUrl);
+            if (isMounted) {
+              router.push(redirectUrl);
+            }
           }, 800);
           return;
         }
@@ -252,30 +285,30 @@ export default function MainContent() {
         }
         
         // OPTIMIZED: Dynamic polling frequency based on progress stage
-        let nextPollDelay = 1000; // Default 1 second for active processing
+        let nextPollDelay = 500; // Default 0.5 second for active processing - OPTIMIZED: Faster polling
         
         // Adjust polling frequency based on stage
         switch (stage) {
           case 'pending':
           case 'queued':
-            nextPollDelay = 2000; // 2 seconds for queued items
+            nextPollDelay = 1000; // 1 second for queued items - OPTIMIZED: Faster polling
             break;
           case 'transcribing':
           case 'summarizing':
-            nextPollDelay = 800; // Very frequent during active processing
+            nextPollDelay = 500; // Very frequent during active processing - OPTIMIZED: Faster polling
             break;
           case 'finalizing':
-            nextPollDelay = 1000; // 1 second during finalizing
+            nextPollDelay = 500; // 0.5 second during finalizing - OPTIMIZED: Faster polling
             break;
           default:
-            nextPollDelay = 1500; // 1.5 seconds default
+            nextPollDelay = 800; // 0.8 seconds default - OPTIMIZED: Faster polling
         }
         
         // Continue polling if not complete and under max polls
-        if (pollCount < maxPolls) {
+        if (pollCount < maxPolls && isMounted) {
           console.log(`⏳ Scheduling next poll in ${nextPollDelay}ms (attempt ${pollCount + 1})`);
           setTimeout(poll, nextPollDelay);
-        } else {
+        } else if (isMounted) {
           // Max polls reached - redirect anyway
           console.log('⏰ Max polls reached, redirecting anyway');
           setStatusMessage("Taking longer than expected. Redirecting...");
@@ -287,13 +320,15 @@ export default function MainContent() {
       } catch (error) {
         console.error('❌ Polling error:', error);
         
+        if (!isMounted) return; // Skip error handling if unmounted
+        
         // OPTIMIZED: More resilient error handling with exponential backoff
         const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000); // Cap at 5 seconds
         
-        if (pollCount < maxPolls) {
+        if (pollCount < maxPolls && isMounted) {
           console.log(`🔄 Retrying poll in ${retryDelay}ms due to error`);
           setTimeout(poll, retryDelay);
-        } else {
+        } else if (isMounted) {
           // Final fallback - redirect anyway
           setStatusMessage("Checking status... Redirecting shortly...");
           setTimeout(() => {
@@ -306,6 +341,9 @@ export default function MainContent() {
     // OPTIMIZED: Start polling immediately with no delay
     console.log('🚀 Starting immediate poll');
     poll();
+    
+    // Return cleanup function to prevent memory leaks
+    return cleanup;
   };
 
   // Helper function to get status message

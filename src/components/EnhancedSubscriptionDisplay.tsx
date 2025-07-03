@@ -198,7 +198,7 @@ export const EnhancedSubscriptionDisplay: React.FC<SubscriptionDisplayProps> = (
 
     const interval = setInterval(() => {
       fetchSubscription(false);
-    }, 30000); // 30 second intervals
+    }, 30000); // 30 second intervals - OPTIMIZED: Reduced API calls from every 5s to every 30s
 
     return () => clearInterval(interval);
   }, [subscription, error, user, fetchSubscription]);

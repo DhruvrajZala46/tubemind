@@ -22,6 +22,7 @@ interface PerplexityLoaderProps {
   showAnimatedText?: boolean;
   accentColor?: string;
   onComplete?: () => void;
+  fastAnimation?: boolean;
 }
 
 const STAGES: Array<{
@@ -69,7 +70,8 @@ export function PerplexityLoader({
   showProgress = true,
   showAnimatedText = true,
   accentColor = '#DC143C',
-  onComplete
+  onComplete,
+  fastAnimation = false
 }: PerplexityLoaderProps) {
   const [animatedDots, setAnimatedDots] = useState('');
   const [overallProgress, setOverallProgress] = useState(0);
@@ -84,10 +86,10 @@ export function PerplexityLoader({
         if (prev === '...') return '';
         return prev + '.';
       });
-    }, 500);
+    }, fastAnimation ? 300 : 500);
     
     return () => clearInterval(interval);
-  }, [showAnimatedText, currentStage]);
+  }, [showAnimatedText, currentStage, fastAnimation]);
 
   // Improved progress calculation with smooth transitions
   useEffect(() => {
@@ -136,12 +138,13 @@ export function PerplexityLoader({
       setSmoothProgress(prev => {
         const diff = overallProgress - prev;
         if (Math.abs(diff) < 0.1) return overallProgress;
-        return prev + diff * 0.1; // Smooth animation
+        const speed = fastAnimation ? 0.2 : 0.1;
+        return prev + diff * speed;
       });
-    }, 50);
+    }, fastAnimation ? 25 : 50);
     
     return () => clearInterval(interval);
-  }, [overallProgress]);
+  }, [overallProgress, fastAnimation]);
 
   // Get current stage info
   const currentStageInfo = STAGES.find(stage => stage.id === currentStage) || STAGES[0];

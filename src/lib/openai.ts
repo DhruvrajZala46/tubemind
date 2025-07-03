@@ -597,8 +597,8 @@ export async function extractKnowledgeWithOpenAI(
     
     // OPTIMIZED: Conditional detailed logging (only in development)
     if (process.env.NODE_ENV === 'development') {
-      logger.info('\n📄 FULL OPENAI OUTPUT:');
-      logger.info(rawOutput);
+    logger.info('\n📄 FULL OPENAI OUTPUT:');
+    logger.info(rawOutput);
     } else {
       logger.info('\n📄 OPENAI OUTPUT RECEIVED (length: ' + rawOutput.length + ' chars)');
     }
