@@ -560,4 +560,14 @@ You are always given the full transcript for the entire video, from start to fin
 - Use the time information provided to estimate segment start and end times as accurately as possible.
 - If the transcript provides timestamps, use them to set segment boundaries.
 - If timestamps are missing or approximate, estimate as best as possible, but ensure the last segment covers the end of the video.
-- Never stop the summary before the video ends, even if earlier segments are long.`;
+- Never stop the summary before the video ends, even if earlier segments are long.
+
+## CRITICAL SEGMENTATION CHECKLIST (MANDATORY)
+- You MUST create enough segments to cover the entire video, from 0:00 to the actual video end (e.g., 29:11).
+- The last segment MUST end at the video end (not before).
+- Never stop early, even if earlier segments are long.
+- If you do not cover the full video, your output will be rejected.
+- If the video is 29:11, the last segment must end at 29:11.
+- Each segment should have a time range that matches the actual flow of the video.
+- If you are unsure, err on the side of more segments, not fewer.
+- If you cannot find a natural break, continue the segment until the next topic or the end of the video.`;

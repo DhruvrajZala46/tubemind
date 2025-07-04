@@ -621,20 +621,30 @@ export async function extractKnowledgeWithOpenAI(
         true
       );
     }
-    
-    // OPTIMIZED: Conditional detailed logging (only in development)
-    if (process.env.NODE_ENV === 'development') {
-    logger.info('\n📄 FULL OPENAI OUTPUT:');
-    logger.info(rawOutput);
-    } else {
-      logger.info('\n📄 OPENAI OUTPUT RECEIVED (length: ' + rawOutput.length + ' chars)');
-    }
+    // Always log the raw OpenAI output for debugging segmentation issues
+    logger.info('RAW OPENAI OUTPUT', { rawOutput });
 
     // OPTIMIZED: More efficient response parsing
     const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
 
     // Inject the model proof into the main title for undeniable verification
     parsedResponse.mainTitle = `[Model: ${modelUsed}] ${parsedResponse.mainTitle}`;
+
+    // Check if the last segment ends before the video end
+    if (parsedResponse.segments && parsedResponse.segments.length > 0) {
+      const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
+      if (lastSegment.endTime < totalDuration - 30) { // Allow 30s leeway
+        logger.warn(`⚠️ Last summary segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding placeholder segment.`);
+        parsedResponse.segments.push({
+          startTime: lastSegment.endTime,
+          endTime: totalDuration,
+          title: 'No summary available for this part of the video',
+          hook: '',
+          narratorSummary: 'The model did not generate a summary for the final part of the video. Please review the full video for details.',
+          timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`
+        });
+      }
+    }
 
     // OPTIMIZED: Efficient token usage calculation
     let promptTokens = 0, completionTokens = 0, totalTokens = 0;
@@ -722,7 +732,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️🗜️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️��️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
