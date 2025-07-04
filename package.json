@@ -36,6 +36,7 @@
     "dependencies": {
         "@clerk/nextjs": "^6.22.0",
         "@fontsource/inter": "^5.2.6",
+        "@fontsource/libre-baskerville": "^5.2.6",
         "@google-cloud/tasks": "^6.1.0",
         "@heroicons/react": "^2.2.0",
         "@hookform/resolvers": "^5.1.1",

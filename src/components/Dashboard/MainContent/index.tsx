@@ -17,7 +17,7 @@ import { useMainLoading } from "../../../lib/main-loading-context.tsx";
 
 type ProcessingStage = 'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error' | 'pending';
 
-export default function MainContent() {
+export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuOpen }: { isMobileMenuOpen?: boolean, setIsMobileMenuOpen?: (open: boolean) => void }) {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -363,12 +363,29 @@ export default function MainContent() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-4 sm:py-8 md:py-12 max-w-6xl mx-auto">
-      {/* Main Header with Title */}
-      <MainHeader />
-      
-      {/* Main Content Area */}
-      <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 mb-4 sm:mb-8">
+    <div className="flex flex-col items-center justify-center w-full min-h-screen px-4 py-4 sm:py-8 md:py-12 max-w-6xl mx-auto relative">
+      {/* Main Header with Title - hide on mobile, show only message below */}
+      <div className="hidden sm:block w-full">
+        <MainHeader />
+      </div>
+      {/* Mobile: Centered message only */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'calc(100vh - 3.5rem - 4.5rem)' }}>
+        <h1
+          className="text-[2.1rem] font-extrabold text-white text-center mb-2"
+          style={{
+            fontFamily: 'var(--font-sans)',
+            letterSpacing: '-0.01em',
+            lineHeight: 1.13,
+            marginTop: '0.5rem',
+            marginBottom: '0.5rem',
+            padding: '0 0.5rem',
+          }}
+        >
+          Watch Less, Learn More
+        </h1>
+      </div>
+      {/* Desktop: Main content area as before */}
+      <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 mb-4 sm:mb-8 hidden sm:block">
         {/* Video Input Section - Claude AI style */}
         <form className="flex flex-col items-center w-full" autoComplete="off" onSubmit={(e) => {
           e.preventDefault();
@@ -418,6 +435,87 @@ export default function MainContent() {
         {thumbnailUrl && !error && (
           <div className="mt-4 p-4 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center">
             <img src={thumbnailUrl} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
+          </div>
+        )}
+      </div>
+      {/* Mobile: Fixed bottom input bar - UPDATED for better native feel and bg match */}
+      <div
+        className={`fixed bottom-0 left-0 w-full z-40 border-t border-[#22292F] sm:hidden transition-all duration-300`}
+        style={{
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderTop: '1px solid #22292F',
+          padding: '1.1rem 1.2rem calc(env(safe-area-inset-bottom) + 1.1rem) 1.2rem',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Blur overlay when sidebar is open */}
+        {isMobileMenuOpen && (
+          <div
+            className="absolute inset-0 w-full h-full z-50 backdrop-blur-md bg-black/60 pointer-events-auto transition-all duration-300"
+            style={{ borderRadius: '1.25rem' }}
+          />
+        )}
+        <form
+          className="flex items-center w-full max-w-lg mx-auto relative"
+          autoComplete="off"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (input && !error) handleProcess(input);
+          }}
+        >
+          <div
+            className="flex w-full items-center border border-[var(--border-color)] rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-white/10 transition-all"
+            style={{
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              padding: '0.7rem 1.1rem',
+              margin: 0,
+            }}
+          >
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setTouched(true);
+                if (!e.target.value) {
+                  setError("");
+                  return;
+                }
+                if (!extractYouTubeId(e.target.value)) {
+                  setError("Please enter a valid YouTube URL");
+                } else {
+                  setError("");
+                }
+              }}
+              onBlur={() => setTouched(true)}
+              placeholder="Enter YouTube video URL to summarize..."
+              className="flex-1 bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-[17px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
+              style={{
+                minWidth: 0,
+                padding: '1.1rem 1rem',
+                fontSize: 17,
+                marginRight: 8,
+                background: 'transparent',
+              }}
+              disabled={isMobileMenuOpen}
+            />
+            <button
+              type="submit"
+              className="ml-2 flex items-center justify-center h-12 w-12 rounded-2xl bg-[var(--btn-dashboard-bg)] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
+              disabled={!!error || !input.trim() || isSubmitting || isProcessing || isMobileMenuOpen}
+              style={{ minWidth: 0 }}
+            >
+              {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-[var(--btn-primary-text)]" />}
+            </button>
+          </div>
+        </form>
+        {error && touched && (
+          <div className="text-[var(--text-primary)] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
+            {error}
           </div>
         )}
       </div>

@@ -1,10 +1,18 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, createContext } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "../../components/Dashboard/Sidebar";
 import { cn } from "../../lib/utils";
 import { MainLoadingOverlay } from "../../components/ui/main-loading-overlay.tsx";
 import { MainLoadingProvider, useMainLoading } from "../../lib/main-loading-context.tsx";
+
+export const SidebarMenuContext = createContext<{
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+}>({
+  isMobileMenuOpen: false,
+  setIsMobileMenuOpen: () => {},
+});
 
 const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -42,7 +50,7 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
   }, [pathname, isMobileMenuOpen]);
   
   // Allow scrolling on all routes for better mobile UX
-  const isNewRoute = false; // Changed: always allow scrolling
+  const isNewRoute = pathname === '/dashboard/new';
 
   // Function to handle sidebar collapse state changes from the Sidebar component
   const handleSidebarCollapseChange = (collapsed: boolean) => {
@@ -57,92 +65,94 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
   };
 
   return (
-    <div className="flex h-screen bg-[var(--bg-dashboard)] overflow-hidden font-sans">
-      {/* Desktop Sidebar - Only visible on lg+ screens */}
-      <aside
-        className={cn(
-          "hidden lg:flex h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] flex-shrink-0 overflow-y-auto z-40 transition-all duration-300 ease-in-out",
-          isSidebarCollapsed ? "w-16" : "w-[280px]"
-        )}
-      >
-        <Sidebar 
-          onCollapseChange={handleSidebarCollapseChange} 
-          isMobileMenuOpen={false}
-          setIsMobileMenuOpen={setIsMobileMenuOpen}
-        />
-      </aside>
-
-      {/* Mobile Sidebar Overlay - Premium Native Animation */}
-      {isMobileMenuOpen && (
-        <aside 
-          className="lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] overflow-y-auto shadow-2xl"
-          style={{
-            transform: 'translateX(0)',
-            transition: 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            boxShadow: '4px 0 24px rgba(0, 0, 0, 0.15), 2px 0 8px rgba(0, 0, 0, 0.1)',
-          }}
+    <SidebarMenuContext.Provider value={{ isMobileMenuOpen, setIsMobileMenuOpen }}>
+      <div className="flex h-screen bg-[var(--bg-dashboard)] overflow-hidden font-sans">
+        {/* Desktop Sidebar - Only visible on lg+ screens */}
+        <aside
+          className={cn(
+            "hidden lg:flex h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] flex-shrink-0 overflow-y-auto z-40 transition-all duration-300 ease-in-out",
+            isSidebarCollapsed ? "w-16" : "w-[280px]"
+          )}
         >
           <Sidebar 
             onCollapseChange={handleSidebarCollapseChange} 
-            isMobileMenuOpen={isMobileMenuOpen}
+            isMobileMenuOpen={false}
             setIsMobileMenuOpen={setIsMobileMenuOpen}
           />
         </aside>
-      )}
 
-      {/* Mobile Floating Toggle Button - Claude Style PanelLeft */}
-      {!isMobileMenuOpen && (
-        <button
-          onClick={() => {
-            console.log('Mobile menu button clicked!');
-            setIsMobileMenuOpen(true);
-          }}
-          className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-[var(--bg-sidebar)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] rounded-lg shadow-lg border border-[var(--border-color)] backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
-          style={{
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)',
-            WebkitBackdropFilter: 'blur(8px)',
-            backdropFilter: 'blur(8px)',
-          }}
-          aria-label="Open sidebar"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="18" height="18" x="3" y="3" rx="2"/>
-            <path d="M9 3v18"/>
-          </svg>
-        </button>
-      )}
-
-      {/* Mobile Backdrop - Premium Subtle Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/15 backdrop-blur-md transition-all duration-400 ease-out"
-          style={{
-            backdropFilter: 'blur(8px) saturate(1.2)',
-            WebkitBackdropFilter: 'blur(8px) saturate(1.2)',
-          }}
-          onClick={() => {
-            console.log('Backdrop clicked, closing sidebar');
-            setIsMobileMenuOpen(false);
-          }}
-        />
-      )}
-
-      {/* Main Content - Full width on mobile, with desktop margin */}
-      <main 
-        className={cn(
-          "flex-1 h-screen bg-[var(--bg-dashboard)] transition-all duration-300 ease-in-out relative",
-          isNewRoute ? "flex items-center justify-center overflow-hidden" : "overflow-y-auto",
-          // Mobile: Full width always, Desktop: Respect sidebar collapse
-          "w-full",
-          // Desktop sidebar margins
-          isSidebarCollapsed ? "lg:ml-16 lg:w-[calc(100%-4rem)]" : "lg:ml-0 lg:w-full"
+        {/* Mobile Sidebar Overlay - Premium Native Animation */}
+        {isMobileMenuOpen && (
+          <aside 
+            className="lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] h-full bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] overflow-y-auto shadow-2xl"
+            style={{
+              transform: 'translateX(0)',
+              transition: 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              boxShadow: '4px 0 24px rgba(0, 0, 0, 0.15), 2px 0 8px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <Sidebar 
+              onCollapseChange={handleSidebarCollapseChange} 
+              isMobileMenuOpen={isMobileMenuOpen}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+            />
+          </aside>
         )}
-        onClick={handleMainContentClick}
-      >
-        {children}
-        <MainLoadingOverlay isVisible={isMainLoading} text={loadingText} />
-      </main>
-    </div>
+
+        {/* Mobile Floating Toggle Button - Claude Style PanelLeft */}
+        {!isMobileMenuOpen && !isNewRoute && (
+          <button
+            onClick={() => {
+              console.log('Mobile menu button clicked!');
+              setIsMobileMenuOpen(true);
+            }}
+            className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 bg-[var(--bg-sidebar)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] rounded-lg shadow-lg border border-[var(--border-color)] backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
+            style={{
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)',
+              WebkitBackdropFilter: 'blur(8px)',
+              backdropFilter: 'blur(8px)',
+            }}
+            aria-label="Open sidebar"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2"/>
+              <path d="M9 3v18"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Mobile Backdrop - Premium Subtle Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/15 backdrop-blur-md transition-all duration-400 ease-out"
+            style={{
+              backdropFilter: 'blur(8px) saturate(1.2)',
+              WebkitBackdropFilter: 'blur(8px) saturate(1.2)',
+            }}
+            onClick={() => {
+              console.log('Backdrop clicked, closing sidebar');
+              setIsMobileMenuOpen(false);
+            }}
+          />
+        )}
+
+        {/* Main Content - Full width on mobile, with desktop margin */}
+        <main 
+          className={cn(
+            "flex-1 h-screen bg-[var(--bg-dashboard)] transition-all duration-300 ease-in-out relative",
+            isNewRoute ? "flex items-center justify-center overflow-hidden" : "overflow-y-auto",
+            // Mobile: Full width always, Desktop: Respect sidebar collapse
+            "w-full",
+            // Desktop sidebar margins
+            isSidebarCollapsed ? "lg:ml-16 lg:w-[calc(100%-4rem)]" : "lg:ml-0 lg:w-full"
+          )}
+          onClick={handleMainContentClick}
+        >
+          {children}
+          <MainLoadingOverlay isVisible={isMainLoading} text={loadingText} />
+        </main>
+      </div>
+    </SidebarMenuContext.Provider>
   );
 };
 
