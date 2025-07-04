@@ -172,34 +172,45 @@ export async function processVideo(
     
     // OPTIMIZED: Use a transaction for atomicity and performance
     await executeQuery(async (sql) => {
-      await sql.transaction(async (tx) => [
-        // Update main summary
-        tx`
-          UPDATE video_summaries 
-          SET 
-            main_title = ${aiResult.mainTitle},
-            overall_summary = ${aiResult.overallSummary},
-            raw_ai_output = ${aiResult.rawOpenAIOutput || aiResult.openaiOutput || 'No content available'},
-            prompt_tokens = ${aiResult.promptTokens || 0},
-            completion_tokens = ${aiResult.completionTokens || 0},
-            total_tokens = ${aiResult.totalTokens || 0},
-            input_cost = ${aiResult.inputCost || 0.0},
-            output_cost = ${aiResult.outputCost || 0.0},
-            total_cost = ${aiResult.totalCost || 0.0},
-            processing_status = 'finalizing',
-            processing_stage = 'finalizing',
-            processing_progress = 60,
-            updated_at = NOW()
-          WHERE id = ${summaryDbId}
-        `,
-        // OPTIMIZED: Batch insert video segments if they exist
-        ...(segments.length > 0 ? [
-          tx.unsafe(`
-            INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary)
-            VALUES ${segments.map(s => `(${s.video_id}, ${s.segment_number}, ${s.start_time}, ${s.end_time}, ${tx(s.title)}, ${tx(s.summary)})`).join(', ')}
-          `)
-        ] : [])
-      ]);
+      await sql.transaction((tx) => {
+        const queries = [
+          tx`
+            UPDATE video_summaries 
+            SET 
+              main_title = ${aiResult.mainTitle},
+              overall_summary = ${aiResult.overallSummary},
+              raw_ai_output = ${aiResult.rawOpenAIOutput || aiResult.openaiOutput || 'No content available'},
+              prompt_tokens = ${aiResult.promptTokens || 0},
+              completion_tokens = ${aiResult.completionTokens || 0},
+              total_tokens = ${aiResult.totalTokens || 0},
+              input_cost = ${aiResult.inputCost || 0.0},
+              output_cost = ${aiResult.outputCost || 0.0},
+              total_cost = ${aiResult.totalCost || 0.0},
+              processing_status = 'finalizing',
+              processing_stage = 'finalizing',
+              processing_progress = 60,
+              updated_at = NOW()
+            WHERE id = ${summaryDbId}
+          `
+        ];
+        if (segments.length > 0) {
+          for (const s of segments) {
+            queries.push(
+              tx`
+                INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary)
+                VALUES (${s.video_id}, ${s.segment_number}, ${s.start_time}, ${s.end_time}, ${s.title}, ${s.summary})
+                ON CONFLICT (video_id, segment_number)
+                DO UPDATE SET
+                  start_time = EXCLUDED.start_time,
+                  end_time = EXCLUDED.end_time,
+                  title = EXCLUDED.title,
+                  summary = EXCLUDED.summary
+              `
+            );
+          }
+        }
+        return queries;
+      });
     });
     
     logStep('Database Update', 'SUCCESS', { duration: `${Date.now() - step3Time}ms` });
