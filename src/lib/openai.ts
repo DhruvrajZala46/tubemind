@@ -531,6 +531,32 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
   return chunks;
 }
 
+// Helper: OpenAI call with retry and timeout
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 60000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const response = await getOpenAIClient().chat.completions.create({
+        model,
+        messages,
+        temperature: 0.9,
+        max_tokens: 4096,
+        stream: false
+      }, { signal: controller.signal });
+      clearTimeout(timeout);
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      logger.warn(`[CHUNK] OpenAI call failed (attempt ${attempt}/${maxRetries}) for chunk ${chunkIndex + 1}: ${err.message}`, { stack: err.stack, chunkIndex });
+      if (attempt < maxRetries) await new Promise(res => setTimeout(res, 2000)); // wait 2s before retry
+    }
+  }
+  logger.error(`[CHUNK] OpenAI call failed after ${maxRetries} attempts for chunk ${chunkIndex + 1}.`, { error: lastError?.message, stack: lastError?.stack, chunkIndex });
+  throw new Error('AI processing failed due to a network or API error. Please try again.');
+}
+
 // Main function with chunked summarization for long videos
 export async function extractKnowledgeWithOpenAI(
   transcript: any[],
@@ -585,13 +611,8 @@ export async function extractKnowledgeWithOpenAI(
       }
     ];
     const chunkStartTime = Date.now();
-    const response = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4.1-nano-2025-04-14',
-      messages: messages,
-      temperature: 0.9,
-      max_tokens: 4096,
-      stream: false
-    });
+    // Use retry logic for OpenAI call
+    const response = await callOpenAIWithRetry(messages, 'gpt-4.1-nano-2025-04-14', i, 3, 60000);
     const chunkEndTime = Date.now();
     logger.info(`[CHUNK] OpenAI response for chunk ${i+1} received in ${chunkEndTime - chunkStartTime}ms`);
     const rawOutput = response.choices[0]?.message?.content || '';
@@ -618,13 +639,8 @@ export async function extractKnowledgeWithOpenAI(
     }
   ];
   const stitchStartTime = Date.now();
-  const stitchResponse = await getOpenAIClient().chat.completions.create({
-    model: 'gpt-4.1-nano-2025-04-14',
-    messages: stitchMessages,
-    temperature: 0.9,
-    max_tokens: 4096,
-    stream: false
-  });
+  // Use retry logic for stitching as well
+  const stitchResponse = await callOpenAIWithRetry(stitchMessages, 'gpt-4.1-nano-2025-04-14', -1, 3, 60000);
   const stitchEndTime = Date.now();
   logger.info(`[STITCHING] OpenAI response for stitching received in ${stitchEndTime - stitchStartTime}ms`);
   const stitchedOutput = stitchResponse.choices[0]?.message?.content || '';
