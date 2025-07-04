@@ -35,65 +35,63 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [pollStart, setPollStart] = useState<number | null>(null);
+  const [errorSince, setErrorSince] = useState<number | null>(null);
 
   useEffect(() => {
     if (!summaryId) return;
 
     let timeoutId: NodeJS.Timeout | null = null;
     let isMounted = true; // Track if component is still mounted
+    if (!pollStart) setPollStart(Date.now());
 
     const pollStatus = async () => {
-      // Don't poll if component has been unmounted
-      if (!isMounted) {
-        console.log('🛑 ProcessingStatusPoller: Component unmounted, stopping poll');
-        return;
-      }
-
+      if (!isMounted) return;
       try {
-        console.log('🔄 ProcessingStatusPoller: Polling status for summaryId:', summaryId);
         const response = await fetch(`/api/summaries/${summaryId}/status`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch status');
-        }
+        if (!response.ok) throw new Error('Failed to fetch status');
         const data = await response.json();
-        
-        // Only update state if component is still mounted
         if (isMounted) {
-        setData(data);
-        setIsLoading(false);
-        
-          // CRITICAL: Only continue polling if still processing AND component is mounted
-        if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
-            console.log('🔄 ProcessingStatusPoller: Scheduling next poll in 2s, status:', data.processing_status);
+          setData(data);
+          setIsLoading(false);
+          setError(null);
+          setErrorSince(null);
+          if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
             timeoutId = setTimeout(pollStatus, 2000);
-          } else {
-            console.log('✅ ProcessingStatusPoller: Processing complete, stopping polls. Status:', data.processing_status);
           }
         }
       } catch (err) {
         if (isMounted) {
-          console.error('❌ ProcessingStatusPoller: Error polling status:', err);
-        setError(err instanceof Error ? err : new Error('Unknown error'));
-        setIsLoading(false);
+          setIsLoading(false);
+          setError(err instanceof Error ? err : new Error('Unknown error'));
+          if (!errorSince) setErrorSince(Date.now());
+          // Keep polling for up to 3 minutes after first error
+          const now = Date.now();
+          if (pollStart && now - pollStart < 3 * 60 * 1000) {
+            timeoutId = setTimeout(pollStatus, 3000); // poll slower on error
+          }
         }
       }
     };
-
-    // Start initial poll
     pollStatus();
-    
-    // CRITICAL: Cleanup function
     return () => {
-      console.log('🧹 ProcessingStatusPoller: Cleaning up - clearing timeout and marking unmounted');
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [summaryId]);
 
-  if (error) {
+  // If error but less than 3 minutes since polling started, show 'Still processing...'
+  if (error && pollStart && Date.now() - pollStart < 3 * 60 * 1000) {
+    return (
+      <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0 text-center text-[var(--text-primary)]">
+        <PerplexityLoader currentStage={data?.processing_stage ? mapApiStatusToProcessingStage(data.processing_stage) : 'pending'} progress={data?.processing_progress || 0} showProgress={true} showAnimatedText={true} />
+        <div className="mt-2 text-sm text-gray-400">Still processing, please wait...</div>
+      </div>
+    );
+  }
+
+  // If error and more than 3 minutes since polling started, show real error
+  if (error && pollStart && Date.now() - pollStart >= 3 * 60 * 1000) {
     return <div className="text-[var(--text-primary)]">Error loading status: {error.message}</div>;
   }
 
