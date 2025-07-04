@@ -120,6 +120,9 @@ export async function processVideo(
     
     // Wait for transcript
     const transcript = await transcriptPromise;
+    // Log transcript structure for debugging
+    logger.info('First 10 transcript segments:', transcript.slice(0, 10));
+    logger.info('Last 3 transcript segments:', transcript.slice(-3));
     // Wait for DB prep (non-blocking)
     await Promise.allSettled([prepDbPromise]);
     

@@ -552,4 +552,12 @@ GOOD BULLET POINT EXAMPLE (DO THIS):
 Here's what happens:
 - Point one
 - Point two
-- Point three`;
+- Point three
+
+## CRITICAL VIDEO COVERAGE INSTRUCTIONS (MANDATORY)
+You are always given the full transcript for the entire video, from start to finish.
+- Your summary must cover the entire video, with the final segment ending at (or very near) the actual end of the video.
+- Use the time information provided to estimate segment start and end times as accurately as possible.
+- If the transcript provides timestamps, use them to set segment boundaries.
+- If timestamps are missing or approximate, estimate as best as possible, but ensure the last segment covers the end of the video.
+- Never stop the summary before the video ends, even if earlier segments are long.`;

@@ -3,6 +3,8 @@ import { formatTranscriptByMinutes } from './youtube';
 import { SYSTEM_PROMPT } from './system-prompt';
 import { createLogger } from './logger';
 import { timeToSeconds } from './utils';
+// @ts-ignore: No types available for gpt-3-encoder
+import { encode } from 'gpt-3-encoder';
 
 const logger = createLogger('openai');
 
@@ -549,8 +551,33 @@ export async function extractKnowledgeWithOpenAI(
 
   try {
     // OPTIMIZED: More efficient transcript formatting
-    const formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
-    
+    let formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
+
+    // Token counting and truncation logic
+    const systemPromptTokens = encode(SYSTEM_PROMPT).length;
+    let transcriptTokens = encode(formattedTranscript).length;
+    const maxContextTokens = 128000; // For gpt-4.1-nano
+    const userPromptBase = `Here is the full transcript, chunked by minute for your reference:\n\n`;
+    const userPromptBaseTokens = encode(userPromptBase).length;
+    const durationInstruction = `**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`;
+    const durationInstructionTokens = encode(durationInstruction).length;
+    let totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
+
+    // Truncate transcript if needed
+    if (totalPromptTokens > maxContextTokens) {
+      logger.warn(`Prompt exceeds model context window (${totalPromptTokens} > ${maxContextTokens}). Truncating transcript from the start.`);
+      // Remove lines from the start until under the limit
+      let transcriptLines = formattedTranscript.split('\n');
+      while (totalPromptTokens > maxContextTokens && transcriptLines.length > 0) {
+        transcriptLines.shift();
+        formattedTranscript = transcriptLines.join('\n');
+        transcriptTokens = encode(formattedTranscript).length;
+        totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
+      }
+      logger.warn(`Truncated transcript to fit context window. Final prompt tokens: ${totalPromptTokens}`);
+    }
+    logger.info(`Prompt token count: ${totalPromptTokens} (system: ${systemPromptTokens}, transcript: ${transcriptTokens})`);
+
     // OPTIMIZED: Reduced logging for better performance
     logger.info('\n📝 TRANSCRIPT FORMATTED FOR OPENAI (length: ' + formattedTranscript.length + ' chars)');
 
@@ -562,7 +589,7 @@ export async function extractKnowledgeWithOpenAI(
       },
       {
         role: 'user',
-        content: `Here is the full transcript, chunked by minute for your reference:\n\n${formattedTranscript}\n\n**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`
+        content: `${userPromptBase}${formattedTranscript}\n\n${durationInstruction}`
       }
     ];
 
