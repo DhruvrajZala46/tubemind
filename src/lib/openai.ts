@@ -531,9 +531,10 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
   return chunks;
 }
 
-// Helper: OpenAI call with retry and timeout
-async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 60000) {
+// Helper: OpenAI call with retry, exponential backoff, and longer timeout
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 120000) {
   let lastError;
+  const backoffSchedule = [2000, 5000, 10000]; // 2s, 5s, 10s
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
@@ -549,12 +550,20 @@ async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatComplet
       return response;
     } catch (err: any) {
       lastError = err;
-      logger.warn(`[CHUNK] OpenAI call failed (attempt ${attempt}/${maxRetries}) for chunk ${chunkIndex + 1}: ${err.message}`, { stack: err.stack, chunkIndex });
-      if (attempt < maxRetries) await new Promise(res => setTimeout(res, 2000)); // wait 2s before retry
+      if (err.name === 'AbortError') {
+        logger.warn(`[CHUNK] OpenAI call ABORTED due to timeout (${timeoutMs}ms) for chunk ${chunkIndex + 1} (attempt ${attempt}/${maxRetries})`, { chunkIndex, timeoutMs });
+      } else {
+        logger.warn(`[CHUNK] OpenAI call failed (attempt ${attempt}/${maxRetries}) for chunk ${chunkIndex + 1}: ${err.message}`, { stack: err.stack, chunkIndex });
+      }
+      if (attempt < maxRetries) {
+        const backoff = backoffSchedule[attempt - 1] || 10000;
+        logger.info(`[CHUNK] Waiting ${backoff}ms before retrying chunk ${chunkIndex + 1} (attempt ${attempt + 1})`);
+        await new Promise(res => setTimeout(res, backoff));
+      }
     }
   }
   logger.error(`[CHUNK] OpenAI call failed after ${maxRetries} attempts for chunk ${chunkIndex + 1}.`, { error: lastError?.message, stack: lastError?.stack, chunkIndex });
-  throw new Error('AI processing failed due to a network or API error. Please try again.');
+  throw new Error('AI processing failed due to a network or API timeout. Please try again later.');
 }
 
 // Main function with chunked summarization for long videos
@@ -611,8 +620,8 @@ export async function extractKnowledgeWithOpenAI(
       }
     ];
     const chunkStartTime = Date.now();
-    // Use retry logic for OpenAI call
-    const response = await callOpenAIWithRetry(messages, 'gpt-4.1-nano-2025-04-14', i, 3, 60000);
+    // Use retry logic for OpenAI call (now with 120s timeout and exponential backoff)
+    const response = await callOpenAIWithRetry(messages, 'gpt-4.1-nano-2025-04-14', i, 3, 120000);
     const chunkEndTime = Date.now();
     logger.info(`[CHUNK] OpenAI response for chunk ${i+1} received in ${chunkEndTime - chunkStartTime}ms`);
     const rawOutput = response.choices[0]?.message?.content || '';
@@ -639,8 +648,8 @@ export async function extractKnowledgeWithOpenAI(
     }
   ];
   const stitchStartTime = Date.now();
-  // Use retry logic for stitching as well
-  const stitchResponse = await callOpenAIWithRetry(stitchMessages, 'gpt-4.1-nano-2025-04-14', -1, 3, 60000);
+  // Use retry logic for stitching as well (120s timeout)
+  const stitchResponse = await callOpenAIWithRetry(stitchMessages, 'gpt-4.1-nano-2025-04-14', -1, 3, 120000);
   const stitchEndTime = Date.now();
   logger.info(`[STITCHING] OpenAI response for stitching received in ${stitchEndTime - stitchStartTime}ms`);
   const stitchedOutput = stitchResponse.choices[0]?.message?.content || '';
