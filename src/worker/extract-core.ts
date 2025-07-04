@@ -158,24 +158,23 @@ export async function processVideo(
     
     await updateProgress('finalizing', 20, 'Organizing results...');
     
-    // OPTIMIZED: Single database transaction for all operations
+    // Prepare segment data for batch insert
+    const segments = aiResult.segments && aiResult.segments.length > 0 
+      ? aiResult.segments.map((segment, index) => ({
+          video_id: videoDbId,
+          segment_number: index + 1,
+          start_time: segment.startTime,
+          end_time: segment.endTime,
+          title: segment.title,
+          summary: segment.narratorSummary
+        }))
+      : [];
+    
+    // OPTIMIZED: Use a transaction for atomicity and performance
     await executeQuery(async (sql) => {
-      // Prepare segment data for batch insert
-      const segments = aiResult.segments && aiResult.segments.length > 0 
-        ? aiResult.segments.map((segment, index) => ({
-            video_id: videoDbId,
-            segment_number: index + 1,
-            start_time: segment.startTime,
-            end_time: segment.endTime,
-            title: segment.title,
-            summary: segment.narratorSummary
-          }))
-        : [];
-      
-      // OPTIMIZED: Use a transaction for atomicity and performance
-      await sql.begin(async (transaction) => {
+      await sql.transaction(async (tx) => [
         // Update main summary
-        await transaction`
+        tx`
           UPDATE video_summaries 
           SET 
             main_title = ${aiResult.mainTitle},
@@ -192,21 +191,15 @@ export async function processVideo(
             processing_progress = 60,
             updated_at = NOW()
           WHERE id = ${summaryDbId}
-        `;
-        
+        `,
         // OPTIMIZED: Batch insert video segments if they exist
-        if (segments.length > 0) {
-          // Use batch insert for better performance
-          const segmentValues = segments.map(s => 
-            `(${s.video_id}, ${s.segment_number}, ${s.start_time}, ${s.end_time}, ${sql(s.title)}, ${sql(s.summary)})`
-          ).join(', ');
-          
-          await transaction.unsafe(`
+        ...(segments.length > 0 ? [
+          tx.unsafe(`
             INSERT INTO video_segments (video_id, segment_number, start_time, end_time, title, summary)
-            VALUES ${segmentValues}
-          `);
-        }
-      });
+            VALUES ${segments.map(s => `(${s.video_id}, ${s.segment_number}, ${s.start_time}, ${s.end_time}, ${tx(s.title)}, ${tx(s.summary)})`).join(', ')}
+          `)
+        ] : [])
+      ]);
     });
     
     logStep('Database Update', 'SUCCESS', { duration: `${Date.now() - step3Time}ms` });
