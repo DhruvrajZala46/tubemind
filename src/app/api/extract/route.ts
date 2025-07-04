@@ -390,7 +390,18 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     // This is a general catch-all for unexpected errors
     const e = error?.message || 'An unexpected error occurred.';
-    logger.error('Unhandled error in video extraction endpoint', { data: { error: e } });
+    // Try to include userId and email if available
+    let userId = null;
+    let userEmail = null;
+    try {
+      // Try to extract user from Clerk again if possible
+      const user = await currentUser();
+      if (user) {
+        userId = user.id;
+        userEmail = user.emailAddresses?.[0]?.emailAddress || null;
+      }
+    } catch {}
+    logger.error('Unhandled error in video extraction endpoint', { data: { error: e }, userId, email: userEmail });
     return NextResponse.json({ error: 'An unexpected error occurred. If this persists, please contact support.' }, { status: 500 });
   } finally {
     const duration = Date.now() - startTime;
