@@ -584,83 +584,90 @@ export async function extractKnowledgeWithOpenAI(
   totalCost: number,
   videoDurationSeconds: number
 }> {
-  // If video is <= 30 min, use single call
-  if (totalDuration <= 1800) {
-    // ... existing single-call logic ...
-    // (copy the current implementation here)
-    // ... existing code ...
+  // Remove all chunking logic. Use a single call for all videos.
+  // For videos <= 30 min, use gpt-4.1-nano. For > 30 min, use gpt-4o-mini.
+  const model = totalDuration <= 1800 ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4o-mini';
+  logger.info(`[OPENAI] Using model: ${model} for video duration: ${totalDuration}s`);
+
+  if (!transcript || transcript.length === 0) {
+    throw new OpenAIServiceError(
+      'No transcript available for analysis',
+      'MISSING_TRANSCRIPT',
+      400,
+      false
+    );
   }
 
-  // For long videos, use chunked summarization
-  const chunkSeconds = 900; // 15 min
-  const overlapSeconds = 120; // 2 min overlap
-  const chunks = splitTranscriptIntoChunks(transcript, chunkSeconds, overlapSeconds, totalDuration);
-  logger.info(`[CHUNKING] Splitting transcript into ${chunks.length} chunks (chunk size: ${chunkSeconds}s, overlap: ${overlapSeconds}s)`);
-  const chunkSummaries: string[] = [];
-  let chunkProgress = 0;
-  for (let i = 0; i < chunks.length; i++) {
-    const { start, end, chunk } = chunks[i];
-    logger.info(`[CHUNK] Processing chunk ${i+1}/${chunks.length}: ${formatTime(start)}–${formatTime(end)} (${chunk.length} transcript segments)`);
-    let contextPrompt = '';
-    if (i === 0) {
-      contextPrompt = `Summarize the start of the video from 0:00 to ${formatTime(end)}. Make sure to set the stage and introduce the main topics.`;
-    } else {
-      contextPrompt = `Summarize this part of the video from ${formatTime(start)} to ${formatTime(end)}. Connect the story to what happened before. The previous segment ended with: "${chunkSummaries[i-1]?.slice(-200)}"`;
+  // Format transcript as before
+  let formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
+
+  // Token counting and truncation logic (as before)
+  const systemPromptTokens = encode(SYSTEM_PROMPT).length;
+  let transcriptTokens = encode(formattedTranscript).length;
+  const maxContextTokens = 128000; // For gpt-4.1-nano and gpt-4o-mini
+  const userPromptBase = `Here is the full transcript, chunked by minute for your reference:\n\n`;
+  const userPromptBaseTokens = encode(userPromptBase).length;
+  const durationInstruction = `**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`;
+  const durationInstructionTokens = encode(durationInstruction).length;
+  let totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
+
+  // Truncate transcript if needed
+  if (totalPromptTokens > maxContextTokens) {
+    logger.warn(`Prompt exceeds model context window (${totalPromptTokens} > ${maxContextTokens}). Truncating transcript from the start.`);
+    // Remove lines from the start until under the limit
+    let transcriptLines = formattedTranscript.split('\n');
+    while (totalPromptTokens > maxContextTokens && transcriptLines.length > 0) {
+      transcriptLines.shift();
+      formattedTranscript = transcriptLines.join('\n');
+      transcriptTokens = encode(formattedTranscript).length;
+      totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
     }
-    const formattedTranscript = formatTranscriptByMinutes(chunk, 60, end - start);
-    logger.info(`[CHUNK] Prompt preview for chunk ${i+1}:`, { contextPrompt, transcriptPreview: formattedTranscript.slice(0, 300) });
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: SYSTEM_PROMPT
-      },
-      {
-        role: 'user',
-        content: `${contextPrompt}\n\n${formattedTranscript}\n\nThis chunk covers ${formatTime(start)} to ${formatTime(end)} of the video.`
-      }
-    ];
-    const chunkStartTime = Date.now();
-    // Use retry logic for OpenAI call (now with 120s timeout and exponential backoff)
-    const response = await callOpenAIWithRetry(messages, 'gpt-4.1-nano-2025-04-14', i, 3, 120000);
-    const chunkEndTime = Date.now();
-    logger.info(`[CHUNK] OpenAI response for chunk ${i+1} received in ${chunkEndTime - chunkStartTime}ms`);
-    const rawOutput = response.choices[0]?.message?.content || '';
-    logger.info('RAW OPENAI OUTPUT (chunk)', { chunkIndex: i, rawOutput });
-    chunkSummaries.push(rawOutput);
-    chunkProgress = Math.round(((i + 1) / (chunks.length + 1)) * 100);
-    if (updateProgress) {
-      logger.info(`[CHUNK] Progress update: ${chunkProgress}% after chunk ${i+1}`);
-      await updateProgress('summarizing', chunkProgress, `Chunk ${i+1}/${chunks.length} summarized`);
-    }
+    logger.warn(`Truncated transcript to fit context window. Final prompt tokens: ${totalPromptTokens}`);
   }
-  // Stitching pass
-  logger.info(`[STITCHING] Merging ${chunkSummaries.length} chunk summaries into final summary`);
-  const stitchPrompt = `Here are summaries of each part of a video. Merge them into a single, perfectly connected, smooth-flowing summary that feels like watching the full video. Add context bridges and transitions as needed. Do not repeat information. Make it feel like one story from start to finish.\n\n${chunkSummaries.map((s, i) => `--- Chunk ${i+1} ---\n${s}`).join('\n\n')}`;
-  logger.info('[STITCHING] Stitch prompt preview:', { stitchPromptPreview: stitchPrompt.slice(0, 500) });
-  const stitchMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+  logger.info(`Prompt token count: ${totalPromptTokens} (system: ${systemPromptTokens}, transcript: ${transcriptTokens})`);
+
+  logger.info('\n📝 TRANSCRIPT FORMATTED FOR OPENAI (length: ' + formattedTranscript.length + ' chars)');
+
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: 'system',
       content: SYSTEM_PROMPT
     },
     {
       role: 'user',
-      content: stitchPrompt
+      content: `${userPromptBase}${formattedTranscript}\n\n${durationInstruction}`
     }
   ];
-  const stitchStartTime = Date.now();
-  // Use retry logic for stitching as well (120s timeout)
-  const stitchResponse = await callOpenAIWithRetry(stitchMessages, 'gpt-4.1-nano-2025-04-14', -1, 3, 120000);
-  const stitchEndTime = Date.now();
-  logger.info(`[STITCHING] OpenAI response for stitching received in ${stitchEndTime - stitchStartTime}ms`);
-  const stitchedOutput = stitchResponse.choices[0]?.message?.content || '';
-  logger.info('RAW OPENAI OUTPUT (stitched)', { stitchedOutput });
-  if (updateProgress) {
-    logger.info('[STITCHING] Progress update: 100% after stitching');
-    await updateProgress('summarizing', 100, 'Final summary stitched');
+
+  const startTime = Date.now();
+  logger.info(`[OPENAI] API call start at ${new Date(startTime).toISOString()}`);
+  const response = await getOpenAIClient().chat.completions.create({
+    model,
+    messages: messages,
+    temperature: 0.9,
+    max_tokens: 4096,
+    stream: false
+  });
+  const endTime = Date.now();
+  logger.info(`[OPENAI] API call successful in ${endTime - startTime}ms`);
+
+  const modelUsed = response.model;
+  logger.info(`Model used: ${modelUsed}`);
+
+  const rawOutput = response.choices[0]?.message?.content || '';
+  if (!rawOutput) {
+    throw new OpenAIServiceError(
+      'OpenAI returned empty response',
+      'EMPTY_RESPONSE',
+      500,
+      true
+    );
   }
-  // Parse stitched output as usual
-  const parsedResponse = parseOpenAIResponse(stitchedOutput, videoTitle, totalDuration);
-  parsedResponse.mainTitle = `[Model: ${stitchResponse.model}] ${parsedResponse.mainTitle}`;
+  logger.info('RAW OPENAI OUTPUT', { rawOutput });
+
+  const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
+  parsedResponse.mainTitle = `[Model: ${modelUsed}] ${parsedResponse.mainTitle}`;
+
   // Check if the last segment ends before the video end
   if (parsedResponse.segments && parsedResponse.segments.length > 0) {
     const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
@@ -678,12 +685,12 @@ export async function extractKnowledgeWithOpenAI(
   }
   return {
     ...parsedResponse,
-    rawOpenAIOutput: stitchedOutput,
-    transcriptSent: '[chunked]',
-    openaiOutput: stitchedOutput,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
+    rawOpenAIOutput: rawOutput,
+    transcriptSent: formattedTranscript,
+    openaiOutput: rawOutput,
+    promptTokens: response.usage?.prompt_tokens || 0,
+    completionTokens: response.usage?.completion_tokens || 0,
+    totalTokens: response.usage?.total_tokens || 0,
     inputCost: 0,
     outputCost: 0,
     totalCost: 0,
@@ -720,7 +727,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🛠️🗡️⚔️🔫🏹🛡️🔧🔩⚙️��️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️��️🗡️⚔️🔫🏹🛡️🔧🔩⚙️️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
