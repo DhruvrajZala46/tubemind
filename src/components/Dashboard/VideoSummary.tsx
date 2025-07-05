@@ -581,15 +581,36 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
       } catch (error) {
         console.error('❌ VideoSummary: Error polling summary status:', error);
-        setError('Failed to check processing status');
         
-        // CRITICAL: Stop polling on persistent errors
-        if (pollingInterval.current) {
-          console.log('🛑 VideoSummary: Stopping polling due to error');
-          clearInterval(pollingInterval.current);
-          pollingInterval.current = null;
+        // CRITICAL FIX: Better error classification
+        const isAbortError = error instanceof Error && 
+          (error.name === 'AbortError' || 
+           error.message.includes('aborted') || 
+           error.message.includes('timeout') ||
+           error.message.includes('fetch'));
+        
+        const isNetworkError = error instanceof Error && 
+          (error.message.includes('network') || 
+           error.message.includes('connection') ||
+           error.message.includes('502') ||
+           error.message.includes('503') ||
+           error.message.includes('504'));
+        
+        // Only show error and stop polling for non-network issues
+        if (!isAbortError && !isNetworkError) {
+          setError('Failed to check processing status');
+          
+          // CRITICAL: Stop polling on persistent errors
+          if (pollingInterval.current) {
+            console.log('🛑 VideoSummary: Stopping polling due to error');
+            clearInterval(pollingInterval.current);
+            pollingInterval.current = null;
+          }
+          return; // Exit polling function
+        } else {
+          // For network/abort errors, just continue silently
+          console.log('⏳ VideoSummary: Network/abort error, continuing...');
         }
-        return; // Exit polling function
       }
     };
 

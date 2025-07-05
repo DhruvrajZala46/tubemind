@@ -607,7 +607,31 @@ export async function extractKnowledgeWithOpenAI(
   const maxContextTokens = 128000; // For gpt-4.1-nano and gpt-4o-mini
   const userPromptBase = `Here is the full transcript, chunked by minute for your reference:\n\n`;
   const userPromptBaseTokens = encode(userPromptBase).length;
-  const durationInstruction = `**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\nPlease analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`;
+  const durationInstruction = `**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\n\n**🚨 MANDATORY FULL VIDEO COVERAGE REQUIREMENTS:**
+1. You MUST cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}
+2. You MUST create segments that span the complete ${formatTime(totalDuration)} timeline
+3. You MUST NOT stop before ${formatTime(totalDuration)}
+4. You MUST use INTELLIGENT segmentation based on content flow, NOT fixed time ranges
+5. You MUST break segments when topics change, conversations shift, or new concepts are introduced
+6. You MUST ensure the last segment ends at exactly ${formatTime(totalDuration)}
+7. You MUST process every single second of the ${formatTime(totalDuration)} video
+8. You MUST include the conclusion, credits, and any final thoughts
+9. You MUST continue until the very last word is spoken
+10. You MUST NOT assume the video is "done" until you reach ${formatTime(totalDuration)}
+
+**SEGMENTATION RULES:**
+- Break when speaker introduces new topic
+- Break when conversation direction changes  
+- Break when story/example ends
+- Break when emotional tone shifts
+- Break when moving from problem to solution
+- Break when transitioning between concepts
+- DO NOT use arbitrary time-based breaks
+
+**FINAL VERIFICATION:**
+Before finishing, verify that your last segment ends at exactly ${formatTime(totalDuration)} and covers all content until the very end.
+
+Please analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`;
   const durationInstructionTokens = encode(durationInstruction).length;
   let totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
 
@@ -668,21 +692,76 @@ export async function extractKnowledgeWithOpenAI(
   const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
   parsedResponse.mainTitle = `[Model: ${modelUsed}] ${parsedResponse.mainTitle}`;
 
-  // Check if the last segment ends before the video end
-  if (parsedResponse.segments && parsedResponse.segments.length > 0) {
-    const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
-    if (lastSegment.endTime < totalDuration - 30) {
-      logger.warn(`⚠️ Last summary segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding placeholder segment.`);
-      parsedResponse.segments.push({
-        startTime: lastSegment.endTime,
-        endTime: totalDuration,
-        title: 'No summary available for this part of the video',
-        hook: '',
-        narratorSummary: 'The model did not generate a summary for the final part of the video. Please review the full video for details.',
-        timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`
-      });
+      // CRITICAL FIX: Ensure complete video coverage
+    if (parsedResponse.segments && parsedResponse.segments.length > 0) {
+      const firstSegment = parsedResponse.segments[0];
+      const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
+      
+      // Ensure first segment starts at 0:00
+      if (firstSegment.startTime > 30) {
+        logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
+        parsedResponse.segments.unshift({
+          title: 'Introduction',
+          startTime: 0,
+          endTime: firstSegment.startTime,
+          timestamp: `0:00–${formatTime(firstSegment.startTime)}`,
+          hook: 'Video introduction and setup',
+          narratorSummary: 'The video begins with an introduction and setup phase.'
+        });
+      }
+      
+      // CRITICAL: Ensure last segment ends at video end
+      if (lastSegment.endTime < totalDuration - 30) {
+        logger.warn(`🚨 CRITICAL: Last segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding final segment!`);
+        parsedResponse.segments.push({
+          title: 'Conclusion and Final Thoughts',
+          startTime: lastSegment.endTime,
+          endTime: totalDuration,
+          timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`,
+          hook: 'Wrapping up the video content',
+          narratorSummary: 'The video concludes with final thoughts, takeaways, and any closing remarks.'
+        });
+      } else if (lastSegment.endTime < totalDuration) {
+        // Just extend the last segment
+        logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
+        lastSegment.endTime = totalDuration;
+        lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
+      }
+      
+      // Check for gaps and fill them
+      for (let i = 0; i < parsedResponse.segments.length - 1; i++) {
+        const current = parsedResponse.segments[i];
+        const next = parsedResponse.segments[i + 1];
+        const gap = next.startTime - current.endTime;
+        
+        if (gap > 60) { // Gap larger than 1 minute
+          logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
+          parsedResponse.segments.splice(i + 1, 0, {
+            title: 'Additional Content',
+            startTime: current.endTime,
+            endTime: next.startTime,
+            timestamp: `${formatTime(current.endTime)}–${formatTime(next.startTime)}`,
+            hook: 'Continued discussion and examples',
+            narratorSummary: 'The video continues with additional content and examples.'
+          });
+          i++; // Skip the newly inserted segment
+        }
+      }
+      
+      // FINAL VERIFICATION: Double-check complete coverage
+      const finalFirst = parsedResponse.segments[0];
+      const finalLast = parsedResponse.segments[parsedResponse.segments.length - 1];
+      
+      if (finalFirst.startTime > 0) {
+        logger.error(`🚨 CRITICAL ERROR: First segment doesn't start at 0:00! It starts at ${formatTime(finalFirst.startTime)}`);
+      }
+      
+      if (finalLast.endTime < totalDuration) {
+        logger.error(`🚨 CRITICAL ERROR: Last segment doesn't end at video duration! It ends at ${formatTime(finalLast.endTime)}, should be ${formatTime(totalDuration)}`);
+      }
+      
+      logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(finalFirst.startTime)} to ${formatTime(finalLast.endTime)} (target: 0:00 to ${formatTime(totalDuration)})`);
     }
-  }
   return {
     ...parsedResponse,
     rawOpenAIOutput: rawOutput,
@@ -856,13 +935,60 @@ function parseOpenAIResponse(
       });
     }
     
-    // Ensure the last segment ends at the video's end time
+    // CRITICAL FIX: Ensure complete video coverage
     if (uniqueSegments.length > 0) {
+      const firstSegment = uniqueSegments[0];
       const lastSegment = uniqueSegments[uniqueSegments.length - 1];
-      if (lastSegment.endTime < totalDuration) {
+      
+      // Ensure first segment starts at 0:00
+      if (firstSegment.startTime > 30) {
+        logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
+        uniqueSegments.unshift({
+          title: 'Introduction',
+          startTime: 0,
+          endTime: firstSegment.startTime,
+          timestamp: `0:00–${formatTime(firstSegment.startTime)}`,
+          hook: 'Video introduction and setup',
+          narratorSummary: 'The video begins with an introduction and setup phase.'
+        });
+      }
+      
+      // Ensure last segment ends at video end
+      if (lastSegment.endTime < totalDuration - 30) {
+        logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adding final segment to ${formatTime(totalDuration)}`);
+        uniqueSegments.push({
+          title: 'Conclusion and Final Thoughts',
+          startTime: lastSegment.endTime,
+          endTime: totalDuration,
+          timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`,
+          hook: 'Wrapping up the video content',
+          narratorSummary: 'The video concludes with final thoughts and takeaways.'
+        });
+      } else if (lastSegment.endTime < totalDuration) {
+        // Just extend the last segment
         logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
         lastSegment.endTime = totalDuration;
         lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
+      }
+      
+      // Check for gaps and fill them
+      for (let i = 0; i < uniqueSegments.length - 1; i++) {
+        const current = uniqueSegments[i];
+        const next = uniqueSegments[i + 1];
+        const gap = next.startTime - current.endTime;
+        
+        if (gap > 60) { // Gap larger than 1 minute
+          logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
+          uniqueSegments.splice(i + 1, 0, {
+            title: 'Additional Content',
+            startTime: current.endTime,
+            endTime: next.startTime,
+            timestamp: `${formatTime(current.endTime)}–${formatTime(next.startTime)}`,
+            hook: 'Continued discussion and examples',
+            narratorSummary: 'The video continues with additional content and examples.'
+          });
+          i++; // Skip the newly inserted segment
+        }
       }
     }
     

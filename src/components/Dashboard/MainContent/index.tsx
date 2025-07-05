@@ -322,18 +322,42 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         
         if (!isMounted) return; // Skip error handling if unmounted
         
-        // OPTIMIZED: More resilient error handling with exponential backoff
-        const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000); // Cap at 5 seconds
+        // CRITICAL FIX: Distinguish between abort errors and real errors
+        const isAbortError = error instanceof Error && 
+          (error.name === 'AbortError' || 
+           error.message.includes('aborted') || 
+           error.message.includes('timeout') ||
+           error.message.includes('fetch'));
         
-        if (pollCount < maxPolls && isMounted) {
-          console.log(`🔄 Retrying poll in ${retryDelay}ms due to error`);
-          setTimeout(poll, retryDelay);
-        } else if (isMounted) {
-          // Final fallback - redirect anyway
-          setStatusMessage("Checking status... Redirecting shortly...");
-          setTimeout(() => {
-            router.push(redirectUrl);
-          }, 3000);
+        if (isAbortError) {
+          // Abort errors are temporary - just retry with backoff
+          console.log('⏳ Fetch aborted (timeout), retrying...');
+          const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000);
+          
+          if (pollCount < maxPolls && isMounted) {
+            console.log(`🔄 Retrying poll in ${retryDelay}ms due to abort`);
+            setTimeout(poll, retryDelay);
+          } else if (isMounted) {
+            // After many aborts, redirect anyway
+            setStatusMessage("Still processing... Redirecting shortly...");
+            setTimeout(() => {
+              router.push(redirectUrl);
+            }, 3000);
+          }
+        } else {
+          // Real error - use exponential backoff
+          const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000);
+          
+          if (pollCount < maxPolls && isMounted) {
+            console.log(`🔄 Retrying poll in ${retryDelay}ms due to error`);
+            setTimeout(poll, retryDelay);
+          } else if (isMounted) {
+            // Final fallback - redirect anyway
+            setStatusMessage("Checking status... Redirecting shortly...");
+            setTimeout(() => {
+              router.push(redirectUrl);
+            }, 3000);
+          }
         }
       }
     };

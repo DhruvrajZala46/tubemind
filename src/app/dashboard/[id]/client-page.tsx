@@ -83,17 +83,27 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
       } catch (err) {
         if (!isMounted) return;
         
-        // Determine if this is a network abort or a real error
+        // CRITICAL FIX: Better error classification
         const isAbort = err instanceof Error && 
-          (err.name === 'AbortError' || err.message.includes('aborted'));
+          (err.name === 'AbortError' || 
+           err.message.includes('aborted') || 
+           err.message.includes('timeout') ||
+           err.message.includes('fetch'));
+        
+        const isNetworkError = err instanceof Error && 
+          (err.message.includes('network') || 
+           err.message.includes('connection') ||
+           err.message.includes('502') ||
+           err.message.includes('503') ||
+           err.message.includes('504'));
         
         // Only consider it a fatal error if:
-        // 1. It's not an abort error AND
+        // 1. It's not an abort/network error AND
         // 2. We've had consistent errors for over 3 minutes
         const now = Date.now();
         const isConsistentError = errorSince && (now - errorSince > 3 * 60 * 1000);
         
-        if (!isAbort && isConsistentError) {
+        if (!isAbort && !isNetworkError && isConsistentError) {
           setIsFatalError(true);
         }
         

@@ -102,8 +102,22 @@ export function ProcessingStatusDisplay({ videoId, summaryId, initialStatus }: P
       } catch (err) {
         if (isMounted) {
           console.error('❌ ProcessingStatusDisplay: Error polling status:', err);
-          setError(err instanceof Error ? err.message : 'Unknown error');
-          setIsLoading(false);
+          
+          // CRITICAL FIX: Don't show errors for abort/timeout issues
+          const isAbortError = err instanceof Error && 
+            (err.name === 'AbortError' || 
+             err.message.includes('aborted') || 
+             err.message.includes('timeout') ||
+             err.message.includes('fetch'));
+          
+          if (!isAbortError) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+            setIsLoading(false);
+          } else {
+            // For abort errors, just continue polling silently
+            console.log('⏳ ProcessingStatusDisplay: Fetch aborted, continuing...');
+            timeoutId = setTimeout(pollStatus, 2000);
+          }
         }
       }
     };
