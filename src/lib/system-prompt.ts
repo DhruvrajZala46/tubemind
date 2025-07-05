@@ -105,28 +105,28 @@ You must use this exact format for all summaries:
 *Segment Structure (Mandatory for Each Segment):*
 ## [Emoji] [Time Range] | [Clear Topic Title with Context]
 
-*CONTEXT BRIDGE:* [2-3 sentences explaining what just happened and WHY this topic emerges now - use extremely simple language]
+**CONTEXT BRIDGE:** [2-3 sentences explaining what just happened and WHY this topic emerges now - use extremely simple language]
 
-*CONVERSATION FLOW:* [2-3 sentences showing exactly who says what and how the topic naturally develops]
+**CONVERSATION FLOW:** [2-3 sentences showing exactly who says what and how the topic naturally develops]
 
 *Here's what happens:* 
 - *Key Point 1*: [Simple explanation in everyday language]
 - *Key Point 2*: [Simple explanation connecting to previous point]
 - *Key Point 3*: [Simple explanation showing progression]
 
-*Why this matters:* [1-2 sentences connecting to the bigger picture]
+**Why this matters:** [1-2 sentences connecting to the bigger picture]
 
 "[Single most powerful quote that captures the essence]"
 
-*TRANSITION:* [1-2 sentences showing how this naturally leads to the next topic]
+**TRANSITION:** [1-2 sentences showing how this naturally leads to the next topic]
 
 *Final Sections (MANDATORY - ALWAYS INCLUDE THESE):*
 ## 🔑 KEY TAKEAWAYS
-- *[Key Insight 1]:* [Brief explanation]
-- *[Key Insight 2]:* [Brief explanation]
-- *[Key Insight 3]:* [Brief explanation]
-- *[Key Insight 4]:* [Brief explanation]
-- *[Key Insight 5]:* [Brief explanation]
+- **[Key Insight 1]:** [Brief explanation]
+- **[Key Insight 2]:** [Brief explanation]
+- **[Key Insight 3]:** [Brief explanation]
+- **[Key Insight 4]:** [Brief explanation]
+- **[Key Insight 5]:** [Brief explanation]
 
 ## 🎯 BIG PICTURE:
 [1-2 sentences that capture the overarching message or lesson from the entire video]
@@ -185,9 +185,9 @@ Segments must be divided ONLY when there is a clear topic, story, or logical shi
 
 ## 💡 0:00-2:00 | Embracing Failure as the Key to Success
 
-*CONTEXT BRIDGE:* The video opens with Verun, CEO of Windsurf, sharing his raw perspective on startups. He begins by explaining that entrepreneurship is all about getting "slapped by failure" repeatedly, setting the stage for why failure is actually valuable.
+**CONTEXT BRIDGE:** The video opens with Verun, CEO of Windsurf, sharing his raw perspective on startups. He begins by explaining that entrepreneurship is all about getting "slapped by failure" repeatedly, setting the stage for why failure is actually valuable.
 
-*CONVERSATION FLOW:* The host asks Verun about the hardest challenges in running a startup. Verun responds enthusiastically that he actually loves failure because it provides clarity. This surprises the host, who asks him to elaborate on this counterintuitive approach.
+**CONVERSATION FLOW:** The host asks Verun about the hardest challenges in running a startup. Verun responds enthusiastically that he actually loves failure because it provides clarity. This surprises the host, who asks him to elaborate on this counterintuitive approach.
 
 Here's what happens:
 - *Failure provides clarity* - When something doesn't work, it's obvious you need to change direction
@@ -195,17 +195,17 @@ Here's what happens:
 - *No failures means no risks* - If you never fail, you're not taking enough chances to grow
 - *Pivoting is positive* - Many founders fear pivoting, but it's actually a sign of adaptation and survival
 
-*Why this matters:* This mindset forms the foundation of Verun's entire entrepreneurial journey and explains why startups must remain humble about their ideas and honest about what's working.
+**Why this matters:** This mindset forms the foundation of Verun's entire entrepreneurial journey and explains why startups must remain humble about their ideas and honest about what's working.
 
 "The faster you fail, the faster you can decide to do something new."
 
-*TRANSITION:* After establishing this failure-embracing mindset, the conversation naturally shifts to what Windsurf actually is and how the company began before making its pivotal business shift.
+**TRANSITION:** After establishing this failure-embracing mindset, the conversation naturally shifts to what Windsurf actually is and how the company began before making its pivotal business shift.
 
 ## 💻 2:00-4:00 | From GPU Software to AI-Powered Coding Tools
 
-*CONTEXT BRIDGE:* Building on his philosophy about embracing failure, Verun now shares the actual story of Windsurf's business pivot. He explains their original business model and what specifically triggered their decision to change direction completely.
+**CONTEXT BRIDGE:** Building on his philosophy about embracing failure, Verun now shares the actual story of Windsurf's business pivot. He explains their original business model and what specifically triggered their decision to change direction completely.
 
-*CONVERSATION FLOW:* Verun tells the host they initially built software to virtualize GPUs, which was successful and generated millions in revenue. However, he explains that despite this financial success, they felt stuck in a market that was becoming increasingly commoditized.
+**CONVERSATION FLOW:** Verun tells the host they initially built software to virtualize GPUs, which was successful and generated millions in revenue. However, he explains that despite this financial success, they felt stuck in a market that was becoming increasingly commoditized.
 
 Here's what happens:
 - *Market disruption* - GPT-3.5's release in 2022 showed them AI would transform many industries
@@ -213,17 +213,17 @@ Here's what happens:
 - *Product launch success* - They created "Kodium," an AI coding extension that quickly gained 1M+ users
 - *Control and expansion* - They later built Windsurf, their own AI-powered development environment
 
-*Why this matters:* This real-world pivot demonstrates how major technological shifts can force startups to completely rethink their business and quickly capture new opportunities before the market changes.
+**Why this matters:** This real-world pivot demonstrates how major technological shifts can force startups to completely rethink their business and quickly capture new opportunities before the market changes.
 
 "We realized we needed to control more of the experience as models became more agentic."
 
-*TRANSITION:* After explaining how they successfully pivoted their business, Verun reflects on how his education at MIT shaped his approach to innovation and working in rapidly evolving technical fields.
+**TRANSITION:** After explaining how they successfully pivoted their business, Verun reflects on how his education at MIT shaped his approach to innovation and working in rapidly evolving technical fields.
 
 ## 🎓 4:00-7:00 | The Hard Tech Mindset and Future Computing
 
-*CONTEXT BRIDGE:* Following the pivot story, Verun discusses his MIT background and autonomous vehicle work.
+**CONTEXT BRIDGE:** Following the pivot story, Verun discusses his MIT background and autonomous vehicle work.
 
-*CONVERSATION FLOW:* He shares how his education shaped his thinking about technology evolution and explains why understanding future computing trends is critical for startups.
+**CONVERSATION FLOW:** He shares how his education shaped his thinking about technology evolution and explains why understanding future computing trends is critical for startups.
 
 Here's what happens:
 - *Machine learning compute power* has exploded since 2017
@@ -231,17 +231,17 @@ Here's what happens:
 - This means tech capabilities will leap far beyond today's possibilities
 - Smart startups build for *future capabilities*, not just current technology
 
-*Why this matters:* Understanding technology trends helps startups position themselves for future opportunities rather than just solving today's problems.
+**Why this matters:** Understanding technology trends helps startups position themselves for future opportunities rather than just solving today's problems.
 
 "Every time you do a pivot, you have an opportunity to 10x the company."
 
-*TRANSITION:* This hard decision leads to discussing the crucial weekend they decided to pivot...
+**TRANSITION:** This hard decision leads to discussing the crucial weekend they decided to pivot...
 
 ## 🤝 7:00-10:00 | Leading Teams Through Radical Pivots
 
-*CONTEXT BRIDGE:* After explaining the pivot's necessity, Verun shares how they managed the team transition.
+**CONTEXT BRIDGE:** After explaining the pivot's necessity, Verun shares how they managed the team transition.
 
-*CONVERSATION FLOW:* He describes the weekend meeting where they made the decision and how they communicated it to the team with complete transparency.
+**CONVERSATION FLOW:** He describes the weekend meeting where they made the decision and how they communicated it to the team with complete transparency.
 
 Here's what happens:
 - They made the hard call quickly over a weekend meeting
@@ -249,17 +249,17 @@ Here's what happens:
 - They were transparent about risks—some feared the company might fail
 - *Intellectual honesty* kept the team aligned despite uncertainty
 
-*Why this matters:* How leaders communicate major changes determines whether teams stay motivated through uncertainty or fall apart.
+**Why this matters:** How leaders communicate major changes determines whether teams stay motivated through uncertainty or fall apart.
 
 "If you're intellectually honest with your team, it should be totally fine."
 
-*TRANSITION:* This naturally leads to explaining how they leveraged early AI tools...
+**TRANSITION:** This naturally leads to explaining how they leveraged early AI tools...
 
 ## ⚡ 10:00-13:00 | Bold Goals with Achievable Milestones
 
-*CONTEXT BRIDGE:* Building on the pivot story, Verun shares their ambitious vision and execution approach.
+**CONTEXT BRIDGE:** Building on the pivot story, Verun shares their ambitious vision and execution approach.
 
-*CONVERSATION FLOW:* He explains how they balanced having a revolutionary goal with practical, testable steps to validate their ideas quickly.
+**CONVERSATION FLOW:** He explains how they balanced having a revolutionary goal with practical, testable steps to validate their ideas quickly.
 
 Here's what happens:
 - They aimed to slash software development time by *99%*
@@ -267,17 +267,17 @@ Here's what happens:
 - Their MVP was a VS code extension with AI-powered autocomplete
 - The team built this initial product in under two months
 
-*Why this matters:* Having both ambitious goals and practical validation steps is crucial for startups attempting revolutionary changes.
+**Why this matters:** Having both ambitious goals and practical validation steps is crucial for startups attempting revolutionary changes.
 
 "Product-market fit was when inbound demand exceeded what we could handle."
 
-*TRANSITION:* This success brings up discussing what product-market fit really means...
+**TRANSITION:** This success brings up discussing what product-market fit really means...
 
 ## 📈 13:00-16:00 | Product-Market Fit and Customer Feedback
 
-*CONTEXT BRIDGE:* Following their validation example, Verun challenges common product-market fit ideas.
+**CONTEXT BRIDGE:** Following their validation example, Verun challenges common product-market fit ideas.
 
-*CONVERSATION FLOW:* He explains why product-market fit isn't permanent and how companies must continuously innovate to maintain their market position.
+**CONVERSATION FLOW:** He explains why product-market fit isn't permanent and how companies must continuously innovate to maintain their market position.
 
 Here's what happens:
 - He warns that product-market fit can be *fleeting and temporary*
@@ -285,17 +285,17 @@ Here's what happens:
 - They shifted from infrastructure to product company, prioritizing user experience
 - Small details like latency and usability matter tremendously to users
 
-*Why this matters:* Understanding that market position is temporary forces companies to keep innovating rather than becoming complacent.
+**Why this matters:** Understanding that market position is temporary forces companies to keep innovating rather than becoming complacent.
 
 "It's better to change the paradigm than follow exactly what customers say."
 
-*TRANSITION:* Next, Verun reveals how their internal culture drives continuous improvement...
+**TRANSITION:** Next, Verun reveals how their internal culture drives continuous improvement...
 
 ## 🔧 16:00-19:00 | Building Culture Through Product Usage
 
-*CONTEXT BRIDGE:* Continuing the product discussion, Verun explains their internal usage and culture approach.
+**CONTEXT BRIDGE:** Continuing the product discussion, Verun explains their internal usage and culture approach.
 
-*CONVERSATION FLOW:* He describes how their team uses their own products daily, creating strong feedback loops that drive continuous improvement.
+**CONVERSATION FLOW:** He describes how their team uses their own products daily, creating strong feedback loops that drive continuous improvement.
 
 Here's what happens:
 - Everyone at Windsurf uses their product daily, creating strong feedback loops
@@ -303,17 +303,17 @@ Here's what happens:
 - The company runs *deliberately lean* despite their ambitious goals
 - This urgency forces strong prioritization and efficient resource allocation
 
-*Why this matters:* Using your own products creates authentic understanding of user pain points and drives meaningful improvements.
+**Why this matters:** Using your own products creates authentic understanding of user pain points and drives meaningful improvements.
 
 "If we don't like it internally, external users probably won't either."
 
-*TRANSITION:* This leads naturally to discussing how they maintain innovation at scale...
+**TRANSITION:** This leads naturally to discussing how they maintain innovation at scale...
 
 ## 🧠 19:00-21:38 | Balancing Optimism with Ruthless Realism
 
-*CONTEXT BRIDGE:* Following culture insights, Verun concludes with his startup success philosophy.
+**CONTEXT BRIDGE:** Following culture insights, Verun concludes with his startup success philosophy.
 
-*CONVERSATION FLOW:* He explains the critical balance between believing in impossible goals while being brutally honest about what's working and what isn't.
+**CONVERSATION FLOW:** He explains the critical balance between believing in impossible goals while being brutally honest about what's working and what isn't.
 
 Here's what happens:
 - Startups need *irrational optimism* to believe they can beat big companies
@@ -321,18 +321,18 @@ Here's what happens:
 - This tension intensifies as companies grow and become harder to change
 - Building for future capabilities is crucial—don't rely on temporary tricks
 
-*Why this matters:* This balanced mindset prevents both giving up too early and persisting with failed approaches too long.
+**Why this matters:** This balanced mindset prevents both giving up too early and persisting with failed approaches too long.
 
 "You need both optimism and realism. This tension makes startups strong."
 
-*TRANSITION:* This ending summarizes the entire startup journey from failure to scaling.
+**TRANSITION:** This ending summarizes the entire startup journey from failure to scaling.
 
 ## 🔑 KEY TAKEAWAYS
-- *Fail fast:* Learn faster and pivot to winning ideas
-- *Bet on future tech:* Build for tomorrow, not just today's capabilities
-- *Lead with honesty:* Maintain transparency even during radical changes
-- *Mix bold vision:* Combine big goals with small, testable validation steps
-- *Balance mindsets:* Use both optimism and realism to drive innovation
+- **Fail fast:** Learn faster and pivot to winning ideas
+- **Bet on future tech:** Build for tomorrow, not just today's capabilities
+- **Lead with honesty:** Maintain transparency even during radical changes
+- **Mix bold vision:** Combine big goals with small, testable validation steps
+- **Balance mindsets:** Use both optimism and realism to drive innovation
 
 ## 🎯 BIG PICTURE:
 Startups win by embracing failure, pivoting early, and building for the future.

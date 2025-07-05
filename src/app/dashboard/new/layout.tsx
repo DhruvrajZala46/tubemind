@@ -5,7 +5,7 @@ import { SidebarMenuContext } from "../layout";
 export default function NewDashboardLayout({ children }: { children: React.ReactNode }) {
   const { isMobileMenuOpen, setIsMobileMenuOpen } = useContext(SidebarMenuContext);
   return (
-    <div className="relative flex h-screen w-full bg-[#000000] font-sans">
+    <div className="relative flex h-screen w-full bg-[var(--bg-dashboard)] font-sans">
       {/* Mobile Top Nav Bar - Perplexity-style left-aligned */}
       <div
         className="fixed top-0 left-0 w-full h-14 border-b border-[#22292F] flex items-center px-4 z-30 sm:hidden"
@@ -33,8 +33,8 @@ export default function NewDashboardLayout({ children }: { children: React.React
         <img src="/logo.svg" alt="TubeMind Logo" className="w-7 h-7 mr-2" style={{ display: 'inline-block' }} />
         <span className="text-[18px] font-semibold text-white tracking-tight" style={{ fontFamily: 'Roboto, system-ui, sans-serif', letterSpacing: '-0.01em' }}>TubeMind</span>
       </div>
-      {/* Main content area for mobile: add padding for nav and input */}
-      <main className="w-full flex flex-col items-center justify-center min-h-screen pt-12 pb-20 sm:pt-0 sm:pb-0">
+      {/* Main content area: removed justify-center and added overflow-y-auto for scrolling */}
+      <main className="w-full flex flex-col min-h-screen pt-12 pb-20 sm:pt-0 sm:pb-0 overflow-y-auto">
         {React.cloneElement(children as React.ReactElement<any>, { isMobileMenuOpen, setIsMobileMenuOpen })}
       </main>
     </div>
