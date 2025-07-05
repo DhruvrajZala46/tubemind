@@ -37,6 +37,8 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
   const [error, setError] = useState<Error | null>(null);
   const [pollStart, setPollStart] = useState<number | null>(null);
   const [errorSince, setErrorSince] = useState<number | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isFatalError, setIsFatalError] = useState(false);
 
   useEffect(() => {
     if (!summaryId) return;
@@ -48,40 +50,81 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     const pollStatus = async () => {
       if (!isMounted) return;
       try {
-        const response = await fetch(`/api/summaries/${summaryId}/status`);
-        if (!response.ok) throw new Error('Failed to fetch status');
+        const controller = new AbortController();
+        const fetchTimeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`/api/summaries/${summaryId}/status`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(fetchTimeoutId);
+        
+        if (!response.ok) {
+          // Server returned an error status
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+        
         const data = await response.json();
+        
         if (isMounted) {
           setData(data);
           setIsLoading(false);
           setError(null);
           setErrorSince(null);
+          setRetryCount(0);
+          setIsFatalError(false);
+          
+          // If processing is not complete, continue polling
           if (data.processing_status !== 'completed' && data.processing_status !== 'failed') {
             timeoutId = setTimeout(pollStatus, 2000);
           }
         }
       } catch (err) {
-        if (isMounted) {
-          setIsLoading(false);
-          setError(err instanceof Error ? err : new Error('Unknown error'));
-          if (!errorSince) setErrorSince(Date.now());
-          // Keep polling for up to 3 minutes after first error
-          const now = Date.now();
-          if (pollStart && now - pollStart < 3 * 60 * 1000) {
-            timeoutId = setTimeout(pollStatus, 3000); // poll slower on error
-          }
+        if (!isMounted) return;
+        
+        // Determine if this is a network abort or a real error
+        const isAbort = err instanceof Error && 
+          (err.name === 'AbortError' || err.message.includes('aborted'));
+        
+        // Only consider it a fatal error if:
+        // 1. It's not an abort error AND
+        // 2. We've had consistent errors for over 3 minutes
+        const now = Date.now();
+        const isConsistentError = errorSince && (now - errorSince > 3 * 60 * 1000);
+        
+        if (!isAbort && isConsistentError) {
+          setIsFatalError(true);
+        }
+        
+        setIsLoading(false);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
+        if (!errorSince) setErrorSince(now);
+        
+        // Exponential backoff for retries
+        const nextRetryCount = retryCount + 1;
+        setRetryCount(nextRetryCount);
+        
+        // Calculate backoff time: 1s, 2s, 4s, 8s, max 10s
+        const backoffTime = Math.min(1000 * Math.pow(2, nextRetryCount - 1), 10000);
+        
+        // Keep polling unless we've determined it's a fatal error
+        if (!isFatalError && pollStart && now - pollStart < 5 * 60 * 1000) {
+          timeoutId = setTimeout(pollStatus, backoffTime);
         }
       }
     };
+    
     pollStatus();
+    
     return () => {
       isMounted = false;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [summaryId]);
+  }, [summaryId, isFatalError]);
 
-  // If error but less than 3 minutes since polling started, show 'Still processing...'
-  if (error && pollStart && Date.now() - pollStart < 3 * 60 * 1000) {
+  // If error but not fatal, show 'Still processing...'
+  if (error && !isFatalError) {
     return (
       <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0 text-center text-[var(--text-primary)]">
         <PerplexityLoader currentStage={data?.processing_stage ? mapApiStatusToProcessingStage(data.processing_stage) : 'pending'} progress={data?.processing_progress || 0} showProgress={true} showAnimatedText={true} />
@@ -90,9 +133,9 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     );
   }
 
-  // If error and more than 3 minutes since polling started, show real error
-  if (error && pollStart && Date.now() - pollStart >= 3 * 60 * 1000) {
-    return <div className="text-[var(--text-primary)]">Error loading status: {error.message}</div>;
+  // If fatal error, show real error
+  if (isFatalError) {
+    return <div className="text-[var(--text-primary)]">Processing failed. Please try again.</div>;
   }
 
   // Show loader while loading or while processing (not completed/failed)
