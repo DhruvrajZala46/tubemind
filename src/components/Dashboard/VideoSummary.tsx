@@ -28,6 +28,9 @@ function ChatGPTMarkdown({
   const isAnimating = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Add state to track if we're in special sections
+  const [currentSection, setCurrentSection] = useState<'none' | 'key-takeaways' | 'big-picture'>('none');
+  
   const cleanedMarkdown = useRef<string>('');
   
   // Check if this summary has been viewed before
@@ -112,14 +115,58 @@ function ChatGPTMarkdown({
         <ReactMarkdown
           components={{
             h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 lg:mb-8 mt-4 sm:mt-5 lg:mt-6" {...props} />,
-            h2: ({node, ...props}) => (
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 mt-6 sm:mt-8 lg:mt-10 border-b border-[var(--border-color)] pb-2" {...props} />
-            ),
+            h2: ({node, ...props}) => {
+              const content = props.children?.toString() || '';
+              
+              // Special styling for KEY TAKEAWAYS section
+              if (content.includes('🔑 KEY TAKEAWAYS')) {
+                // Set state to indicate we're in the KEY TAKEAWAYS section
+                setTimeout(() => setCurrentSection('key-takeaways'), 0);
+                return (
+                  <div className="key-takeaways-container">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 border-b border-[var(--border-color)] pb-2" {...props} />
+                  </div>
+                );
+              }
+              
+              // Special styling for BIG PICTURE section
+              if (content.includes('🎯 BIG PICTURE')) {
+                // Set state to indicate we're in the BIG PICTURE section
+                setTimeout(() => setCurrentSection('big-picture'), 0);
+                return (
+                  <div className="big-picture-container">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 border-b border-[var(--border-color)] pb-2" {...props} />
+                  </div>
+                );
+              }
+              
+              // If we encounter another h2, we're no longer in a special section
+              if (currentSection !== 'none') {
+                setTimeout(() => setCurrentSection('none'), 0);
+              }
+              
+              // Regular h2 styling for other sections
+              return (
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 mt-6 sm:mt-8 lg:mt-10 border-b border-[var(--border-color)] pb-2" {...props} />
+              );
+            },
             h3: ({node, ...props}) => <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 mt-4 sm:mt-5 lg:mt-6" {...props} />,
-            ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 my-4" {...props} />,
+            ul: ({node, ...props}) => {
+              // Use our state variable to determine if we're in a special section
+              if (currentSection === 'key-takeaways') {
+                return <ul className="list-disc list-inside space-y-2 my-4 key-takeaways-list" {...props} />;
+              }
+              return <ul className="list-disc list-inside space-y-2 my-4" {...props} />;
+            },
             ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 my-4" {...props} />,
             li: ({node, ...props}) => <li className="leading-relaxed my-1 pl-2" {...props} />,
-            p: ({node, ...props}) => <p className="mb-4 leading-relaxed" {...props} />,
+            p: ({node, ...props}) => {
+              // Special styling for paragraphs in the BIG PICTURE section
+              if (currentSection === 'big-picture') {
+                return <p className="mb-4 leading-relaxed big-picture-text" {...props} />;
+              }
+              return <p className="mb-4 leading-relaxed" {...props} />;
+            },
             strong: ({node, ...props}) => <strong className="font-bold text-[var(--text-primary)]" {...props} />,
             em: ({node, ...props}) => <em className="italic text-[var(--text-secondary)]" {...props} />,
             code: ({node, ...props}) => <code className="bg-[var(--bg-input)] px-1 py-0.5 rounded" {...props} />,
@@ -145,6 +192,92 @@ function ChatGPTMarkdown({
           width: 100%;
           max-width: 100%;
           overflow-wrap: break-word;
+        }
+        
+        /* KEY TAKEAWAYS special styling */
+        .key-takeaways-container {
+          background-color: #121212; /* Match sidebar background color */
+          border-radius: 12px 12px 0 0;
+          padding: 1.5rem 1.5rem 0.5rem;
+          margin: 2rem 0 0;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+          border-left: 4px solid #4f46e5; /* Indigo accent */
+        }
+        
+        .key-takeaways-container h2 {
+          margin-top: 0 !important;
+          border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+          color: #f3f3f3;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+        }
+        
+        .key-takeaways-list {
+          background-color: #121212;
+          border-radius: 0 0 12px 12px;
+          padding: 0.5rem 1.5rem 1.5rem !important;
+          margin-top: 0 !important;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+          border-left: 4px solid #4f46e5; /* Indigo accent */
+        }
+        
+        .key-takeaways-list li {
+          margin-bottom: 0.75rem;
+          color: #f3f3f3;
+          position: relative;
+        }
+        
+        .key-takeaways-list li::before {
+          content: "•";
+          color: #4f46e5; /* Indigo bullet points */
+          font-weight: bold;
+          display: inline-block;
+          width: 1em;
+          margin-left: -1em;
+        }
+        
+        /* BIG PICTURE special styling */
+        .big-picture-container {
+          background-color: #121212; /* Match sidebar background color */
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin: 2rem 0;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+          border-left: 4px solid #10b981; /* Emerald accent */
+        }
+        
+        .big-picture-container h2 {
+          margin-top: 0 !important;
+          border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+          color: #f3f3f3;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+        }
+        
+        .big-picture-text {
+          color: #f3f3f3;
+          font-size: 1.1em;
+          line-height: 1.6;
+          font-weight: 500;
+          padding: 0.5rem 0;
+        }
+        
+        /* Mobile responsiveness for special sections */
+        @media (max-width: 767px) {
+          .key-takeaways-container,
+          .big-picture-container {
+            padding: 1.25rem 1.25rem 0.5rem;
+            border-radius: 10px 10px 0 0;
+          }
+          
+          .key-takeaways-list {
+            padding: 0.5rem 1.25rem 1.25rem !important;
+            border-radius: 0 0 10px 10px;
+          }
+          
+          .big-picture-text {
+            font-size: 1.05em;
+          }
         }
         
         /* Mobile-first responsive text sizing */
