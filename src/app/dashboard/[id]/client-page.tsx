@@ -97,16 +97,32 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
            err.message.includes('503') ||
            err.message.includes('504'));
         
-        // Only consider it a fatal error if:
-        // 1. It's not an abort/network error AND
-        // 2. We've had consistent errors for over 3 minutes
+        // CRITICAL FIX: Only consider it a fatal error if:
+        // 1. It's NOT an abort/network error AND
+        // 2. It's NOT a timeout error AND
+        // 3. We've had consistent NON-NETWORK errors for over 3 minutes
         const now = Date.now();
         const isConsistentError = errorSince && (now - errorSince > 3 * 60 * 1000);
         
+        // NEVER mark abort or network errors as fatal - they're temporary
         if (!isAbort && !isNetworkError && isConsistentError) {
+          console.log('🚨 Marking as fatal error after 3 minutes of consistent non-network errors');
           setIsFatalError(true);
         }
         
+        // For abort/network errors, don't update error state - just continue silently
+        if (isAbort || isNetworkError) {
+          console.log('⏳ Network/abort error detected, continuing polling silently...');
+          // Don't update error state for network issues
+          // Just continue polling with backoff
+          const backoffTime = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          if (pollStart && now - pollStart < 5 * 60 * 1000) {
+            timeoutId = setTimeout(pollStatus, backoffTime);
+          }
+          return; // Don't update error state
+        }
+        
+        // For real errors (not network/abort), update error state
         setIsLoading(false);
         setError(err instanceof Error ? err : new Error('Unknown error'));
         if (!errorSince) setErrorSince(now);
@@ -133,7 +149,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     };
   }, [summaryId, isFatalError]);
 
-  // If error but not fatal, show 'Still processing...'
+  // CRITICAL FIX: Never show errors for network/abort issues - just show processing
   if (error && !isFatalError) {
     return (
       <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0 text-center text-[var(--text-primary)]">
@@ -143,7 +159,7 @@ function ProcessingStatusPoller({ summaryId }: { summaryId: string }) {
     );
   }
 
-  // If fatal error, show real error
+  // If fatal error, show real error (this should now be very rare)
   if (isFatalError) {
     return <div className="text-[var(--text-primary)]">Processing failed. Please try again.</div>;
   }
