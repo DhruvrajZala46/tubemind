@@ -88,9 +88,9 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
     setStatusMessage("Fetching video metadata...");
 
     try {
-      // OPTIMIZED: Use AbortController for timeout management
+      // OPTIMIZED: Use AbortController for timeout management with much longer timeout for long video processing
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout for long videos
       
       const response = await fetch('/api/extract', {
         method: 'POST',
@@ -156,6 +156,32 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       }
     }
     catch (err: any) {
+      // CRITICAL FIX: Handle AbortError (timeout) specifically
+      const isAbortError = err instanceof Error && 
+        (err.name === 'AbortError' || 
+         err.message.includes('aborted') || 
+         err.message.includes('timeout'));
+      
+      if (isAbortError) {
+        // Timeout occurred - but processing continues in background
+        console.log('⏳ Request timed out but processing continues in background');
+        setProcessingStage("transcribing");
+        setProgress(10);
+        setStatusMessage("Processing is taking longer than expected, but continues in the background...");
+        
+        // Show informative toast
+        toast.success("Video submitted successfully! Processing continues - check your dashboard in a few minutes.");
+        
+        // Redirect to dashboard where they can see their processing videos
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 4000);
+        
+        stopSubmitting();
+        return;
+      }
+      
+      // Real error - show error message
       setError(err.message || 'An error occurred');
       setProcessingStage('error');
       stopSubmitting();

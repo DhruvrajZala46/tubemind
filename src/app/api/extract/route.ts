@@ -47,9 +47,9 @@ async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
       // Use dynamic import for node-fetch
       const fetch = (await import('node-fetch')).default;
       
-      // Create timeout controller with longer timeout for video processing
+      // Create timeout controller with much longer timeout for long video processing
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout (videos take time)
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for long videos
       
       try {
         // Make direct HTTP call to worker service
