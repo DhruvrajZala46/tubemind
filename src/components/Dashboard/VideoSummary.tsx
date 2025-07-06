@@ -12,7 +12,7 @@ import Link from 'next/link';
 // ChatGPT-style markdown renderer with typewriter effect
 function ChatGPTMarkdown({ 
   markdown, 
-  typewriterSpeed = 0.5, // Super fast typewriter speed
+  typewriterSpeed = 0.1, // ULTRA-FAST typewriter speed for instant reading
   enableTypewriter = true,
   className = "",
   summaryId = "" // Add summaryId to track if this summary has been viewed
@@ -114,7 +114,7 @@ function ChatGPTMarkdown({
       <Suspense fallback={<div>Loading...</div>}>
         <ReactMarkdown
           components={{
-            h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 lg:mb-8 mt-4 sm:mt-5 lg:mt-6" {...props} />,
+            h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-2 sm:mt-3 lg:mt-4 lightning-heading" {...props} />,
             h2: ({node, ...props}) => {
               const content = props.children?.toString() || '';
               
@@ -123,8 +123,8 @@ function ChatGPTMarkdown({
                 // Set state to indicate we're in the KEY TAKEAWAYS section
                 setTimeout(() => setCurrentSection('key-takeaways'), 0);
                 return (
-                  <div className="key-takeaways-container">
-                    <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 border-b border-[var(--border-color)] pb-2" {...props} />
+                  <div className="key-takeaways-container lightning-section">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
                   </div>
                 );
               }
@@ -134,8 +134,8 @@ function ChatGPTMarkdown({
                 // Set state to indicate we're in the BIG PICTURE section
                 setTimeout(() => setCurrentSection('big-picture'), 0);
                 return (
-                  <div className="big-picture-container">
-                    <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 border-b border-[var(--border-color)] pb-2" {...props} />
+                  <div className="big-picture-container lightning-section">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
                   </div>
                 );
               }
@@ -145,9 +145,9 @@ function ChatGPTMarkdown({
                 setTimeout(() => setCurrentSection('none'), 0);
               }
               
-              // Regular h2 styling for other sections
+              // Regular h2 styling for other sections - OPTIMIZED for speed reading
               return (
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4 lg:mb-5 mt-6 sm:mt-8 lg:mt-10 border-b border-[var(--border-color)] pb-2" {...props} />
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-3 sm:mt-4 lg:mt-5 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
               );
             },
             h3: ({node, ...props}) => <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 mt-4 sm:mt-5 lg:mt-6" {...props} />,
@@ -182,7 +182,7 @@ function ChatGPTMarkdown({
         .chatgpt-markdown {
           font-family: var(--font-sans);
           font-size: 1rem; /* Updated base font size */
-          line-height: 1.6;
+          line-height: 1.5; /* OPTIMIZED: Tighter line height for faster reading */
           color: #e6e6e6;
           background: transparent;
           border: 0;
@@ -192,6 +192,17 @@ function ChatGPTMarkdown({
           width: 100%;
           max-width: 100%;
           overflow-wrap: break-word;
+        }
+        
+        /* ⚡ LIGHTNING READING OPTIMIZATIONS */
+        .lightning-heading {
+          letter-spacing: -0.02em;
+          font-weight: 700 !important;
+          color: #f8f9fa !important;
+        }
+        
+        .lightning-section {
+          margin: 1rem 0 !important;
         }
         
         /* KEY TAKEAWAYS special styling */
@@ -381,20 +392,21 @@ function ChatGPTMarkdown({
         }
         
         .chatgpt-markdown p {
-          margin-bottom: 1.1em; /* Improved spacing */
+          margin-bottom: 0.8em; /* OPTIMIZED: Tighter spacing for faster reading */
           letter-spacing: 0.01em;
+          line-height: 1.5; /* Consistent tight line height */
         }
         
-        /* Desktop paragraph spacing */
+        /* Desktop paragraph spacing - OPTIMIZED */
         @media (min-width: 768px) {
           .chatgpt-markdown p {
-            margin-bottom: 1.1em;
+            margin-bottom: 0.9em; /* Slightly more space on larger screens */
           }
         }
         
         @media (min-width: 1024px) {
           .chatgpt-markdown p {
-            margin-bottom: 1.2em;
+            margin-bottom: 1em; /* Balanced spacing for desktop */
           }
         }
         
@@ -543,17 +555,46 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
     console.log('🔍 VideoSummary: Setting up polling for processing status:', summary.processing_status);
 
-    const pollSummaryStatus = async () => {
-        try {
-        console.log('🔄 VideoSummary: Polling summary status for summaryId:', summaryId);
-          const response = await fetch(`/api/summaries/${summaryId}/status`);
-        
-          if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
+    // CRITICAL FIX: Create AbortController for proper cleanup
+    let abortController = new AbortController();
+    let isComponentMounted = true;
 
-          const data = await response.json();
+    const pollSummaryStatus = async () => {
+      // CRITICAL: Skip if component is unmounted
+      if (!isComponentMounted) {
+        console.log('🚫 VideoSummary: Component unmounted, skipping poll');
+        return;
+      }
+
+      try {
+        console.log('🔄 VideoSummary: Polling summary status for summaryId:', summaryId);
+        
+        // CRITICAL FIX: Use AbortController for proper cancellation
+        const response = await fetch(`/api/summaries/${summaryId}/status`, {
+          signal: abortController.signal,
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        // CRITICAL: Check if component is still mounted before processing response
+        if (!isComponentMounted) {
+          console.log('🚫 VideoSummary: Component unmounted during fetch, ignoring response');
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
         console.log('📊 VideoSummary: Summary status data:', data);
+
+        // CRITICAL: Double-check component is still mounted before state updates
+        if (!isComponentMounted) {
+          console.log('🚫 VideoSummary: Component unmounted before state update, skipping');
+          return;
+        }
 
         // OPTIMIZED: Use actual progress from backend
         const updatedSummary = {
@@ -570,7 +611,7 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         previousSummary.current = updatedSummary;
 
         // CRITICAL: Stop polling immediately when completed or failed
-          if (!isProcessing(data.processing_status)) {
+        if (!isProcessing(data.processing_status)) {
           console.log('✅ VideoSummary: Processing finished, stopping polling. Final status:', data.processing_status);
           if (pollingInterval.current) {
             clearInterval(pollingInterval.current);
@@ -580,24 +621,31 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
         }
 
       } catch (error) {
+        // CRITICAL FIX: Silently handle all abort errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('🔇 VideoSummary: Fetch aborted (component cleanup) - this is normal');
+          return;
+        }
+        
+        // CRITICAL: Only log other errors if component is still mounted
+        if (!isComponentMounted) {
+          console.log('🔇 VideoSummary: Component unmounted, ignoring error');
+          return;
+        }
+        
         console.error('❌ VideoSummary: Error polling summary status:', error);
         
         // CRITICAL FIX: Better error classification
-        const isAbortError = error instanceof Error && 
-          (error.name === 'AbortError' || 
-           error.message.includes('aborted') || 
-           error.message.includes('timeout') ||
-           error.message.includes('fetch'));
-        
         const isNetworkError = error instanceof Error && 
           (error.message.includes('network') || 
            error.message.includes('connection') ||
            error.message.includes('502') ||
            error.message.includes('503') ||
-           error.message.includes('504'));
+           error.message.includes('504') ||
+           error.message.includes('timeout'));
         
-        // Only show error and stop polling for non-network issues
-        if (!isAbortError && !isNetworkError) {
+        // Only show error and stop polling for persistent non-network issues
+        if (!isNetworkError) {
           setError('Failed to check processing status');
           
           // CRITICAL: Stop polling on persistent errors
@@ -606,10 +654,10 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
             clearInterval(pollingInterval.current);
             pollingInterval.current = null;
           }
-          return; // Exit polling function
+          return;
         } else {
-          // For network/abort errors, just continue silently
-          console.log('⏳ VideoSummary: Network/abort error, continuing...');
+          // For network errors, just continue silently
+          console.log('⏳ VideoSummary: Network error, continuing...');
         }
       }
     };
@@ -639,7 +687,15 @@ export default function VideoSummary({ summary: initialSummary, videoId, summary
 
     // CRITICAL: Cleanup function that always runs
     return () => {
-      console.log('🧹 VideoSummary useEffect cleanup - clearing polling interval');
+      console.log('🧹 VideoSummary useEffect cleanup - clearing polling interval and aborting requests');
+      isComponentMounted = false;
+      
+      // Abort any ongoing fetch requests
+      if (abortController) {
+        abortController.abort();
+      }
+      
+      // Clear polling interval
       if (pollingInterval.current) {
         clearInterval(pollingInterval.current);
         pollingInterval.current = null;
