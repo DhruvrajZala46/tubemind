@@ -608,21 +608,25 @@ export async function extractKnowledgeWithOpenAI(
       const chunkIndex = i + index;
       const chunkTranscript = chunk.chunk.map((item: any) => item.text.trim()).join(' ');
       
-      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your task is to extract the key information from this specific chunk.
-      
-      **CRITICAL INSTRUCTIONS:**
-      - Focus ONLY on the content within this chunk.
-      - DO NOT make up information or assume context from other parts of the video.
-      - Provide a concise summary of the key points, conversations, and examples present in this transcript portion.
-      - Maintain the chronological flow of information as it appears in this chunk.
-      - The final output MUST be a clear, well-structured summary of THIS CHUNK ONLY.
+      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your task is to extract the key information from this specific chunk, following the rules below.
 
-      TRANSCRIPT CHUNK:
+      **CRITICAL SUMMARIZATION RULES:**
+      1.  **USE SIMPLE LANGUAGE:** Write in clear, simple English that a 12-year-old can easily understand. Avoid complex words and long sentences.
+      2.  **EXPLAIN ALL JARGON:** If you encounter ANY technical term or complex concept (e.g., "neuroplasticity", "signal transmission"), you MUST immediately explain it in simple terms within parentheses. For example: "neuroplasticity (the brain's amazing ability to change and build new connections)".
+      3.  **ADAPTIVE FORMATTING:**
+          *   For conversations or storytelling, use short, easy-to-read paragraphs.
+          *   If the speaker lists items, steps, or types of things (e.g., "There are three types of changes..."), you MUST format them as a bulleted or numbered list to improve readability. Do not describe a list in a single dense paragraph.
+      4.  **MAINTAIN FLOW:** Summarize the content in the exact chronological order it appears in the transcript chunk. Do not jump around.
+      5.  **FOCUS:** Focus ONLY on the content within this transcript chunk. Do not make up information or infer content from outside this chunk.
+
+      Your output for this chunk should be a clear, well-structured, and easy-to-understand summary.
+
+      **TRANSCRIPT CHUNK TO SUMMARIZE:**
       ${chunkTranscript}`;
 
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
         role: 'system',
-        content: "You are an expert summarizer. Your task is to process a single chunk of a video transcript and provide a clear, concise summary of only that chunk. Focus strictly on the content provided."
+        content: "You are an expert summarizer. Your task is to process a single chunk of a video transcript and provide a clear, concise, and easy-to-understand summary of only that chunk, following strict rules for simplicity and clarity."
       }, {
         role: 'user',
         content: userPrompt
@@ -652,18 +656,17 @@ export async function extractKnowledgeWithOpenAI(
 
   const combinedSummary = validSummaries.map((summary, index) => `--- Summary of Chunk ${index + 1} ---\n${summary}`).join('\n\n');
 
-  const finalUserPrompt = `I have processed a video titled "${videoTitle}" in several chunks. Below are the summaries for each chunk. Your task is to synthesize these individual summaries into a single, cohesive, and comprehensive final summary that flows naturally.
+  const finalUserPrompt = `I have processed a video titled "${videoTitle}" in several chunks. Below are the summaries for each chunk. Your task is to act as a master storyteller and synthesizer. Your goal is to weave these individual summaries into a single, cohesive, and comprehensive final summary that flows perfectly.
 
   **CRITICAL INSTRUCTIONS:**
-  1.  Use the provided system prompt (Ultimate Fast-Flow Video Summary System) to format the final output.
-  2.  The total video duration is **${formatTime(totalDuration)}**. Ensure your final timeline reflects this.
-  3.  Merge the chunk summaries seamlessly. Create logical segments based on topic flow, not on the chunk boundaries.
-  4.  Rewrite and rephrase as needed to ensure a smooth, story-like narrative.
-  5.  Fill any logical gaps between chunks to create a coherent flow.
-  6.  The final output must look like it was generated from the full transcript at once.
-  7.  Ensure the last segment of your final summary ends at exactly **${formatTime(totalDuration)}**.
+  1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Ultimate Fast-Flow Video Summary System" prompt for the final output's structure, tone, and formatting.
+  2.  **CREATE A SEAMLESS NARRATIVE:** Do not simply list the chunk summaries. You must rewrite, rephrase, and connect them to create a single, flowing story. The transitions between topics should feel natural and logical.
+  3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
+  4.  **INTELLIGENT SEGMENTATION:** The chunk summaries are just raw material. You must create new, logical segments based on the actual topic flow of the content. Do not use the original chunk boundaries for your final segments.
+  5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the combined chunk summaries is included in the final output. Nothing can be left out.
+  6.  **FINAL GOAL:** The final output must read as if it were generated from the full transcript at once by a single, brilliant summarizer. The reader should have no idea it was assembled from smaller pieces.
 
-  Here are the chunk summaries:
+  Here are the chunk summaries to synthesize:
   ${combinedSummary}`;
 
   const finalMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
