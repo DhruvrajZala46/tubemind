@@ -584,192 +584,184 @@ export async function extractKnowledgeWithOpenAI(
   totalCost: number,
   videoDurationSeconds: number
 }> {
-  // Remove all chunking logic. Use a single call for all videos.
-  // For videos <= 30 min, use gpt-4.1-nano. For > 30 min, use gpt-4o-mini.
   const model = totalDuration <= 1800 ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4o-mini';
-  logger.info(`[OPENAI] Using model: ${model} for video duration: ${totalDuration}s`);
+  const chunkSeconds = 480; // 8 minutes
+  const overlapSeconds = 120; // 2 minutes
+  logger.info(`[MODEL] Using model: ${model}, chunkSeconds: ${chunkSeconds}, overlapSeconds: ${overlapSeconds}`);
 
   if (!transcript || transcript.length === 0) {
-    throw new OpenAIServiceError(
-      'No transcript available for analysis',
-      'MISSING_TRANSCRIPT',
-      400,
-      false
-    );
+    throw new OpenAIServiceError('No transcript available for analysis', 'MISSING_TRANSCRIPT', 400, false);
   }
 
-  // Format transcript as before
-  let formattedTranscript = formatTranscriptByMinutes(transcript, 60, totalDuration);
+  const chunks = splitTranscriptIntoChunks(transcript, chunkSeconds, overlapSeconds, totalDuration);
+  const batchSize = 10;
+  logger.info(`[MAP] Split transcript into ${chunks.length} chunks. Processing in batches of ${batchSize}.`);
 
-  // Token counting and truncation logic (as before)
-  const systemPromptTokens = encode(SYSTEM_PROMPT).length;
-  let transcriptTokens = encode(formattedTranscript).length;
-  const maxContextTokens = 128000; // For gpt-4.1-nano and gpt-4o-mini
-  const userPromptBase = `Here is the full transcript, chunked by minute for your reference:\n\n`;
-  const userPromptBaseTokens = encode(userPromptBase).length;
-  const durationInstruction = `**CRITICAL: This video is exactly ${formatTime(totalDuration)} (${totalDuration} seconds) long.**\n\n**🚨 MANDATORY FULL VIDEO COVERAGE REQUIREMENTS:**
-1. You MUST cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}
-2. You MUST create segments that span the complete ${formatTime(totalDuration)} timeline
-3. You MUST NOT stop before ${formatTime(totalDuration)}
-4. You MUST use INTELLIGENT segmentation based on content flow, NOT fixed time ranges
-5. You MUST break segments when topics change, conversations shift, or new concepts are introduced
-6. You MUST ensure the last segment ends at exactly ${formatTime(totalDuration)}
-7. You MUST process every single second of the ${formatTime(totalDuration)} video
-8. You MUST include the conclusion, credits, and any final thoughts
-9. You MUST continue until the very last word is spoken
-10. You MUST NOT assume the video is "done" until you reach ${formatTime(totalDuration)}
+  await updateProgress?.('summarizing', 20, `Analyzing ${chunks.length} content chunks...`);
 
-**SEGMENTATION RULES:**
-- Break when speaker introduces new topic
-- Break when conversation direction changes  
-- Break when story/example ends
-- Break when emotional tone shifts
-- Break when moving from problem to solution
-- Break when transitioning between concepts
-- DO NOT use arbitrary time-based breaks
+  let chunkSummaries: (string | null)[] = [];
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    logger.info(`[MAP] Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(chunks.length / batchSize)}...`);
+    
+    const batchResults = await Promise.all(batch.map(async (chunk, index) => {
+      const chunkIndex = i + index;
+      const chunkTranscript = chunk.chunk.map((item: any) => item.text.trim()).join(' ');
+      
+      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your task is to extract the key information from this specific chunk.
+      
+      **CRITICAL INSTRUCTIONS:**
+      - Focus ONLY on the content within this chunk.
+      - DO NOT make up information or assume context from other parts of the video.
+      - Provide a concise summary of the key points, conversations, and examples present in this transcript portion.
+      - Maintain the chronological flow of information as it appears in this chunk.
+      - The final output MUST be a clear, well-structured summary of THIS CHUNK ONLY.
 
-**FINAL VERIFICATION:**
-Before finishing, verify that your last segment ends at exactly ${formatTime(totalDuration)} and covers all content until the very end.
+      TRANSCRIPT CHUNK:
+      ${chunkTranscript}`;
 
-Please analyze this transcript and create an engaging, comprehensive summary following the format specified in the system prompt.`;
-  const durationInstructionTokens = encode(durationInstruction).length;
-  let totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
+      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
+        role: 'system',
+        content: "You are an expert summarizer. Your task is to process a single chunk of a video transcript and provide a clear, concise summary of only that chunk. Focus strictly on the content provided."
+      }, {
+        role: 'user',
+        content: userPrompt
+      }];
 
-  // Truncate transcript if needed
-  if (totalPromptTokens > maxContextTokens) {
-    logger.warn(`Prompt exceeds model context window (${totalPromptTokens} > ${maxContextTokens}). Truncating transcript from the start.`);
-    // Remove lines from the start until under the limit
-    let transcriptLines = formattedTranscript.split('\n');
-    while (totalPromptTokens > maxContextTokens && transcriptLines.length > 0) {
-      transcriptLines.shift();
-      formattedTranscript = transcriptLines.join('\n');
-      transcriptTokens = encode(formattedTranscript).length;
-      totalPromptTokens = systemPromptTokens + userPromptBaseTokens + transcriptTokens + durationInstructionTokens;
-    }
-    logger.warn(`Truncated transcript to fit context window. Final prompt tokens: ${totalPromptTokens}`);
+      try {
+        const response = await callOpenAIWithRetry(messages, model, chunkIndex);
+        return response.choices[0]?.message?.content || null;
+      } catch (error) {
+        logger.error(
+          `[CHUNK] Error processing chunk ${chunkIndex + 1}:`,
+          {
+            error: error instanceof Error ? { message: error.message, stack: error.stack } : error 
+          }
+        );
+        return null; // Return null on error to avoid breaking the whole process
+      }
+    }));
+    
+    chunkSummaries.push(...batchResults);
+    await updateProgress?.('summarizing', 20 + Math.round((Math.min(i + batchSize, chunks.length) / chunks.length) * 50), `Analyzed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks...`);
   }
-  logger.info(`Prompt token count: ${totalPromptTokens} (system: ${systemPromptTokens}, transcript: ${transcriptTokens})`);
 
-  logger.info('\n📝 TRANSCRIPT FORMATTED FOR OPENAI (length: ' + formattedTranscript.length + ' chars)');
+  const validSummaries = chunkSummaries.filter(s => s !== null) as string[];
+  logger.info(`[REDUCE] Starting merge level 1. Merging ${validSummaries.length} summaries into 1.`);
+  await updateProgress?.('summarizing', 75, 'Merging chunk summaries...');
 
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    {
-      role: 'system',
-      content: SYSTEM_PROMPT
-    },
-    {
-      role: 'user',
-      content: `${userPromptBase}${formattedTranscript}\n\n${durationInstruction}`
-    }
-  ];
+  const combinedSummary = validSummaries.map((summary, index) => `--- Summary of Chunk ${index + 1} ---\n${summary}`).join('\n\n');
 
-  const startTime = Date.now();
-  logger.info(`[OPENAI] API call start at ${new Date(startTime).toISOString()}`);
-  const response = await getOpenAIClient().chat.completions.create({
-    model,
-    messages: messages,
-    temperature: 0.9,
-    max_tokens: 4096,
-    stream: false
-  });
-  const endTime = Date.now();
-  logger.info(`[OPENAI] API call successful in ${endTime - startTime}ms`);
+  const finalUserPrompt = `I have processed a video titled "${videoTitle}" in several chunks. Below are the summaries for each chunk. Your task is to synthesize these individual summaries into a single, cohesive, and comprehensive final summary that flows naturally.
 
-  const modelUsed = response.model;
-  logger.info(`Model used: ${modelUsed}`);
+  **CRITICAL INSTRUCTIONS:**
+  1.  Use the provided system prompt (Ultimate Fast-Flow Video Summary System) to format the final output.
+  2.  The total video duration is **${formatTime(totalDuration)}**. Ensure your final timeline reflects this.
+  3.  Merge the chunk summaries seamlessly. Create logical segments based on topic flow, not on the chunk boundaries.
+  4.  Rewrite and rephrase as needed to ensure a smooth, story-like narrative.
+  5.  Fill any logical gaps between chunks to create a coherent flow.
+  6.  The final output must look like it was generated from the full transcript at once.
+  7.  Ensure the last segment of your final summary ends at exactly **${formatTime(totalDuration)}**.
 
-  const rawOutput = response.choices[0]?.message?.content || '';
+  Here are the chunk summaries:
+  ${combinedSummary}`;
+
+  const finalMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
+    role: 'system',
+    content: SYSTEM_PROMPT,
+  }, {
+    role: 'user',
+    content: finalUserPrompt,
+  }];
+
+  logger.info(`[REDUCE] Calling final merge API...`);
+  const finalResponse = await callOpenAIWithRetry(finalMessages, 'gpt-4o-mini', -1); // Use a more capable model for merging
+  const rawOutput = finalResponse.choices[0]?.message?.content || '';
+  await updateProgress?.('summarizing', 95, 'Finalizing summary...');
+
   if (!rawOutput) {
-    throw new OpenAIServiceError(
-      'OpenAI returned empty response',
-      'EMPTY_RESPONSE',
-      500,
-      true
-    );
+    throw new OpenAIServiceError('OpenAI returned empty response during final merge', 'EMPTY_RESPONSE', 500, true);
   }
-  logger.info('RAW OPENAI OUTPUT', { rawOutput });
+
+  logger.info('RAW FINAL OPENAI OUTPUT', { rawOutput });
 
   const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
-  parsedResponse.mainTitle = `[Model: ${modelUsed}] ${parsedResponse.mainTitle}`;
+  parsedResponse.mainTitle = `[Model: ${model}] ${parsedResponse.mainTitle}`;
 
-      // CRITICAL FIX: Ensure complete video coverage
-    if (parsedResponse.segments && parsedResponse.segments.length > 0) {
-      const firstSegment = parsedResponse.segments[0];
-      const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
-      
-      // Ensure first segment starts at 0:00
-      if (firstSegment.startTime > 30) {
-        logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
-        parsedResponse.segments.unshift({
-          title: 'Introduction',
-          startTime: 0,
-          endTime: firstSegment.startTime,
-          timestamp: `0:00–${formatTime(firstSegment.startTime)}`,
-          hook: 'Video introduction and setup',
-          narratorSummary: 'The video begins with an introduction and setup phase.'
-        });
-      }
-      
-      // CRITICAL: Ensure last segment ends at video end
-      if (lastSegment.endTime < totalDuration - 30) {
-        logger.warn(`🚨 CRITICAL: Last segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding final segment!`);
-        parsedResponse.segments.push({
-          title: 'Conclusion and Final Thoughts',
-          startTime: lastSegment.endTime,
-          endTime: totalDuration,
-          timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`,
-          hook: 'Wrapping up the video content',
-          narratorSummary: 'The video concludes with final thoughts, takeaways, and any closing remarks.'
-        });
-      } else if (lastSegment.endTime < totalDuration) {
-        // Just extend the last segment
-        logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
-        lastSegment.endTime = totalDuration;
-        lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
-      }
-      
-      // Check for gaps and fill them
-      for (let i = 0; i < parsedResponse.segments.length - 1; i++) {
-        const current = parsedResponse.segments[i];
-        const next = parsedResponse.segments[i + 1];
-        const gap = next.startTime - current.endTime;
-        
-        if (gap > 60) { // Gap larger than 1 minute
-          logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
-          parsedResponse.segments.splice(i + 1, 0, {
-            title: 'Additional Content',
-            startTime: current.endTime,
-            endTime: next.startTime,
-            timestamp: `${formatTime(current.endTime)}–${formatTime(next.startTime)}`,
-            hook: 'Continued discussion and examples',
-            narratorSummary: 'The video continues with additional content and examples.'
-          });
-          i++; // Skip the newly inserted segment
-        }
-      }
-      
-      // FINAL VERIFICATION: Double-check complete coverage
-      const finalFirst = parsedResponse.segments[0];
-      const finalLast = parsedResponse.segments[parsedResponse.segments.length - 1];
-      
-      if (finalFirst.startTime > 0) {
-        logger.error(`🚨 CRITICAL ERROR: First segment doesn't start at 0:00! It starts at ${formatTime(finalFirst.startTime)}`);
-      }
-      
-      if (finalLast.endTime < totalDuration) {
-        logger.error(`🚨 CRITICAL ERROR: Last segment doesn't end at video duration! It ends at ${formatTime(finalLast.endTime)}, should be ${formatTime(totalDuration)}`);
-      }
-      
-      logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(finalFirst.startTime)} to ${formatTime(finalLast.endTime)} (target: 0:00 to ${formatTime(totalDuration)})`);
+  // CRITICAL FIX: Ensure complete video coverage
+  if (parsedResponse.segments && parsedResponse.segments.length > 0) {
+    const firstSegment = parsedResponse.segments[0];
+    const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
+    
+    if (firstSegment.startTime > 30) {
+      logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
+      parsedResponse.segments.unshift({
+        title: 'Introduction',
+        startTime: 0,
+        endTime: firstSegment.startTime,
+        timestamp: `0:00–${formatTime(firstSegment.startTime)}`,
+        hook: 'Video introduction and setup',
+        narratorSummary: 'The video begins with an introduction and setup phase.'
+      });
     }
+    
+    if (lastSegment.endTime < totalDuration - 30) {
+      logger.warn(`🚨 CRITICAL: Last segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding final segment!`);
+      parsedResponse.segments.push({
+        title: 'Conclusion and Final Thoughts',
+        startTime: lastSegment.endTime,
+        endTime: totalDuration,
+        timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`,
+        hook: 'Wrapping up the video content',
+        narratorSummary: 'The video concludes with final thoughts, takeaways, and any closing remarks.'
+      });
+    } else if (lastSegment.endTime < totalDuration) {
+      logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
+      lastSegment.endTime = totalDuration;
+      lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
+    }
+    
+    for (let i = 0; i < parsedResponse.segments.length - 1; i++) {
+      const current = parsedResponse.segments[i];
+      const next = parsedResponse.segments[i + 1];
+      const gap = next.startTime - current.endTime;
+      
+      if (gap > 60) {
+        logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
+        parsedResponse.segments.splice(i + 1, 0, {
+          title: 'Additional Content',
+          startTime: current.endTime,
+          endTime: next.startTime,
+          timestamp: `${formatTime(current.endTime)}–${formatTime(next.startTime)}`,
+          hook: 'Continued discussion and examples',
+          narratorSummary: 'The video continues with additional content and examples.'
+        });
+        i++;
+      }
+    }
+    
+    const finalFirst = parsedResponse.segments[0];
+    const finalLast = parsedResponse.segments[parsedResponse.segments.length - 1];
+    
+    if (finalFirst.startTime > 0) {
+      logger.error(`🚨 CRITICAL ERROR: First segment doesn't start at 0:00! It starts at ${formatTime(finalFirst.startTime)}`);
+    }
+    
+    if (finalLast.endTime < totalDuration) {
+      logger.error(`🚨 CRITICAL ERROR: Last segment doesn't end at video duration! It ends at ${formatTime(finalLast.endTime)}, should be ${formatTime(totalDuration)}`);
+    }
+    
+    logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(finalFirst.startTime)} to ${formatTime(finalLast.endTime)} (target: 0:00 to ${formatTime(totalDuration)})`);
+  }
+
   return {
     ...parsedResponse,
     rawOpenAIOutput: rawOutput,
-    transcriptSent: formattedTranscript,
+    transcriptSent: "Transcript processed in chunks.",
     openaiOutput: rawOutput,
-    promptTokens: response.usage?.prompt_tokens || 0,
-    completionTokens: response.usage?.completion_tokens || 0,
-    totalTokens: response.usage?.total_tokens || 0,
+    promptTokens: finalResponse.usage?.prompt_tokens || 0,
+    completionTokens: finalResponse.usage?.completion_tokens || 0,
+    totalTokens: finalResponse.usage?.total_tokens || 0,
     inputCost: 0,
     outputCost: 0,
     totalCost: 0,
@@ -806,7 +798,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️��️🗡️⚔️🔫🏹🛡️🔧🔩⚙️️⚖️🔗⚗️🧪🧫🧬🔬🔭📡💉💊🩹🩺🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
