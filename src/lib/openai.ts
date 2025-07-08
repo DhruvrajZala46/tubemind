@@ -606,27 +606,26 @@ export async function extractKnowledgeWithOpenAI(
     
     const batchResults = await Promise.all(batch.map(async (chunk, index) => {
       const chunkIndex = i + index;
-      const chunkTranscript = chunk.chunk.map((item: any) => item.text.trim()).join(' ');
+      const chunkTranscript = chunk.chunk.map((item: any) => `[${formatTime(item.start)}] ${item.text.trim()}`).join('\n');
       
-      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your task is to extract the key information from this specific chunk, following the rules below.
+      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your mission is to act as a **Content Restructurer and Clarifier**, not a summarizer. Your goal is to take the raw transcript chunk and make it perfectly clear and readable **without losing a single piece of information.**
 
-      **CRITICAL SUMMARIZATION RULES:**
-      1.  **USE SIMPLE LANGUAGE:** Write in clear, simple English that a 12-year-old can easily understand. Avoid complex words and long sentences.
-      2.  **EXPLAIN ALL JARGON:** If you encounter ANY technical term or complex concept (e.g., "neuroplasticity", "signal transmission"), you MUST immediately explain it in simple terms within parentheses. For example: "neuroplasticity (the brain's amazing ability to change and build new connections)".
-      3.  **ADAPTIVE FORMATTING:**
-          *   For conversations or storytelling, use short, easy-to-read paragraphs.
-          *   If the speaker lists items, steps, or types of things (e.g., "There are three types of changes..."), you MUST format them as a bulleted or numbered list to improve readability. Do not describe a list in a single dense paragraph.
-      4.  **MAINTAIN FLOW:** Summarize the content in the exact chronological order it appears in the transcript chunk. Do not jump around.
-      5.  **FOCUS:** Focus ONLY on the content within this transcript chunk. Do not make up information or infer content from outside this chunk.
+      **CRITICAL RESTRUCTURING RULES:**
+      1.  **DO NOT OMIT ANY DETAILS:** You must include every point, example, story, and nuance from the transcript. Your output should contain 100% of the original information, just presented more clearly.
+      2.  **USE SIMPLE LANGUAGE:** Rewrite complex sentences into clear, simple English that a 12-year-old can easily understand.
+      3.  **EXPLAIN ALL JARGON:** If you encounter ANY technical term, you MUST immediately explain it in simple terms within parentheses. For example: "neuroplasticity (the brain's ability to change)".
+      4.  **ADAPTIVE FORMATTING:** If the speaker lists items, steps, or types of things, you MUST format them as a bulleted or numbered list. Use paragraphs for storytelling.
+      5.  **MAINTAIN FLOW:** Present the content in the exact chronological order it appears in the transcript chunk.
+      6.  **DETECT CONVERSATIONS:** If the transcript appears to be a conversation between two or more people, preserve that back-and-forth dynamic. Do not reformat it as a monologue from a single speaker. Structure the text to make it clear that a dialogue is taking place.
 
-      Your output for this chunk should be a clear, well-structured, and easy-to-understand summary.
+      Your output for this chunk must be a complete and clear representation of the original content.
 
-      **TRANSCRIPT CHUNK TO SUMMARIZE:**
+      **TRANSCRIPT CHUNK TO RESTRUCTURE AND CLARIFY:**
       ${chunkTranscript}`;
 
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
         role: 'system',
-        content: "You are an expert summarizer. Your task is to process a single chunk of a video transcript and provide a clear, concise, and easy-to-understand summary of only that chunk, following strict rules for simplicity and clarity."
+        content: "You are an expert Content Restructurer and Clarifier. Your task is to take a raw video transcript chunk and make it perfectly clear, readable, and easy to understand, without omitting any information. Your job is to clarify and format, not to shorten."
       }, {
         role: 'user',
         content: userPrompt
