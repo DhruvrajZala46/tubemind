@@ -189,13 +189,24 @@ export async function POST(request: NextRequest) {
       videoDbId = existingVideo[0].id;
       logger.info(`Existing video found in DB with id: ${videoDbId}`, { videoId });
       await executeQuery(sql => 
-        sql`UPDATE videos SET ${sql(videoData)} WHERE id = ${videoDbId}`
+        sql`UPDATE videos SET 
+            user_id = ${videoData.user_id},
+            video_id = ${videoData.video_id},
+            title = ${videoData.title},
+            description = ${videoData.description},
+            thumbnail_url = ${videoData.thumbnail_url},
+            channel_title = ${videoData.channel_title},
+            duration = ${videoData.duration},
+            view_count = ${videoData.view_count},
+            publish_date = ${videoData.publish_date}
+          WHERE id = ${videoDbId}`
       );
     } else {
       videoDbId = randomUUID();
       logger.info(`Creating new video in DB with id: ${videoDbId}`, { videoId });
       await executeQuery(sql => 
-        sql`INSERT INTO videos ${sql({ id: videoDbId, ...videoData })}`
+        sql`INSERT INTO videos (id, user_id, video_id, title, description, thumbnail_url, channel_title, duration, view_count, publish_date)
+           VALUES (${videoDbId}, ${videoData.user_id}, ${videoData.video_id}, ${videoData.title}, ${videoData.description}, ${videoData.thumbnail_url}, ${videoData.channel_title}, ${videoData.duration}, ${videoData.view_count}, ${videoData.publish_date})`
       );
     }
 
@@ -217,7 +228,8 @@ export async function POST(request: NextRequest) {
     };
     
     await executeQuery(sql => 
-      sql`INSERT INTO video_summaries ${sql(summaryData)}`
+      sql`INSERT INTO video_summaries (id, video_id, main_title, processing_status, video_duration_seconds, overall_summary, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost)
+         VALUES (${summaryData.id}, ${summaryData.video_id}, ${summaryData.main_title}, ${summaryData.processing_status}, ${summaryData.video_duration_seconds}, ${summaryData.overall_summary}, ${summaryData.raw_ai_output}, ${summaryData.transcript_sent}, ${summaryData.prompt_tokens}, ${summaryData.completion_tokens}, ${summaryData.total_tokens}, ${summaryData.input_cost}, ${summaryData.output_cost}, ${summaryData.total_cost})`
     );
 
     logger.info(`✅ Job created and saved to DB. Summary ID: ${summaryId}`, { userId, videoId });
