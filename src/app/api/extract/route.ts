@@ -14,177 +14,66 @@ import { canUserPerformAction, reserveCredits, releaseCredits } from '../../../l
 import { getOrCreateUser } from '../../../lib/auth-utils';
 import { randomUUID } from 'crypto';
 
-// Define JobData interface locally
-interface JobData {
-  videoId: string;
-  videoDbId: string;
-  summaryDbId: string;
-  userId: string;
-  userEmail: string;
-  user: { id: string; email: string; name?: string };
-  metadata: any;
-  totalDurationSeconds: number;
-  creditsNeeded: number;
-  youtubeUrl: string;
-}
+// This is the correct function to enqueue jobs, no JobQueue class needed.
+async function enqueueJobToCloudTasks(jobData: any): Promise<void> {
+    const workerUrl = process.env.WORKER_SERVICE_URL;
+    if (!workerUrl) {
+        logger.error('WORKER_SERVICE_URL is not set. Cannot enqueue job.');
+        // In a real scenario, you'd have a more robust fallback, but for now, we prevent it from crashing.
+        // The job is in the DB, a separate process could pick it up.
+        return;
+    }
 
-// Cloud Tasks integration with Vercel-compatible fallback
-async function enqueueJobToCloudTasks(jobData: JobData): Promise<string> {
-  const project = process.env.GCP_PROJECT || 'agile-entry-463508-u6';
-  const queue = process.env.CLOUD_TASKS_QUEUE || 'video-processing-queue';
-  const location = process.env.CLOUD_TASKS_LOCATION || 'us-central1';
-  const workerUrl = process.env.WORKER_SERVICE_URL || 'https://tubemind-worker-304961481608.us-central1.run.app';
-  
-  // Check if we're in Vercel environment - use HTTP API instead of SDK
-  if (process.env.VERCEL || process.env.VERCEL_ENV) {
     try {
-      logger.info('Using direct HTTP call to worker (Vercel environment)', { 
-        videoId: jobData.videoId,
-        userId: jobData.userId,
-        workerUrl 
-      });
-      
-      // Use dynamic import for node-fetch
-      const fetch = (await import('node-fetch')).default;
-      
-      // Create timeout controller with much longer timeout for long video processing
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for long videos
-      
-      try {
-        // Make direct HTTP call to worker service
-        // Note: This is fire-and-forget - worker will continue even if this times out
-        const response = await fetch(workerUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(jobData),
-          signal: controller.signal
+        logger.info('Enqueuing job via direct HTTP POST to worker (fire-and-forget)', { 
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+            workerUrl 
         });
         
-        clearTimeout(timeoutId);
+        // Use dynamic import for node-fetch
+        const fetch = (await import('node-fetch')).default;
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          logger.error('Worker service returned error', { 
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText,
-            videoId: jobData.videoId,
-            userId: jobData.userId,
-            workerUrl
-          });
-          // Don't throw - let it fall through to success (worker may still process)
-          logger.info('Worker call failed but job is queued in database - processing may continue', {
-            videoId: jobData.videoId,
-            userId: jobData.userId
-          });
-        } else {
-          const result = await response.json();
-          logger.info('Worker service responded successfully', { 
-            videoId: jobData.videoId,
-            userId: jobData.userId,
-            result
-          });
-        }
-        
-        return `direct-call-${jobData.summaryDbId}`;
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        
-        // If it's a timeout, that's OK - worker continues in background
-        if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
-          logger.info('Worker call timed out but job is queued - processing continues in background', {
-            videoId: jobData.videoId,
-            userId: jobData.userId,
-            timeout: '30s'
-          });
-          return `timeout-ok-${jobData.summaryDbId}`;
-        }
-        
-        throw fetchError;
-      }
+        // We do NOT await this call. This is "fire-and-forget".
+        fetch(workerUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(jobData),
+        }).catch(fetchError => {
+            // Log the error but do not throw, as the API has already returned a successful response.
+            // The worker infrastructure should handle retries based on jobs in the DB.
+            logger.error('Fire-and-forget worker call failed.', {
+                error: fetchError.message,
+                videoId: jobData.videoId,
+                userId: jobData.userId,
+            });
+        });
+
     } catch (error: any) {
-      logger.error('Direct worker call failed', { 
-        error: error.message,
-        videoId: jobData.videoId,
-        userId: jobData.userId,
-        workerUrl,
-        stack: error.stack
-      });
-      
-      // For now, don't throw - let the job stay in database queue
-      // In production, you might want to implement a retry mechanism
-      return `failed-${jobData.summaryDbId}`;
+        logger.error('Failed to initiate fire-and-forget worker call.', { 
+            error: error.message,
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+            stack: error.stack
+        });
     }
-  } else {
-    // Use Cloud Tasks SDK for non-Vercel environments
-    try {
-      const { CloudTasksClient } = await import('@google-cloud/tasks');
-      
-      const client = new CloudTasksClient();
-      const parent = client.queuePath(project, location, queue);
-      
-      const task = {
-        httpRequest: {
-          httpMethod: 'POST' as const,
-          url: workerUrl,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: Buffer.from(JSON.stringify(jobData)).toString('base64'),
-        },
-      };
-      
-      logger.info('Creating Cloud Tasks job', { 
-        videoId: jobData.videoId,
-        userId: jobData.userId,
-        queue: parent,
-        workerUrl 
-      });
-      
-      const request = { parent: parent, task: task };
-      const [response] = await client.createTask(request);
-      
-      logger.info('Cloud Tasks job created successfully', { 
-        taskName: response.name,
-        videoId: jobData.videoId,
-        userId: jobData.userId 
-      });
-      
-      return response.name || `task-${jobData.summaryDbId}`;
-      
-    } catch (error: any) {
-      logger.error('Failed to create Cloud Tasks job', { 
-        error: error.message,
-        videoId: jobData.videoId,
-        userId: jobData.userId 
-      });
-      
-      return `fallback-${jobData.summaryDbId}`;
-    }
-  }
 }
 
-// Fallback: Add job to database for manual processing
-async function addJobToDatabase(jobData: JobData): Promise<void> {
-  await executeQuery(async (sql: any) => {
-    await sql`
-      INSERT INTO video_summaries (id, video_id, main_title, overall_summary, processing_status, created_at, updated_at, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost, video_duration_seconds, job_data)
-      VALUES (${jobData.summaryDbId}, ${jobData.videoDbId}, ${jobData.metadata.title}, '', 'queued', NOW(), NOW(), '', '', 0, 0, 0, 0, 0, 0, ${jobData.totalDurationSeconds}, ${JSON.stringify(jobData)})
-      ON CONFLICT (id) DO UPDATE SET job_data = EXCLUDED.job_data
-    `;
-  });
-}
 
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  logger.info('🎬 Video extraction API request received', { userId: null, email: null });
+  logger.info('🎬 Video extraction API request received');
   metrics.apiRequest('/extract', 'POST', 0, startTime);
+
+  let userId: string | null = null;
+  let videoId: string | null = null;
+  let summaryId: string | null = null;
+  let creditsReserved = 0;
 
   try {
     const { url } = await request.json();
@@ -192,21 +81,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 });
     }
 
-    const videoId = extractVideoId(url);
+    videoId = extractVideoId(url);
     if (!videoId) {
       return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
     }
 
     const user = await currentUser();
     if (!user) {
-      logger.warn('Authentication failed - no user found', { userId: null, email: null });
+      logger.warn('Authentication failed - no user found');
       return NextResponse.json({ error: 'Authentication required. Please sign in.' }, { status: 401 });
     }
-    await getOrCreateUser(user);
-
-    const userId = user.id;
-    const userEmail = user.emailAddresses[0]?.emailAddress || '';
+    
+    const dbUser = await getOrCreateUser(user);
+    userId = dbUser.id;
+    const userEmail = dbUser.email || '';
     logger.info('User authenticated', { userId, email: userEmail });
+
+    if (!userId) {
+      // This should theoretically never happen if the above logic is correct, but it satisfies TypeScript.
+      return NextResponse.json({ error: 'Failed to identify user.' }, { status: 500 });
+    }
 
     const subscription = await getUserSubscription(userId);
     if (!subscription) {
@@ -220,7 +114,8 @@ export async function POST(request: NextRequest) {
         tier: subscription.tier,
         status: subscription.status,
         creditsUsed: subscription.creditsUsed,
-        creditsLimit: subscription.creditsLimit
+        creditsLimit: subscription.creditsLimit,
+        creditsReserved: subscription.creditsReserved,
       }
     });
 
@@ -229,172 +124,153 @@ export async function POST(request: NextRequest) {
       try {
         metadata = await getVideoMetadata(videoId);
         cache.cacheVideoMetadata(videoId, metadata);
-        console.log(`📊 Fresh metadata fetched for video: ${videoId}`);
+        logger.info(`📊 Fresh metadata fetched for video: ${videoId}`);
       } catch (error: any) {
-        logger.error('Failed to fetch video metadata', { userId, data: { videoId, error: error.message } });
+        logger.error('Failed to fetch video metadata', { userId, videoId, error: error.message });
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
     } else {
-      console.log(`⚡ Cache HIT for metadata: ${videoId}`);
+      logger.info(`⚡️ Cache HIT for metadata: ${videoId}`);
     }
 
     const totalDurationSeconds = metadata.durationInSeconds || 0;
     const creditsNeeded = calculateVideoCredits(totalDurationSeconds);
     
-    // Check if user has enough credits with improved validation
-    const creditsUsed = subscription.creditsUsed || 0;
-    const creditsReserved = subscription.creditsReserved || 0;
-    const creditsLimit = subscription.creditsLimit || 0;
-    // FIX: Don't double-count reserved credits - they're for OTHER pending jobs
-    const totalAvailable = Math.max(0, creditsLimit - creditsUsed);
-    
-    if (creditsNeeded > totalAvailable) {
-      logger.warn('Credit limit exceeded', { 
-        userId, 
-        data: { 
-          creditsNeeded, 
-          available: totalAvailable, 
-          creditsUsed,
-          creditsReserved,
-          creditsLimit,
-          tier: subscription.tier 
-        } 
-      });
-      
-      // Provide a more detailed error message
+    const permission = await canUserPerformAction(userId, 'extract_video', creditsNeeded);
+    if (!permission.allowed) {
+      logger.warn('User has insufficient credits or permission denied.', { userId, reason: permission.reason });
       return NextResponse.json({ 
-        error: `Credit limit exceeded. You need ${creditsNeeded} credits for this video but only have ${totalAvailable} credits available.`, 
-        subscription: { 
-          tier: subscription.tier, 
-          creditsUsed: creditsUsed,
-          creditsReserved: creditsReserved,
-          creditsLimit: creditsLimit,
-          available: totalAvailable
-        } 
-      }, { status: 403 });
+        error: permission.reason || 'Insufficient credits. Please upgrade your plan or wait for your credits to reset.' 
+      }, { status: 402 });
     }
 
-    // Reserve credits before queueing the job to prevent race conditions
-    try {
-      await reserveCredits(userId, creditsNeeded);
-      // Invalidate cache immediately after reserving credits
-      cache.invalidateUserSubscription(userId);
-      
-      logger.info('Credits reserved successfully', {
-        userId,
-        data: {
-          creditsNeeded,
-          previouslyAvailable: totalAvailable,
-          newAvailable: totalAvailable - creditsNeeded
-        }
-      });
-    } catch (creditError: any) {
-      logger.error('Failed to reserve credits', { userId, error: creditError.message });
-      return NextResponse.json({ error: 'Failed to reserve credits. Please try again.' }, { status: 500 });
+    // Restore the check for already processed videos
+    const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string}[]>(sql => 
+      sql`SELECT v.id, vs.id as summary_id 
+         FROM videos v 
+         JOIN video_summaries vs ON v.id = vs.video_id 
+         WHERE v.video_id = ${videoId!} AND vs.user_id = ${userId} AND vs.processing_status = 'completed'`
+    );
+
+    if (existingVideoAndSummary && existingVideoAndSummary.length > 0) {
+        logger.info(`Video already processed for user. Returning existing summary.`, { userId, videoId, summaryId: existingVideoAndSummary[0].summary_id });
+        return NextResponse.json({
+            message: 'Video already processed. Returning existing summary.',
+            videoId: existingVideoAndSummary[0].id,
+            summaryId: existingVideoAndSummary[0].summary_id,
+            status: 'completed'
+        }, { status: 200 });
     }
 
-    const existingVideo = await dbWithRetry(async () => {
-      return await executeQuery(async (sql) => {
-        return await sql`
-          SELECT v.id, v.video_id, vs.id as summary_id, 'completed' as processing_status, vs.main_title
-          FROM videos v
-          LEFT JOIN video_summaries vs ON v.id = vs.video_id
-          WHERE v.user_id = ${userId} AND v.video_id = ${videoId}
-          LIMIT 1
-        `;
-      });
-    }, 'Check Existing Video');
-    
-    if (existingVideo.length > 0) {
-      logger.info('Video already processed for this user, returning cached result');
-      return NextResponse.json({
-        success: true,
-        data: {
-          videoId,
-          summaryId: existingVideo[0].summary_id,
-          alreadyProcessed: true,
-          processingStatus: existingVideo[0].processing_status || 'completed',
-          title: existingVideo[0].main_title,
-          message: 'Video already processed',
-          redirectUrl: `/dashboard/${existingVideo[0].id}`
-        }
-      });
-    }
+    await reserveCredits(userId, creditsNeeded);
+    creditsReserved = creditsNeeded;
+    logger.info(`🔒 ${creditsNeeded} credits reserved for user ${userId}`);
 
-    const securityCheck = await validateVideoProcessingRequest(userId);
-    if (!securityCheck.allowed) {
-      logger.warn('Security check failed (rate-limit)', { userId, data: { videoId, reason: securityCheck.reason } });
-      return NextResponse.json({ error: securityCheck.reason }, { status: 429 });
-    }
-
+    summaryId = randomUUID();
     let videoDbId: string;
-    try {
-      const videoInsertResult = await dbWithRetry(async () => {
-        return await executeQuery(async (sql) => {
-          return await sql`
-            INSERT INTO videos (user_id, video_id, title, description, thumbnail_url, channel_title, duration, view_count, publish_date)
-            VALUES (${userId}, ${videoId}, ${metadata.title}, ${metadata.description || ''}, ${metadata.thumbnailUrl || ''}, ${metadata.channelTitle || ''}, ${totalDurationSeconds}, ${parseInt(metadata.viewCount) || 0}, NOW())
-            RETURNING id
-          `;
-        });
-      }, 'Create Video Entry');
-      videoDbId = videoInsertResult[0].id;
-    } catch (error: any) {
-      logger.error('Failed to create video entry', { userId, data: { videoId, error: error.message } });
-      return NextResponse.json({ error: 'Failed to create video entry.' }, { status: 500 });
+
+    const videoData = {
+      user_id: userId,
+      video_id: videoId,
+      title: metadata.title,
+      description: metadata.description,
+      thumbnail_url: metadata.thumbnailUrl,
+      channel_title: metadata.channelTitle,
+      duration: totalDurationSeconds,
+      view_count: metadata.viewCount,
+      publish_date: metadata.publishDate,
+    };
+    
+    const existingVideo = await executeQuery<{id: string}[]>(sql => 
+      sql`SELECT id FROM videos WHERE video_id = ${videoId}`
+    );
+
+    if (existingVideo && existingVideo.length > 0) {
+      videoDbId = existingVideo[0].id;
+      logger.info(`Existing video found in DB with id: ${videoDbId}`, { videoId });
+      await executeQuery(sql => 
+        sql`UPDATE videos SET ${sql(videoData)} WHERE id = ${videoDbId}`
+      );
+    } else {
+      videoDbId = randomUUID();
+      logger.info(`Creating new video in DB with id: ${videoDbId}`, { videoId });
+      await executeQuery(sql => 
+        sql`INSERT INTO videos ${sql({ id: videoDbId, ...videoData })}`
+      );
     }
 
-    // After inserting the video and summary, add the job to the DB queue
-    const summaryId = randomUUID();
-    const jobData: JobData = {
-      videoId,
+    const summaryData = {
+      id: summaryId,
+      video_id: videoDbId,
+      user_id: userId,
+      main_title: metadata.title,
+      processing_status: 'queued',
+      video_duration_seconds: totalDurationSeconds,
+      overall_summary: '',
+      raw_ai_output: '',
+      transcript_sent: '',
+    };
+    
+    await executeQuery(sql => 
+      sql`INSERT INTO video_summaries ${sql(summaryData)}`
+    );
+
+    logger.info(`✅ Job created and saved to DB. Summary ID: ${summaryId}`, { userId, videoId });
+
+    const jobData = {
+      videoId: videoId,
       videoDbId,
       summaryDbId: summaryId,
-      userId,
-      userEmail,
-      user: { id: userId, email: userEmail, name: user.fullName ?? undefined },
-      metadata,
-      totalDurationSeconds,
-      creditsNeeded,
-      youtubeUrl: url
+      userId: userId,
+      userEmail: userEmail,
+      metadata: metadata,
+      totalDurationSeconds: totalDurationSeconds,
+      creditsNeeded: creditsNeeded,
+      youtubeUrl: url,
     };
-    try {
-      logger.info('JobData to be queued', { jobData });
-      
-      // For Vercel frontend: Add to database queue
-      // The Cloud Run API service will poll this and use Cloud Tasks
-      await addJobToDatabase(jobData);
-      logger.info('Job added to database queue (Cloud Run will process via Cloud Tasks)');
-        
-      // Also call the placeholder function for consistency
-      await enqueueJobToCloudTasks(jobData);
-      
-    } catch (queueError: any) {
-      logger.error('Failed to queue video processing job', { userId, error: queueError.message });
-      await releaseCredits(userId, creditsNeeded);
-      return NextResponse.json({ error: 'Failed to queue video processing job.' }, { status: 500 });
-    }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        videoId,
-        summaryId,
-        alreadyProcessed: false,
-        processingStatus: 'queued',
-        title: metadata.title,
-        message: 'Job queued for processing',
-        redirectUrl: `/dashboard/${videoDbId}`
-      }
-    });
+    // Enqueue the job for the worker to process, but DO NOT wait for it.
+    // This is the key to avoiding timeouts.
+    // No need to `await`, this is fire-and-forget
+    enqueueJobToCloudTasks(jobData);
+
+    logger.info('🚀 Job enqueued for background processing.', { userId, videoId, summaryId });
+
+    metrics.apiRequest('/extract', 'POST', 202, startTime);
+    return NextResponse.json({ 
+      message: 'Video processing started.',
+      videoId: videoDbId,
+      summaryId: summaryId,
+      status: 'queued'
+    }, { status: 202 });
+
   } catch (error: any) {
-    // This is a general catch-all for unexpected errors
-    const e = error?.message || 'An unexpected error occurred.';
-    logger.error('Unhandled error in video extraction endpoint', { data: { error: e } });
-    return NextResponse.json({ error: 'An unexpected error occurred. If this persists, please contact support.' }, { status: 500 });
-  } finally {
-    const duration = Date.now() - startTime;
-    logger.info(`🎬 Video extraction API request finished in ${duration}ms`);
-    metrics.apiRequest('/extract', 'POST', duration, startTime);
+    logger.error('❌ Unhandled error in /api/extract', {
+      userId,
+      videoId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    if (userId && creditsReserved > 0) {
+      try {
+        await releaseCredits(userId, creditsReserved);
+        logger.info(`Credits released for user ${userId} due to error.`, { creditsReserved });
+      } catch (releaseError: any) {
+        logger.error('CRITICAL: Failed to release credits after an error.', {
+          userId,
+          creditsReserved,
+          originalError: error.message,
+          releaseError: releaseError.message,
+        });
+      }
+    }
+    
+    metrics.apiRequest('/extract', 'POST', 500, startTime);
+    const responseBody = {
+      error: 'An unexpected error occurred while starting the video processing. Your credits have not been charged. Please try again.',
+      details: error.message
+    };
+    return NextResponse.json(responseBody, { status: 500 });
   }
 } 
