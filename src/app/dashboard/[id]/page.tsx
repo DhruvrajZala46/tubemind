@@ -283,8 +283,8 @@ export default async function VideoSummaryPage({ params }: PageProps) {
   // Pass the data to the client component
   return (
     <VideoSummaryClientPage 
-      summary={summary} 
-      pollingId={pollingId} 
+      initialSummary={summary} 
+      videoId={pollingId} 
       summaryId={String(summary.summary_id)} 
     />
   );

@@ -103,7 +103,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ summaryId: string }> }
 ) {
   try {
     // Check authentication
@@ -117,7 +117,7 @@ export async function GET(
     }
 
     const params = await context.params;
-    const { id } = params;
+    const { summaryId: id } = params;
     console.log(`🔍 API: Fetching summary for ID: ${id}, User: ${user.id}`);
 
     const summary = await getVideoSummary(id, user.id);
@@ -138,7 +138,7 @@ export async function GET(
 
     return NextResponse.json(summary);
   } catch (error) {
-    console.error('API Error in GET /api/summaries/[id]:', error);
+    console.error('API Error in GET /api/summaries/[summaryId]:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -148,7 +148,7 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ summaryId: string }> }
 ) {
   const user = await currentUser();
 
@@ -157,7 +157,7 @@ export async function DELETE(
   }
 
   const resolvedParams = await params;
-  const { id: summaryId } = resolvedParams;
+  const { summaryId } = resolvedParams;
 
   try {
     await deleteVideoSummary(summaryId, user.id);
