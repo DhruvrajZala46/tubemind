@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       sql`SELECT v.id, vs.id as summary_id 
          FROM videos v 
          JOIN video_summaries vs ON v.id = vs.video_id 
-         WHERE v.video_id = ${videoId!} AND vs.user_id = ${userId} AND vs.processing_status = 'completed'`
+         WHERE v.video_id = ${videoId!} AND v.user_id = ${userId} AND vs.processing_status = 'completed'`
     );
 
     if (existingVideoAndSummary && existingVideoAndSummary.length > 0) {
@@ -202,13 +202,18 @@ export async function POST(request: NextRequest) {
     const summaryData = {
       id: summaryId,
       video_id: videoDbId,
-      user_id: userId,
       main_title: metadata.title,
       processing_status: 'queued',
       video_duration_seconds: totalDurationSeconds,
       overall_summary: '',
       raw_ai_output: '',
       transcript_sent: '',
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      input_cost: 0,
+      output_cost: 0,
+      total_cost: 0,
     };
     
     await executeQuery(sql => 
