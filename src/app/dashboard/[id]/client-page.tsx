@@ -65,7 +65,7 @@ function ProcessingStatusPoller({
             if (data.status === 'completed' || data.status === 'failed') {
                 onComplete(data);
             } else {
-                timeoutId = setTimeout(pollStatus, 3000); // Poll every 3 seconds
+                timeoutId = setTimeout(pollStatus, 2000); // Poll every 2 seconds
          }
         }
       } catch (err) {
@@ -94,18 +94,37 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
   const [processingStatus, setProcessingStatus] = useState(
     initialSummary?.processing_status || 'pending'
   );
+  const [progress, setProgress] = useState(initialSummary?.processing_progress || 0);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
   const handlePollUpdate = (data: any) => {
     if (data.status) {
         setProcessingStatus(data.status);
     }
+    if (typeof data.processing_progress === 'number') {
+        setProgress(data.processing_progress);
+    }
   };
 
-  const handlePollComplete = (data: any) => {
+  const handlePollComplete = async (data: any) => {
     setProcessingStatus(data.status);
+    if (typeof data.processing_progress === 'number') {
+        setProgress(data.processing_progress);
+    }
     if (data.status === 'completed') {
-        // Instead of setting partial data, refresh the page to get full summary
-        window.location.reload();
+        setIsLoadingSummary(true);
+        // Fetch the latest summary data from the API
+        try {
+            const response = await fetch(`/api/summaries/${summaryId}`);
+            if (response.ok) {
+                const summary = await response.json();
+                setSummaryData(summary);
+            }
+        } catch (err) {
+            console.error('Failed to fetch completed summary:', err);
+        } finally {
+            setIsLoadingSummary(false);
+        }
     }
   };
 
@@ -126,6 +145,8 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
             <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0">
                 <PerplexityLoader 
                   currentStage={mapApiStatusToProcessingStage(processingStatus)}
+                  progress={progress}
+                  showProgress={true}
                   showAnimatedText={true}
                 />
             </div>
@@ -134,6 +155,8 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
                 <h2>Processing Failed</h2>
                 <p>Something went wrong while processing your video. Please try again.</p>
             </div>
+        ) : isLoadingSummary ? (
+            <div className="text-center text-lg text-[var(--text-secondary)]">Loading summary...</div>
         ) : (
             <VideoSummary summary={summaryData} videoId={videoId} summaryId={summaryId} />
         )}
