@@ -66,7 +66,7 @@ function ProcessingStatusPoller({
                 onComplete(data);
             } else {
                 timeoutId = setTimeout(pollStatus, 3000); // Poll every 3 seconds
-            }
+         }
         }
       } catch (err) {
         if (isMounted) {
@@ -91,7 +91,9 @@ function ProcessingStatusPoller({
 // Main client component
 export default function VideoSummaryClientPage({ initialSummary, videoId, summaryId }: VideoSummaryClientPageProps) {
   const [summaryData, setSummaryData] = useState(initialSummary);
-  const [processingStatus, setProcessingStatus] = useState(initialSummary ? 'completed' : 'pending');
+  const [processingStatus, setProcessingStatus] = useState(
+    initialSummary?.processing_status || 'pending'
+  );
 
   const handlePollUpdate = (data: any) => {
     if (data.status) {
@@ -106,19 +108,13 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
         window.location.reload();
     }
   };
-  
-  // If we don't have a summary yet, start polling.
-  useEffect(() => {
-      if (!initialSummary) {
-          setProcessingStatus('pending');
-      }
-  }, [initialSummary]);
 
   const isProcessing = processingStatus !== 'completed' && processingStatus !== 'failed';
+  const shouldPoll = isProcessing && summaryId;
 
   return (
     <main className="min-h-screen bg-[var(--bg-dashboard)] text-[var(--text-primary)] w-full">
-        {!initialSummary && isProcessing && (
+        {shouldPoll && (
             <ProcessingStatusPoller 
                 summaryId={summaryId}
                 onUpdate={handlePollUpdate}

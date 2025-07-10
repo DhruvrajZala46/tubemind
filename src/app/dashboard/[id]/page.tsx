@@ -45,7 +45,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
     
     // Check if the ID is a UUID format first
     if (isUUID(id)) {
-      // Try to find by UUID (summary ID, not video ID) - use INNER JOIN since we expect summary to exist
+      // First try to find by summary ID (the correct way)
       result = await sql`
         SELECT 
           v.id,
@@ -67,6 +67,31 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
         WHERE vs.id = ${id}
         AND v.user_id = ${userId}
       ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
+      
+      // If not found by summary ID, try by video database ID
+      if (!result || result.length === 0) {
+        result = await sql`
+          SELECT 
+            v.id,
+            v.video_id,
+            v.title,
+            v.description,
+            v.thumbnail_url,
+            v.channel_title,
+            v.duration,
+            v.view_count,
+            v.publish_date,
+            vs.main_title,
+            vs.overall_summary,
+            vs.raw_ai_output,
+            vs.processing_status,
+            vs.id as summary_id
+          FROM videos v
+          LEFT JOIN video_summaries vs ON v.id = vs.video_id
+          WHERE v.id = ${id}
+          AND v.user_id = ${userId}
+        ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
+      }
     }
 
     // If not found by UUID or ID is not UUID format, try to find by YouTube video ID
@@ -267,18 +292,24 @@ export default async function VideoSummaryPage({ params }: PageProps) {
     notFound();
   }
 
+  // If we found a summary but we're on the video ID URL and there's a completed summary, redirect to the summary ID URL
+  if (summary.summary_id && summary.summary_id !== videoId && summary.processing_status === 'completed') {
+    redirect(`/dashboard/${summary.summary_id}`);
+  }
+
   console.log('📊 Summary data loaded:', {
     videoId,
     summaryVideoId: summary.video_id,
     hasRawOutput: !!summary.raw_ai_output,
     rawOutputLength: summary.raw_ai_output?.length || 0,
     mainTitle: summary.main_title,
-    overallSummary: summary.overall_summary
+    overallSummary: summary.overall_summary,
+    processingStatus: summary.processing_status,
+    summaryId: summary.summary_id
   });
 
-  // Use the UUID for polling (current page ID), not the YouTube video_id
-  // The API route can handle both UUID and YouTube video ID
-  const pollingId = videoId; // Use the page ID for polling
+  // Use the summary ID for polling if available, otherwise use the page ID
+  const pollingId = summary.summary_id || videoId;
 
   // Pass the data to the client component
   return (
