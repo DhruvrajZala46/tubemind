@@ -7,15 +7,16 @@ const logger = createLogger('api:summary-status');
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { summaryId: string } }
+  context: { params: Promise<{ summaryId: string }> }
 ) {
-  const { summaryId } = params;
-
-  if (!summaryId) {
-    return NextResponse.json({ error: 'Summary ID is required' }, { status: 400 });
-  }
-
   try {
+    const params = await context.params;
+    const { summaryId } = params;
+
+    if (!summaryId) {
+      return NextResponse.json({ error: 'Summary ID is required' }, { status: 400 });
+    }
+
     const user = await currentUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -47,7 +48,7 @@ export async function GET(
      });
 
   } catch (error: any) {
-    logger.error('Error fetching summary status', { summaryId, error: error.message });
+    logger.error('Error fetching summary status', { error: error.message });
     return NextResponse.json({ error: 'Failed to fetch summary status.' }, { status: 500 });
   }
 } 
