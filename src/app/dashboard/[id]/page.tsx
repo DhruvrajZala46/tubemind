@@ -45,7 +45,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
     
     // Check if the ID is a UUID format first
     if (isUUID(id)) {
-      // Try to find by UUID (primary key)
+      // Try to find by UUID (summary ID, not video ID)
       result = await sql`
         SELECT 
           v.id,
@@ -64,7 +64,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
           vs.id as summary_id
         FROM videos v
         LEFT JOIN video_summaries vs ON v.id = vs.video_id
-        WHERE v.id = ${id}
+        WHERE vs.id = ${id}
         AND v.user_id = ${userId}
       ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
     }
@@ -285,7 +285,7 @@ export default async function VideoSummaryPage({ params }: PageProps) {
     <VideoSummaryClientPage 
       initialSummary={summary} 
       videoId={pollingId} 
-      summaryId={String(summary.summary_id)} 
+      summaryId={summary.summary_id || videoId} 
     />
   );
 } 
