@@ -24,9 +24,10 @@ export async function GET(
 
     const result = await executeQuery<{ processing_status: string, overall_summary: string, main_title: string }[]>(async (sql: any) => 
       await sql`
-        SELECT processing_status, overall_summary, main_title
-        FROM video_summaries 
-        WHERE id = ${summaryId} AND user_id = ${user.id}
+        SELECT vs.processing_status, vs.overall_summary, vs.main_title
+        FROM video_summaries vs
+        JOIN videos v ON vs.video_id = v.id
+        WHERE vs.id = ${summaryId} AND v.user_id = ${user.id}
       `
     );
 
