@@ -46,19 +46,18 @@ const RATE_LIMIT_CONFIG = {
 // Source: https://openai.com/api/pricing/ and official OpenAI documentation
 const OFFICIAL_OPENAI_PRICING = {
   'gpt-4.1-mini': {
-    inputPricePerMillionTokens: 0.15,
-    outputPricePerMillionTokens: 0.60,
-    inputPricePerToken: 0.15 / 1000000,
-    outputPricePerToken: 0.60 / 1000000,
+    inputPricePerMillionTokens: 0.40, // Updated pricing
+    outputPricePerMillionTokens: 1.60, // Updated pricing
+    inputPricePerToken: 0.40 / 1000000, // Updated pricing
+    outputPricePerToken: 1.60 / 1000000, // Updated pricing
     maxContextTokens: 128000,
     maxCompletionTokens: 16384,
   },
   'gpt-4.1-mini-2025-04-14': {
-    // Same pricing as gpt-4.1-mini (dated version)
-    inputPricePerMillionTokens: 0.15,
-    outputPricePerMillionTokens: 0.60,
-    inputPricePerToken: 0.15 / 1000000,
-    outputPricePerToken: 0.60 / 1000000,
+    inputPricePerMillionTokens: 0.40, // Updated pricing
+    outputPricePerMillionTokens: 1.60, // Updated pricing
+    inputPricePerToken: 0.40 / 1000000, // Updated pricing
+    outputPricePerToken: 1.60 / 1000000, // Updated pricing
     maxContextTokens: 128000,
     maxCompletionTokens: 16384,
   },
@@ -584,7 +583,8 @@ export async function extractKnowledgeWithOpenAI(
   totalCost: number,
   videoDurationSeconds: number
 }> {
-  const model = totalDuration <= 1800 ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4o-mini';
+  // UPDATED LOGIC: Use gpt-4.1-mini for videos > 20 min (1200s), else gpt-4.1-nano
+  const model = totalDuration > 1200 ? 'gpt-4.1-mini-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
   const chunkSeconds = 480; // 8 minutes
   const overlapSeconds = 120; // 2 minutes
   logger.info(`[MODEL] Using model: ${model}, chunkSeconds: ${chunkSeconds}, overlapSeconds: ${overlapSeconds}`);
