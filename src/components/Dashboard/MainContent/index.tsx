@@ -139,8 +139,8 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       toast.success("Video submitted successfully! Processing...");
 
       // Start polling for progress and redirect when complete
-      const summaryId = data.data.summaryId;
-      const redirectUrl = data.data.redirectUrl;
+      const summaryId = data.summaryId;
+      const redirectUrl = `/dashboard/${data.summaryId}`;
       
       console.log('🔍 Polling setup:', { summaryId, redirectUrl });
       
