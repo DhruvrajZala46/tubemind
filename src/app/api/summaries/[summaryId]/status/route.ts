@@ -43,8 +43,13 @@ export async function GET(
     logger.info(`Summary status check`, { summaryId, userId: user.id, status });
 
     return NextResponse.json({ 
-        status,
+        status: status,  // Keep for compatibility with ProcessingStatusPoller
+        processing_status: status,  // Add for VideoSummary and ProcessingStatusDisplay
+        processing_stage: status,   // Add for stage mapping
+        processing_progress: status === 'completed' ? 100 : (status === 'failed' ? 0 : 50), // Add progress
         summary,
+        overall_summary: summary, // Add for VideoSummary compatibility
+        main_title: title,
         title
      });
 
