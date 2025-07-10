@@ -584,7 +584,7 @@ export async function extractKnowledgeWithOpenAI(
   videoDurationSeconds: number
 }> {
   // REVERTED: Use gpt-4o-mini for videos > 20 min (1200s), else gpt-4.1-nano
-  const model = totalDuration > 1200 ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
+  const model = totalDuration > 1200 ? 'gpt-4o-mini' : 'gpt-4.1-nano-2025-04-14';
   const chunkSeconds = 360; // 6 minutes
   const overlapSeconds = 180; // 3 minutes
   logger.info(`[MODEL] Using model: ${model}, chunkSeconds: ${chunkSeconds}, overlapSeconds: ${overlapSeconds}`);
