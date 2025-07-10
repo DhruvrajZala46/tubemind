@@ -102,7 +102,8 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
   const handlePollComplete = (data: any) => {
     setProcessingStatus(data.status);
     if (data.status === 'completed') {
-        setSummaryData(data.summary);
+        // Instead of setting partial data, refresh the page to get full summary
+        window.location.reload();
     }
   };
   

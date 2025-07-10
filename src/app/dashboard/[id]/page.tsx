@@ -45,7 +45,7 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
     
     // Check if the ID is a UUID format first
     if (isUUID(id)) {
-      // Try to find by UUID (summary ID, not video ID)
+      // Try to find by UUID (summary ID, not video ID) - use INNER JOIN since we expect summary to exist
       result = await sql`
         SELECT 
           v.id,
@@ -62,8 +62,8 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
           vs.raw_ai_output,
           vs.processing_status,
           vs.id as summary_id
-        FROM videos v
-        LEFT JOIN video_summaries vs ON v.id = vs.video_id
+        FROM video_summaries vs
+        INNER JOIN videos v ON vs.video_id = v.id
         WHERE vs.id = ${id}
         AND v.user_id = ${userId}
       ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
