@@ -70,27 +70,27 @@ async function getVideoSummary(id: string, userId: string): Promise<VideoSummary
       
       // If not found by summary ID, try by video database ID
       if (!result || result.length === 0) {
-        result = await sql`
-          SELECT 
-            v.id,
-            v.video_id,
-            v.title,
-            v.description,
-            v.thumbnail_url,
-            v.channel_title,
-            v.duration,
-            v.view_count,
-            v.publish_date,
-            vs.main_title,
-            vs.overall_summary,
-            vs.raw_ai_output,
-            vs.processing_status,
-            vs.id as summary_id
-          FROM videos v
-          LEFT JOIN video_summaries vs ON v.id = vs.video_id
-          WHERE v.id = ${id}
-          AND v.user_id = ${userId}
-        ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
+      result = await sql`
+        SELECT 
+          v.id,
+          v.video_id,
+          v.title,
+          v.description,
+          v.thumbnail_url,
+          v.channel_title,
+          v.duration,
+          v.view_count,
+          v.publish_date,
+          vs.main_title,
+          vs.overall_summary,
+          vs.raw_ai_output,
+          vs.processing_status,
+          vs.id as summary_id
+        FROM videos v
+        LEFT JOIN video_summaries vs ON v.id = vs.video_id
+        WHERE v.id = ${id}
+        AND v.user_id = ${userId}
+      ` as unknown as (VideoSummaryData & { id: string; video_id: string; processing_status: string; summary_id: string })[];
       }
     }
 

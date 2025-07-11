@@ -66,7 +66,7 @@ function ProcessingStatusPoller({
                 onComplete(data);
             } else {
                 timeoutId = setTimeout(pollStatus, 2000); // Poll every 2 seconds
-         }
+          }
         }
       } catch (err) {
         if (isMounted) {

@@ -26,38 +26,38 @@ async function enqueueJobToCloudTasks(jobData: any): Promise<void> {
 
     try {
         logger.info('Enqueuing job via direct HTTP POST to worker (fire-and-forget)', { 
-            videoId: jobData.videoId,
-            userId: jobData.userId,
-            workerUrl 
-        });
-        
-        // Use dynamic import for node-fetch
-        const fetch = (await import('node-fetch')).default;
-        
+        videoId: jobData.videoId,
+        userId: jobData.userId,
+        workerUrl 
+      });
+      
+      // Use dynamic import for node-fetch
+      const fetch = (await import('node-fetch')).default;
+      
         // We do NOT await this call. This is "fire-and-forget".
         fetch(workerUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(jobData),
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(jobData),
         }).catch(fetchError => {
             // Log the error but do not throw, as the API has already returned a successful response.
             // The worker infrastructure should handle retries based on jobs in the DB.
             logger.error('Fire-and-forget worker call failed.', {
                 error: fetchError.message,
-                videoId: jobData.videoId,
-                userId: jobData.userId,
-            });
+            videoId: jobData.videoId,
+            userId: jobData.userId,
+          });
         });
 
     } catch (error: any) {
         logger.error('Failed to initiate fire-and-forget worker call.', { 
-            error: error.message,
-            videoId: jobData.videoId,
-            userId: jobData.userId,
-            stack: error.stack
-        });
+        error: error.message,
+        videoId: jobData.videoId,
+        userId: jobData.userId,
+        stack: error.stack
+      });
     }
 }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       logger.warn('Authentication failed - no user found');
       return NextResponse.json({ error: 'Authentication required. Please sign in.' }, { status: 401 });
     }
-    
+
     const dbUser = await getOrCreateUser(user);
     userId = dbUser.id;
     const userEmail = dbUser.email || '';
@@ -147,14 +147,14 @@ export async function POST(request: NextRequest) {
     // Restore the check for already processed videos
     const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string}[]>(sql => 
       sql`SELECT v.id, vs.id as summary_id 
-         FROM videos v 
+          FROM videos v
          JOIN video_summaries vs ON v.id = vs.video_id 
          WHERE v.video_id = ${videoId!} AND v.user_id = ${userId} AND vs.processing_status = 'completed'`
     );
 
     if (existingVideoAndSummary && existingVideoAndSummary.length > 0) {
         logger.info(`Video already processed for user. Returning existing summary.`, { userId, videoId, summaryId: existingVideoAndSummary[0].summary_id });
-        return NextResponse.json({
+      return NextResponse.json({
             message: 'Video already processed. Returning existing summary.',
             videoId: existingVideoAndSummary[0].id,
             summaryId: existingVideoAndSummary[0].summary_id,
@@ -250,11 +250,11 @@ export async function POST(request: NextRequest) {
     // This is the key to avoiding timeouts.
     // No need to `await`, this is fire-and-forget
     enqueueJobToCloudTasks(jobData);
-
+      
     logger.info('🚀 Job enqueued for background processing.', { userId, videoId, summaryId });
 
     metrics.apiRequest('/extract', 'POST', 202, startTime);
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Video processing started.',
       videoId: videoDbId,
       summaryId: summaryId,

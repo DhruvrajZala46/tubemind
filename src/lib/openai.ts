@@ -531,7 +531,7 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
 }
 
 // Helper: OpenAI call with retry, exponential backoff, and longer timeout
-async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 120000) {
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 120000, temperature = 0.9) {
   let lastError;
   const backoffSchedule = [2000, 5000, 10000]; // 2s, 5s, 10s
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -541,7 +541,7 @@ async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatComplet
       const response = await getOpenAIClient().chat.completions.create({
         model,
         messages,
-        temperature: 0.9,
+        temperature,
         max_tokens: 4096,
         stream: false
       }, { signal: controller.signal });
@@ -617,6 +617,7 @@ export async function extractKnowledgeWithOpenAI(
       4.  **ADAPTIVE FORMATTING:** If the speaker lists items, steps, or types of things, you MUST format them as a bulleted or numbered list. Use paragraphs for storytelling.
       5.  **MAINTAIN FLOW:** Present the content in the exact chronological order it appears in the transcript chunk.
       6.  **DETECT CONVERSATIONS:** If the transcript appears to be a conversation between two or more people, preserve that back-and-forth dynamic. Do not reformat it as a monologue from a single speaker. Structure the text to make it clear that a dialogue is taking place.
+      7.  **INCLUDE DIALOGUE:** Provide at least two direct quotes from speakers in this chunk to keep the conversational energy alive.
 
       Your output for this chunk must be a complete and clear representation of the original content.
 
@@ -632,7 +633,7 @@ export async function extractKnowledgeWithOpenAI(
       }];
 
       try {
-        const response = await callOpenAIWithRetry(messages, model, chunkIndex);
+        const response = await callOpenAIWithRetry(messages, model, chunkIndex, 3, 120000, 0.5);
         return response.choices[0]?.message?.content || null;
       } catch (error) {
         logger.error(
@@ -664,6 +665,7 @@ export async function extractKnowledgeWithOpenAI(
   4.  **INTELLIGENT SEGMENTATION:** The chunk summaries are just raw material. You must create new, logical segments based on the actual topic flow of the content. Do not use the original chunk boundaries for your final segments.
   5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the combined chunk summaries is included in the final output. Nothing can be left out.
   6.  **FINAL GOAL:** The final output must read as if it were generated from the full transcript at once by a single, brilliant summarizer. The reader should have no idea it was assembled from smaller pieces.
+  7.  **STRONG TRANSITIONS:** Begin every segment with a clear transition sentence that references the previous segment’s last key point and explains why this new topic follows.
 
   Here are the chunk summaries to synthesize:
   ${combinedSummary}`;
@@ -677,7 +679,7 @@ export async function extractKnowledgeWithOpenAI(
   }];
 
   logger.info(`[REDUCE] Calling final merge API...`);
-  const finalResponse = await callOpenAIWithRetry(finalMessages, 'gpt-4o-mini', -1); // Use a more capable model for merging
+  const finalResponse = await callOpenAIWithRetry(finalMessages, 'gpt-4o-mini', -1, 3, 120000, 0.3); // Use a more capable model for merging
   const rawOutput = finalResponse.choices[0]?.message?.content || '';
   await updateProgress?.('summarizing', 95, 'Finalizing summary...');
 
@@ -688,6 +690,8 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('RAW FINAL OPENAI OUTPUT', { rawOutput });
 
   const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
+  // --- NEW: Post-process for readability ---
+  const enhancedOutput = enhanceReadability(rawOutput);
   parsedResponse.mainTitle = `[Model: ${model}] ${parsedResponse.mainTitle}`;
 
   // CRITICAL FIX: Ensure complete video coverage
@@ -760,7 +764,7 @@ export async function extractKnowledgeWithOpenAI(
     ...parsedResponse,
     rawOpenAIOutput: rawOutput,
     transcriptSent: "Transcript processed in chunks.",
-    openaiOutput: rawOutput,
+    openaiOutput: enhancedOutput,
     promptTokens: finalResponse.usage?.prompt_tokens || 0,
     completionTokens: finalResponse.usage?.completion_tokens || 0,
     totalTokens: finalResponse.usage?.total_tokens || 0,
@@ -1168,4 +1172,36 @@ export async function checkOpenAIHealth(): Promise<boolean> {
     logger.error(`❌ OpenAI health check FAILED with model ${HEALTH_CHECK_MODEL}: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
+}
+
+// ===== Helper: Enhance readability of OpenAI output =====
+function enhanceReadability(text: string): string {
+  // Replace bullet characters • with markdown dash
+  let processed = text.replace(/^•\s+/gm, '- ');
+
+  // Split long paragraphs into blocks of max 2 sentences
+  const lines = processed.split(/\n/);
+  const rebuilt: string[] = [];
+  const sentenceRegex = /([.!?])+\s+/;
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    // Skip headings, bullets or very short lines
+    if (trimmed.startsWith('#') || trimmed.startsWith('-') || trimmed.startsWith('>') || trimmed.length < 120) {
+      rebuilt.push(line);
+      return;
+    }
+    // Break into sentences
+    const parts = trimmed.split(sentenceRegex).filter(p => p.length > 0);
+    let buffer: string[] = [];
+    parts.forEach(part => {
+      buffer.push(part);
+      if (buffer.length === 4) { // approx 2 sentences (sentence + punctuation repeated)
+        rebuilt.push(buffer.join('').trim());
+        buffer = [];
+      }
+    });
+    if (buffer.length) rebuilt.push(buffer.join('').trim());
+  });
+  processed = rebuilt.join('\n\n');
+  return processed;
 }
