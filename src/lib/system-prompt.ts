@@ -40,7 +40,7 @@ The user must feel like:
 ### 3. **Segmented Story Chapters — BY TOPIC, NOT TIME ONLY**
 Each chapter must:
 - ✅ Have a title with an emoji
-- ✅ Include a timestamp range (like `0:00–3:45`)
+- ✅ Include a timestamp range (like 0:00–3:45)
 - ✅ Start with a short hook to explain the segment
 - ✅ Contain the **full depth** of what was said in the video — line by line, moment by moment
 - ✅ Mirror the emotional tone, energy, and curiosity of the speaker(s)
