@@ -66,6 +66,34 @@ const STAGES: Array<{
   }
 ];
 
+// Dynamic messages for each stage to show variety
+const STAGE_MESSAGES = {
+  pending: [
+    'Initializing process...',
+    'Setting up the environment...',
+    'Preparing for analysis...',
+    'Getting things ready...'
+  ],
+  transcribing: [
+    'Converting speech to text...',
+    'Processing audio content...',
+    'Extracting spoken words...',
+    'Capturing every word...'
+  ],
+  summarizing: [
+    'Analyzing key concepts...',
+    'Identifying main points...',
+    'Finding important insights...',
+    'Connecting ideas together...'
+  ],
+  finalizing: [
+    'Organizing content structure...',
+    'Adding finishing touches...',
+    'Preparing final output...',
+    'Making it perfect...'
+  ]
+};
+
 export function PremiumLoader({
   className,
   currentStage,
@@ -80,6 +108,11 @@ export function PremiumLoader({
   const [smoothProgress, setSmoothProgress] = useState(0);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [dynamicMessage, setDynamicMessage] = useState('');
+  const [particleCount, setParticleCount] = useState(3);
+  const lastProgressUpdateRef = useRef<number>(Date.now());
+  const progressSpeedRef = useRef<number>(1);
+  const [progressActivity, setProgressActivity] = useState<'slow' | 'normal' | 'fast'>('normal');
 
   // Animated dots effect (...)
   useEffect(() => {
@@ -90,10 +123,30 @@ export function PremiumLoader({
         if (prev === '...') return '';
         return prev + '.';
       });
-    }, 400);
+    }, 300); // Faster animation
     
     return () => clearInterval(interval);
   }, [showAnimatedText, currentStage]);
+
+  // Dynamic messages for each stage
+  useEffect(() => {
+    if (currentStage === 'completed' || currentStage === 'failed') return;
+    
+    // Get messages for current stage
+    const messages = STAGE_MESSAGES[currentStage as keyof typeof STAGE_MESSAGES] || [];
+    if (messages.length === 0) return;
+    
+    // Rotate through messages
+    const interval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * messages.length);
+      setDynamicMessage(messages[randomIndex]);
+    }, 3000);
+    
+    // Set initial message
+    setDynamicMessage(messages[0]);
+    
+    return () => clearInterval(interval);
+  }, [currentStage]);
 
   // Improved progress calculation with smooth transitions
   useEffect(() => {
@@ -127,6 +180,31 @@ export function PremiumLoader({
       calculatedProgress = 100;
     }
     
+    // Calculate progress speed
+    const now = Date.now();
+    const timeDiff = now - lastProgressUpdateRef.current;
+    if (timeDiff > 0 && lastProgressUpdateRef.current > 0) {
+      const prevProgress = overallProgress;
+      const progressDiff = calculatedProgress - prevProgress;
+      if (progressDiff > 0) {
+        // Points per second
+        progressSpeedRef.current = (progressDiff / timeDiff) * 1000;
+        
+        // Update progress activity indicator
+        if (progressSpeedRef.current > 5) {
+          setProgressActivity('fast');
+        } else if (progressSpeedRef.current < 0.5) {
+          setProgressActivity('slow');
+        } else {
+          setProgressActivity('normal');
+        }
+        
+        // Update particle count based on speed
+        setParticleCount(Math.max(2, Math.min(8, Math.floor(progressSpeedRef.current * 2))));
+      }
+    }
+    lastProgressUpdateRef.current = now;
+    
     // Ensure progress never goes backwards
     setOverallProgress(prev => Math.max(prev, calculatedProgress));
     
@@ -142,7 +220,10 @@ export function PremiumLoader({
       setSmoothProgress(prev => {
         const diff = overallProgress - prev;
         if (Math.abs(diff) < 0.1) return overallProgress;
-        return prev + diff * 0.1;
+        
+        // Faster animation for larger differences
+        const speed = Math.min(0.3, Math.max(0.05, diff * 0.05));
+        return prev + diff * speed;
       });
     }, 16); // 60fps for smooth animation
     
@@ -157,6 +238,27 @@ export function PremiumLoader({
   // Get current stage info
   const currentStageInfo = STAGES.find(stage => stage.id === currentStage) || STAGES[0];
   const currentStageIndex = STAGES.findIndex(stage => stage.id === currentStage);
+
+  // Generate particles for progress bar
+  const renderParticles = () => {
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      const position = 100 - (i * (100 / particleCount));
+      particles.push(
+        <div 
+          key={i}
+          className="absolute top-1/2 w-1 h-1 rounded-full bg-white/80 animate-pulse-fast" 
+          style={{ 
+            right: `${position}%`, 
+            transform: 'translateY(-50%)',
+            animationDelay: `${i * 0.2}s`,
+            opacity: 0.7 - (i * 0.1)
+          }}
+        />
+      );
+    }
+    return particles;
+  };
 
   // Handle failed state
   if (currentStage === 'failed') {
@@ -198,7 +300,12 @@ export function PremiumLoader({
           <div className="h-2 sm:h-3 bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
             <div 
               ref={progressBarRef}
-              className="h-full rounded-full bg-gradient-to-r from-[#DC143C]/80 to-[#DC143C] transition-all duration-300 ease-out"
+              className={cn(
+                "h-full rounded-full transition-all duration-300 ease-out",
+                progressActivity === 'fast' ? "bg-gradient-to-r from-[#DC143C]/90 to-[#DC143C]" :
+                progressActivity === 'slow' ? "bg-gradient-to-r from-[#DC143C]/70 to-[#DC143C]/90" :
+                "bg-gradient-to-r from-[#DC143C]/80 to-[#DC143C]"
+              )}
               style={{ 
                 width: `${smoothProgress}%`,
                 boxShadow: `0 0 10px ${accentColor}80, 0 0 5px ${accentColor}`
@@ -206,18 +313,36 @@ export function PremiumLoader({
             >
               {/* Animated particles inside progress bar */}
               <div className="absolute top-0 left-0 w-full h-full">
-                <div className="absolute top-1/2 right-0 w-1 h-1 bg-white rounded-full animate-pulse-fast" 
-                     style={{ transform: 'translateY(-50%)' }}></div>
-                <div className="absolute top-1/2 right-[20%] w-1 h-1 bg-white/70 rounded-full animate-pulse-slow" 
-                     style={{ transform: 'translateY(-50%)' }}></div>
+                {renderParticles()}
               </div>
             </div>
+            
+            {/* Pulse animation at the end of progress bar */}
+            <div 
+              className="absolute top-1/2 w-2 h-2 rounded-full bg-[#DC143C]/70 animate-ping" 
+              style={{ 
+                left: `${smoothProgress}%`, 
+                transform: 'translate(-50%, -50%)',
+                opacity: 0.7
+              }}
+            />
           </div>
           
           <div className="flex justify-between items-center mt-3">
-            <p className="text-xs sm:text-sm text-white/70 font-medium">
-              {Math.round(smoothProgress)}% complete
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs sm:text-sm text-white/70 font-medium">
+                {Math.round(smoothProgress)}% complete
+              </p>
+              <div className={cn(
+                "text-xs px-1.5 py-0.5 rounded-full",
+                progressActivity === 'fast' ? "bg-green-500/20 text-green-400" :
+                progressActivity === 'slow' ? "bg-yellow-500/20 text-yellow-400" :
+                "bg-blue-500/20 text-blue-400"
+              )}>
+                {progressActivity === 'fast' ? 'Fast' : 
+                 progressActivity === 'slow' ? 'Processing' : 'Active'}
+              </div>
+            </div>
             <div className="flex items-center gap-1">
               <span className="inline-block w-2 h-2 rounded-full bg-[#DC143C] animate-pulse"></span>
               <p className="text-xs sm:text-sm text-white/70 font-medium">
@@ -284,14 +409,14 @@ export function PremiumLoader({
                   )}
                 </h3>
                 
-                {/* Description with animated gradient on active */}
+                {/* Dynamic description with animated gradient on active */}
                 <p className={cn(
                   "text-xs sm:text-sm mt-1",
                   isActive ? "text-white/80" : 
                   isCompleted ? "text-white/60" :
                   "text-white/40"
                 )}>
-                  {stage.description}
+                  {isActive && dynamicMessage ? dynamicMessage : stage.description}
                 </p>
                 
                 {/* Animated indicator for active state */}
