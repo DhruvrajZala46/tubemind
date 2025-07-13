@@ -534,7 +534,7 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
 }
 
 // Helper: OpenAI call with retry, exponential backoff, and longer timeout
-async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, context: string, maxRetries = 3, timeoutMs = 180000, temperature = 0.7) {
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, context: string, maxRetries = 3, timeoutMs = 180000, temperature = 0.7, maxTokens = 4096) {
   let lastError;
   const backoffSchedule = [5000, 15000, 30000]; // 5s, 15s, 30s
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -549,7 +549,7 @@ async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatComplet
         model,
         messages,
         temperature,
-        max_tokens: 4096, // Standard max_tokens for gpt-4o-mini
+        max_tokens: maxTokens, // Standard max_tokens for gpt-4o-mini
         stream: false
       }, { signal: controller.signal });
 
@@ -659,7 +659,7 @@ ${formattedTranscript}`;
   // STEP 4: Make the single, powerful API call
   await updateProgress?.('summarizing', 30, 'Sending request to AI. This may take a few minutes...');
   logger.info('[WORKFLOW] Calling final generation API...');
-  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Summary Generation", 3, 300000, 0.5); // 5-minute timeout for long videos
+  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Summary Generation", 3, 300000, 0.5, 16384); // 5-minute timeout for long videos, max_tokens set to 16384
   const rawOutput = finalResponse.choices[0]?.message?.content || '';
   await updateProgress?.('summarizing', 95, 'Finalizing summary...');
 
@@ -726,7 +726,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯💪🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯��🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
@@ -748,7 +748,7 @@ function parseOpenAIResponse(
         : content.trim();
       
       // Parse time range
-      const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?))?/);
+      const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?)?)?/);
       const startTimeStr = timeMatch?.[1] || '0:00';
       const endTimeStr = timeMatch?.[2] || formatTime(totalDuration);
       
@@ -778,7 +778,7 @@ function parseOpenAIResponse(
           : content.trim();
         
         // Parse time range
-        const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?))?/);
+        const timeMatch = timeRange.match(/(\d+:\d+(?::\d+)?)(?:\s*[–-]\s*(\d+:\d+(?::\d+)?)?)?/);
         const startTimeStr = timeMatch?.[1] || '0:00';
         const endTimeStr = timeMatch?.[2] || formatTime(totalDuration);
         

@@ -103,7 +103,7 @@ The reader must feel:
 ### ❌ NEVER SEGMENT BY TIME BLOCKS ALONE
 
 ### ✅ SEGMENT LABELS MUST:
-- Show timestamp range (e.g. 0:00–3:12)
+- Show timestamp range 
 - Use 1–2 emojis related to content
 - Have a clear, curiosity-driving title  
 > Example: "0:00–2:15 | 🔥 Why He Spent $2.5M at Age 22"
@@ -455,4 +455,7 @@ Make the reader say:
 
 Remember: you are the ultimate translator of video into perfect, clear, enjoyable knowledge — **with zero loss and zero confusion.**  
 Deliver the experience the user doesn't even know they're missing. 🎬🧠🔥
+
+# 🚨 MANDATORY COVERAGE RULE (DO NOT SKIP ANYTHING)
+You must never skip, condense, or omit any information, knowledge, discussion, story, example, or topic. Every single thing discussed in the video must be covered in detail, no matter how minor or repetitive. This is mandatory.
 `;
