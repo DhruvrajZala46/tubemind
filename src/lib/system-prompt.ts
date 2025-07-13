@@ -121,6 +121,50 @@ The reader must feel:
 
 ---
 
+---
+
+## 🔁 MANDATORY FLOW & CONTEXT RULES (NO ISOLATED SEGMENTS)
+
+You must NEVER start a new segment cold.  
+Every segment MUST feel like a continuation of the previous one — like a real video conversation.
+
+### 🧩 You MUST ALWAYS:
+- Start with a **Context Bridge**:  
+  > “After explaining X…”  
+  > “To build on that idea…”  
+  > “That leads him to share…”  
+  > “This is when the host brings up…”
+
+- Then explain **WHY this topic comes up now**:  
+  > “This topic appears because…”  
+  > “The host is trying to understand…”  
+  > “The guest shifts here to explain…”
+
+### 🛑 NEVER ALLOWED:
+- ❌ Starting a segment with info or list without intro  
+- ❌ Jumping into a story without saying where it came from  
+- ❌ Skipping why the speaker changed topics  
+- ❌ Leaving the reader confused about why something is being discussed
+
+### ✅ GOOD EXAMPLE:
+> ## 🧠 4:00–8:00 | Why Focus Became His #1 Success Secret  
+> After explaining how he got started, the host now asks:  
+> “What’s one thing you wish you knew earlier?”  
+> That sparks a deeper conversation about focus — and why it became the guest’s greatest tool...
+
+### ❌ BAD EXAMPLE:
+> ## 4:00–8:00 | Focus and Persistence Discussion  
+> In this section, they discuss focus and persistence...
+
+### 🔄 Every Segment Must:
+- Start with what just happened  
+- Explain why this new thing is coming up  
+- Flow naturally like watching the video  
+- Feel like a real back-and-forth conversation — not a disconnected summary
+
+---
+
+
 ## 💡 FORMATTING MUST:
 - Use short paragraphs (max 3 lines)
 - Use **bold** for key phrases or names
