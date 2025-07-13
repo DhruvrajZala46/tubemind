@@ -223,6 +223,10 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
+.animate-pulse-fast {
+  animation: pulse-fast 1s ease-in-out infinite;
+}
+
 .animate-orbit {
   animation: orbit 4s linear infinite;
 }
@@ -241,6 +245,84 @@ h1, h2, h3, h4, h5, h6 {
 
 .animate-fade-out {
   animation: fadeOut 0.2s ease-in forwards;
+}
+
+.animate-bounce-delay-1 {
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.animate-bounce-delay-2 {
+  animation: bounce 1s ease-in-out 0.2s infinite;
+}
+
+.animate-bounce-delay-3 {
+  animation: bounce 1s ease-in-out 0.4s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.5s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease-out forwards;
+}
+
+.animate-slide-up-delay {
+  animation: slideUp 0.5s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+@keyframes pulse-fast {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Hide scrollbars only for specific components like sidebar */

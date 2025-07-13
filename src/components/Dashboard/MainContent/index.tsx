@@ -191,7 +191,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
   // New function to poll progress and redirect when complete
   const pollProgressAndRedirect = async (summaryId: string, redirectUrl: string) => {
     let pollCount = 0;
-    const maxPolls = 180; // Increased to 6 minutes of polling but with faster frequency
+    const maxPolls = 300; // Increased to 10 minutes of polling with faster frequency
     let isMounted = true; // Track component mount state
     
     // OPTIMIZED: Cleanup function to prevent memory leaks and stale polling
@@ -311,23 +311,26 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         }
         
         // OPTIMIZED: Dynamic polling frequency based on progress stage
-        let nextPollDelay = 500; // Default 0.5 second for active processing - OPTIMIZED: Faster polling
+        let nextPollDelay = 500; // Default 0.5 second for active processing
         
         // Adjust polling frequency based on stage
         switch (stage) {
           case 'pending':
           case 'queued':
-            nextPollDelay = 1000; // 1 second for queued items - OPTIMIZED: Faster polling
+            nextPollDelay = 800; // 0.8 second for queued items
             break;
           case 'transcribing':
+            nextPollDelay = 600; // 0.6 second during transcribing
+            break;
           case 'summarizing':
-            nextPollDelay = 500; // Very frequent during active processing - OPTIMIZED: Faster polling
+          case 'analyzing':
+            nextPollDelay = 800; // 0.8 second during summarizing
             break;
           case 'finalizing':
-            nextPollDelay = 500; // 0.5 second during finalizing - OPTIMIZED: Faster polling
+            nextPollDelay = 500; // 0.5 second during finalizing (faster)
             break;
           default:
-            nextPollDelay = 800; // 0.8 seconds default - OPTIMIZED: Faster polling
+            nextPollDelay = 700; // 0.7 seconds default
         }
         
         // Continue polling if not complete and under max polls
@@ -358,7 +361,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         if (isAbortError) {
           // Abort errors are temporary - just retry with backoff
           console.log('⏳ Fetch aborted (timeout), retrying...');
-          const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000);
+          const retryDelay = Math.min(500 * Math.pow(1.2, pollCount % 5), 2000);
           
           if (pollCount < maxPolls && isMounted) {
             console.log(`🔄 Retrying poll in ${retryDelay}ms due to abort`);
@@ -372,7 +375,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
           }
         } else {
           // Real error - use exponential backoff
-          const retryDelay = Math.min(1000 * Math.pow(1.5, pollCount % 5), 5000);
+          const retryDelay = Math.min(800 * Math.pow(1.3, pollCount % 5), 3000);
           
           if (pollCount < maxPolls && isMounted) {
             console.log(`🔄 Retrying poll in ${retryDelay}ms due to error`);

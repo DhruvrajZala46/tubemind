@@ -5,21 +5,80 @@ import { currentUser } from '@clerk/nextjs/server';
 
 const logger = createLogger('api:summary-status');
 
-// Map status to estimated progress range
-function getProgressForStatus(status: string): number {
+// Processing stages and their estimated progress ranges
+const PROCESSING_STAGES = {
+  pending: { min: 0, max: 10, increment: 0.2 },
+  queued: { min: 5, max: 15, increment: 0.3 },
+  transcribing: { min: 15, max: 40, increment: 0.5 },
+  summarizing: { min: 40, max: 85, increment: 0.4 },
+  finalizing: { min: 85, max: 98, increment: 0.7 },
+  completed: { min: 100, max: 100, increment: 0 }
+};
+
+// Cache for progress tracking per summary
+const progressCache = new Map<string, {
+  lastProgress: number;
+  lastUpdated: number;
+  stage: string;
+}>();
+
+// Get progress for a specific status with consistent increments
+function getProgressForStatus(status: string, summaryId: string): number {
   const normalizedStatus = status.toLowerCase();
+  let stageKey: keyof typeof PROCESSING_STAGES = 'pending';
   
-  if (normalizedStatus.includes('complet')) return 100;
-  if (normalizedStatus.includes('fail')) return 0;
+  // Map status to stage key
+  if (normalizedStatus.includes('complet')) stageKey = 'completed';
+  else if (normalizedStatus.includes('fail')) return 0;
+  else if (normalizedStatus.includes('finaliz')) stageKey = 'finalizing';
+  else if (normalizedStatus.includes('summari') || normalizedStatus.includes('analyz')) stageKey = 'summarizing';
+  else if (normalizedStatus.includes('transcrib')) stageKey = 'transcribing';
+  else if (normalizedStatus.includes('queue')) stageKey = 'queued';
   
-  // More granular progress estimation
-  if (normalizedStatus.includes('finaliz')) return 85 + Math.floor(Math.random() * 10);
-  if (normalizedStatus.includes('summari') || normalizedStatus.includes('analyz')) return 45 + Math.floor(Math.random() * 30);
-  if (normalizedStatus.includes('transcrib')) return 15 + Math.floor(Math.random() * 25);
-  if (normalizedStatus.includes('pend') || normalizedStatus.includes('queue')) return 5 + Math.floor(Math.random() * 10);
+  const stageConfig = PROCESSING_STAGES[stageKey];
   
-  // Default progress
-  return 50;
+  // Get cached progress or initialize
+  const now = Date.now();
+  const cached = progressCache.get(summaryId);
+  
+  // If completed, always return 100%
+  if (stageKey === 'completed') {
+    progressCache.delete(summaryId); // Clean up cache
+    return 100;
+  }
+  
+  // If stage changed or no cache, initialize with min value for this stage
+  if (!cached || cached.stage !== stageKey) {
+    const newProgress = stageConfig.min;
+    progressCache.set(summaryId, {
+      lastProgress: newProgress,
+      lastUpdated: now,
+      stage: stageKey
+    });
+    return newProgress;
+  }
+  
+  // Calculate time-based increment
+  const elapsedSeconds = (now - cached.lastUpdated) / 1000;
+  const increment = Math.min(
+    stageConfig.increment * elapsedSeconds,
+    (stageConfig.max - cached.lastProgress) / 2 // Slow down as we approach max
+  );
+  
+  // Update progress with increment, but don't exceed max for this stage
+  const newProgress = Math.min(
+    stageConfig.max,
+    cached.lastProgress + increment
+  );
+  
+  // Update cache
+  progressCache.set(summaryId, {
+    lastProgress: newProgress,
+    lastUpdated: now,
+    stage: stageKey
+  });
+  
+  return Math.round(newProgress * 10) / 10; // Round to 1 decimal place
 }
 
 export async function GET(
@@ -78,41 +137,34 @@ export async function GET(
     const elapsedSeconds = Math.floor(elapsedMs / 1000);
     
     // Calculate estimated progress based on status and time elapsed
-    let progress = getProgressForStatus(status);
-    
-    // Add some variability to progress to make it feel more dynamic
-    // But ensure it's always increasing
-    const variability = Math.min(5, Math.floor(Math.random() * 3) + 1);
-    progress = Math.min(99, progress + variability);
+    const progress = getProgressForStatus(status, summaryId);
     
     // If completed, always 100%
-    if (status === 'completed') {
-      progress = 100;
-    }
+    const finalProgress = status === 'completed' ? 100 : progress;
 
     // Generate a detailed status message
     let detailedMessage = '';
     const normalizedStatus = status.toLowerCase();
     
     if (normalizedStatus.includes('transcrib')) {
-      detailedMessage = `Converting video to text (${Math.min(100, Math.floor(progress * 1.5))}% complete)`;
+      detailedMessage = `Converting video to text (${Math.min(100, Math.floor(finalProgress))}% complete)`;
     } else if (normalizedStatus.includes('summari') || normalizedStatus.includes('analyz')) {
-      detailedMessage = `Analyzing content and extracting insights (${Math.min(100, Math.floor(progress * 0.8))}% complete)`;
+      detailedMessage = `Analyzing content and extracting insights (${Math.min(100, Math.floor(finalProgress))}% complete)`;
     } else if (normalizedStatus.includes('finaliz')) {
-      detailedMessage = `Organizing and polishing results (${Math.min(100, Math.floor(progress * 0.95))}% complete)`;
+      detailedMessage = `Organizing and polishing results (${Math.min(100, Math.floor(finalProgress))}% complete)`;
     } else if (normalizedStatus.includes('complet')) {
       detailedMessage = 'Summary ready to view!';
     } else {
       detailedMessage = 'Processing your video...';
     }
 
-    logger.info(`Summary status check`, { summaryId, userId: user.id, status, progress });
+    logger.info(`Summary status check`, { summaryId, userId: user.id, status, progress: finalProgress });
 
     return NextResponse.json({ 
         status: status,  // Keep for compatibility with ProcessingStatusPoller
         processing_status: status,  // Add for VideoSummary and ProcessingStatusDisplay
         processing_stage: status,   // Add for stage mapping
-        processing_progress: progress,
+        processing_progress: finalProgress,
         elapsed_seconds: elapsedSeconds,
         video_duration: videoDuration,
         detailed_message: detailedMessage,

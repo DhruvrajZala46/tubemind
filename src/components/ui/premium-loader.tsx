@@ -28,41 +28,53 @@ const STAGES: Array<{
   description: string;
   baseProgress: number;
   icon: string;
+  expectedDuration: number; // Expected duration in seconds for this stage
+  simulationSpeed: number; // How fast to simulate progress (points per second)
 }> = [
   {
     id: 'pending',
     label: 'Preparing',
     description: 'Getting everything ready...',
     baseProgress: 0,
-    icon: '🚀'
+    icon: '🚀',
+    expectedDuration: 3,
+    simulationSpeed: 5
   },
   {
     id: 'transcribing',
     label: 'Transcribing',
     description: 'Converting video to text...',
     baseProgress: 20,
-    icon: '🎙️'
+    icon: '🎙️',
+    expectedDuration: 20,
+    simulationSpeed: 1.5
   },
   {
     id: 'summarizing',
     label: 'Summarizing', 
     description: 'Analyzing content and generating insights...',
     baseProgress: 60,
-    icon: '🧠'
+    icon: '🧠',
+    expectedDuration: 25,
+    simulationSpeed: 1.2
   },
   {
     id: 'finalizing',
     label: 'Finalizing',
     description: 'Polishing and organizing results...',
     baseProgress: 90,
-    icon: '✨'
+    icon: '✨',
+    expectedDuration: 5,
+    simulationSpeed: 2
   },
   {
     id: 'completed',
     label: 'Complete',
     description: 'Your summary is ready!',
     baseProgress: 100,
-    icon: '✅'
+    icon: '✅',
+    expectedDuration: 0,
+    simulationSpeed: 0
   }
 ];
 
@@ -78,19 +90,27 @@ const STAGE_MESSAGES = {
     'Converting speech to text...',
     'Processing audio content...',
     'Extracting spoken words...',
-    'Capturing every word...'
+    'Capturing every word...',
+    'Analyzing audio patterns...',
+    'Decoding speech segments...'
   ],
   summarizing: [
     'Analyzing key concepts...',
     'Identifying main points...',
     'Finding important insights...',
-    'Connecting ideas together...'
+    'Connecting ideas together...',
+    'Extracting core messages...',
+    'Detecting key arguments...',
+    'Understanding context...',
+    'Mapping content structure...'
   ],
   finalizing: [
     'Organizing content structure...',
     'Adding finishing touches...',
     'Preparing final output...',
-    'Making it perfect...'
+    'Making it perfect...',
+    'Formatting results...',
+    'Optimizing readability...'
   ]
 };
 
@@ -113,6 +133,12 @@ export function PremiumLoader({
   const lastProgressUpdateRef = useRef<number>(Date.now());
   const progressSpeedRef = useRef<number>(1);
   const [progressActivity, setProgressActivity] = useState<'slow' | 'normal' | 'fast'>('normal');
+  
+  // New refs for continuous progress simulation
+  const simulatedProgressRef = useRef<number>(0);
+  const lastSimulationTimeRef = useRef<number>(Date.now());
+  const backendProgressRef = useRef<number>(progress);
+  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animated dots effect (...)
   useEffect(() => {
@@ -148,6 +174,94 @@ export function PremiumLoader({
     return () => clearInterval(interval);
   }, [currentStage]);
 
+  // Store the backend progress in a ref to use in simulation
+  useEffect(() => {
+    backendProgressRef.current = progress;
+  }, [progress]);
+
+  // Continuous progress simulation
+  useEffect(() => {
+    // Clear any existing interval
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+    }
+
+    // Don't simulate for completed or failed states
+    if (currentStage === 'completed' || currentStage === 'failed') {
+      simulatedProgressRef.current = currentStage === 'completed' ? 100 : 0;
+      setOverallProgress(simulatedProgressRef.current);
+      return;
+    }
+
+    // Initialize simulated progress when stage changes
+    const stageInfo = STAGES.find(stage => stage.id === currentStage);
+    if (!stageInfo) return;
+
+    // Start with the higher of current simulation or backend progress
+    simulatedProgressRef.current = Math.max(
+      simulatedProgressRef.current, 
+      backendProgressRef.current || stageInfo.baseProgress
+    );
+
+    // Calculate next stage's base progress to use as ceiling
+    const stageIndex = STAGES.findIndex(s => s.id === currentStage);
+    const nextStage = STAGES[stageIndex + 1];
+    const progressCeiling = nextStage ? nextStage.baseProgress - 1 : 99;
+
+    // Set up simulation interval (60fps for smooth animation)
+    simulationIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastSimulationTimeRef.current;
+      lastSimulationTimeRef.current = now;
+
+      // Skip if no time has passed
+      if (elapsed <= 0) return;
+
+      // Calculate simulation speed based on current stage
+      const baseSpeed = stageInfo.simulationSpeed;
+      
+      // Slow down as we approach the ceiling
+      const remainingProgress = progressCeiling - simulatedProgressRef.current;
+      const speedFactor = Math.min(1, remainingProgress / 20); // Slow down in last 20%
+      
+      // Calculate progress increment (points per second)
+      const increment = (baseSpeed * speedFactor * elapsed) / 1000;
+      
+      // Update simulated progress, but don't exceed ceiling
+      simulatedProgressRef.current = Math.min(
+        progressCeiling,
+        simulatedProgressRef.current + increment
+      );
+
+      // Use the higher of simulated or backend progress
+      const finalProgress = Math.max(
+        simulatedProgressRef.current,
+        backendProgressRef.current || 0
+      );
+      
+      // Update overall progress
+      setOverallProgress(finalProgress);
+      
+      // Update progress activity indicator based on speed
+      if (baseSpeed * speedFactor > 2) {
+        setProgressActivity('fast');
+      } else if (baseSpeed * speedFactor < 0.5) {
+        setProgressActivity('slow');
+      } else {
+        setProgressActivity('normal');
+      }
+      
+      // Update particle count based on speed
+      setParticleCount(Math.max(2, Math.min(8, Math.floor(baseSpeed * speedFactor * 2))));
+    }, 16);
+
+    return () => {
+      if (simulationIntervalRef.current) {
+        clearInterval(simulationIntervalRef.current);
+      }
+    };
+  }, [currentStage]);
+
   // Improved progress calculation with smooth transitions
   useEffect(() => {
     const stageInfo = STAGES.find(stage => stage.id === currentStage);
@@ -156,28 +270,9 @@ export function PremiumLoader({
       return;
     }
     
-    let calculatedProgress = stageInfo.baseProgress;
-    
-    // If we have backend progress, use it within the stage bounds
-    if (progress > 0) {
-      // For pending stage, use backend progress directly (up to 20%)
-      if (currentStage === 'pending') {
-        calculatedProgress = Math.min(20, progress);
-      }
-      // For other stages, interpolate within their range
-      else if (currentStage !== 'completed') {
-        const nextStage = STAGES[STAGES.findIndex(s => s.id === currentStage) + 1];
-        if (nextStage) {
-          const stageRange = nextStage.baseProgress - stageInfo.baseProgress;
-          const stageProgress = (progress / 100) * stageRange;
-          calculatedProgress = stageInfo.baseProgress + stageProgress;
-        }
-      }
-    }
-    
     // For completed stage, always 100%
     if (currentStage === 'completed') {
-      calculatedProgress = 100;
+      setOverallProgress(100);
     }
     
     // Calculate progress speed
@@ -185,34 +280,19 @@ export function PremiumLoader({
     const timeDiff = now - lastProgressUpdateRef.current;
     if (timeDiff > 0 && lastProgressUpdateRef.current > 0) {
       const prevProgress = overallProgress;
-      const progressDiff = calculatedProgress - prevProgress;
+      const progressDiff = overallProgress - prevProgress;
       if (progressDiff > 0) {
         // Points per second
         progressSpeedRef.current = (progressDiff / timeDiff) * 1000;
-        
-        // Update progress activity indicator
-        if (progressSpeedRef.current > 5) {
-          setProgressActivity('fast');
-        } else if (progressSpeedRef.current < 0.5) {
-          setProgressActivity('slow');
-        } else {
-          setProgressActivity('normal');
-        }
-        
-        // Update particle count based on speed
-        setParticleCount(Math.max(2, Math.min(8, Math.floor(progressSpeedRef.current * 2))));
       }
     }
     lastProgressUpdateRef.current = now;
-    
-    // Ensure progress never goes backwards
-    setOverallProgress(prev => Math.max(prev, calculatedProgress));
     
     // Trigger onComplete callback when done
     if (currentStage === 'completed' && onComplete) {
       onComplete();
     }
-  }, [currentStage, progress, onComplete]);
+  }, [currentStage, overallProgress, onComplete]);
 
   // Smooth progress animation
   useEffect(() => {
