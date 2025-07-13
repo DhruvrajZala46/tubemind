@@ -603,7 +603,7 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('[WORKFLOW] Transcript formatted successfully.');
 
   // STEP 2: Select model and validate token count for a single call
-  const model = 'gpt-4o-mini'; 
+  const model = 'gpt-4.1-nano-2025-04-14'; 
   logger.info(`[MODEL] Using model: ${model} for a single-call summarization.`);
 
   const systemPromptTokens = encode(SYSTEM_PROMPT).length;
