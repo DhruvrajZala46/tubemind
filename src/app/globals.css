@@ -498,6 +498,25 @@ html {
   }
 }
 
+/* 🚀 CONTINUOUS PROGRESS: Shimmer animation for progress bar */
+@keyframes progress-shimmer {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-progress-shimmer {
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
 /* Mobile-first responsive improvements - Claude-style */
 @media (max-width: 1023px) {
   /* Force full-width mobile layout - no white space */
