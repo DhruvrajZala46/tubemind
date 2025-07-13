@@ -42,11 +42,11 @@ export default function KnowledgeDisplay({ data, videoTitle, thumbnailUrl, rawAI
   );
 }
 
-// Add a new component for processing status with PerplexityLoader
+// Add a new component for processing status with PremiumLoader
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PerplexityLoader, ProcessingStage } from './ui/perplexity-loader';
+import { PremiumLoader, ProcessingStage } from './ui/premium-loader';
 
 interface ProcessingStatusDisplayProps {
   videoId: string;
@@ -160,7 +160,7 @@ export function ProcessingStatusDisplay({ videoId, summaryId, initialStatus }: P
   // Show the loader while processing
   if (isLoading || status !== 'completed') {
     return (
-      <PerplexityLoader 
+      <PremiumLoader 
         currentStage={mapApiStatusToComponentStage(stage)}
         progress={progress}
         showProgress={true}

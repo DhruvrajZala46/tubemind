@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { PerplexityLoader, ProcessingStage } from './ui/perplexity-loader';
+import { PremiumLoader, ProcessingStage } from './ui/premium-loader';
 
 interface ProcessingStatusProps {
   stage: 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error';
@@ -12,8 +12,8 @@ interface ProcessingStatusProps {
 }
 
 export default function ProcessingStatus({ stage, progress, message, error, onRetry }: ProcessingStatusProps) {
-  // Map our existing stages to the new PerplexityLoader stages
-  const mapStageToPerplexityStage = (stage: string): ProcessingStage => {
+  // Map our existing stages to the new PremiumLoader stages
+  const mapStageToProcessingStage = (stage: string): ProcessingStage => {
     switch (stage) {
       case 'fetching': return 'pending';
       case 'transcribing': return 'transcribing';
@@ -41,14 +41,13 @@ export default function ProcessingStatus({ stage, progress, message, error, onRe
   const displayProgress = Math.max(progress, prevProgressRef.current);
 
   return (
-    <PerplexityLoader
+    <PremiumLoader
       className="w-full max-w-4xl mx-auto"
-      currentStage={mapStageToPerplexityStage(stage)}
+      currentStage={mapStageToProcessingStage(stage)}
       progress={displayProgress}
       showProgress={true}
       showAnimatedText={true}
       accentColor="#DC143C"
-      fastAnimation={true} // OPTIMIZED: Enable faster animations
       onComplete={stage === 'complete' ? () => console.log('Processing completed') : undefined}
     />
   );

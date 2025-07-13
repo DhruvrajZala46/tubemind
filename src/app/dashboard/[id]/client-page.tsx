@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import VideoSummary from '../../../components/Dashboard/VideoSummary';
-import { PerplexityLoader, ProcessingStage } from '@/components/ui/perplexity-loader';
+import { PremiumLoader, ProcessingStage } from '@/components/ui/premium-loader';
 
 interface VideoSummaryClientPageProps {
   initialSummary: any; // Can be null if processing is not complete
@@ -143,7 +143,7 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 max-w-6xl">
         {isProcessing ? (
             <div className="mt-6 sm:mt-8 mb-8 sm:mb-12 px-2 sm:px-0">
-                <PerplexityLoader 
+                <PremiumLoader 
                   currentStage={mapApiStatusToProcessingStage(processingStatus)}
                   progress={progress}
                   showProgress={true}
