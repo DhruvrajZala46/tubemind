@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import MainHeader from "./Header";
-import ProcessingStatus from "../../processing-status";
-import KnowledgeDisplay from "../../knowledge-display";
+import { PremiumLoader } from '../../ui/premium-loader';
 import { useUser } from "@clerk/nextjs";
 import { extractYouTubeId } from '../../../lib/youtube';
 import { ElegantLoader } from "../../ui/elegant-loader";
@@ -15,7 +14,7 @@ import { toast } from 'sonner';
 import { useInstantLoading } from '../../ui/instant-loading';
 import { useMainLoading } from "../../../lib/main-loading-context.tsx";
 
-type ProcessingStage = 'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error' | 'pending';
+type ProcessingStage = 'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error' | 'pending' | 'summarizing' | 'finalizing' | 'failed' | 'queued' | 'extracting' | 'completed';
 
 export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuOpen }: { isMobileMenuOpen?: boolean, setIsMobileMenuOpen?: (open: boolean) => void }) {
   const { isSignedIn, isLoaded } = useUser();
@@ -586,10 +585,24 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       {/* Processing Status */}
       {isProcessing && processingStage !== 'idle' && (
         <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 px-2 sm:px-0">
-          <ProcessingStatus 
-            stage={processingStage as 'fetching' | 'transcribing' | 'analyzing' | 'complete' | 'error'}
+          <PremiumLoader
+            currentStage={
+              ({
+                'fetching': 'pending',
+                'pending': 'pending',
+                'queued': 'pending',
+                'transcribing': 'transcribing',
+                'extracting': 'transcribing',
+                'summarizing': 'summarizing',
+                'analyzing': 'summarizing',
+                'finalizing': 'finalizing',
+                'complete': 'completed',
+                'completed': 'completed',
+                'error': 'failed',
+                'failed': 'failed',
+              } as const)[processingStage] || 'pending'
+            }
             progress={progress}
-            message={statusMessage}
           />
         </div>
       )}
