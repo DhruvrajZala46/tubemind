@@ -37,8 +37,8 @@ const STAGES: Array<{
     description: 'Getting everything ready...',
     baseProgress: 0,
     icon: '🚀',
-    expectedDuration: 3,
-    simulationSpeed: 8 // Faster initial movement
+    expectedDuration: 5,
+    simulationSpeed: 1.5 // Much slower, more realistic
   },
   {
     id: 'transcribing',
@@ -46,8 +46,8 @@ const STAGES: Array<{
     description: 'Converting video to text...',
     baseProgress: 20,
     icon: '🎙️',
-    expectedDuration: 20,
-    simulationSpeed: 2.5 // Steady, continuous movement
+    expectedDuration: 25,
+    simulationSpeed: 0.8 // Slower, realistic transcribing speed
   },
   {
     id: 'summarizing',
@@ -55,8 +55,8 @@ const STAGES: Array<{
     description: 'Analyzing content and generating insights...',
     baseProgress: 60,
     icon: '🧠',
-    expectedDuration: 25,
-    simulationSpeed: 1.8 // Consistent movement during analysis
+    expectedDuration: 30,
+    simulationSpeed: 0.6 // Much slower analysis, more realistic
   },
   {
     id: 'finalizing',
@@ -64,8 +64,8 @@ const STAGES: Array<{
     description: 'Polishing and organizing results...',
     baseProgress: 90,
     icon: '✨',
-    expectedDuration: 5,
-    simulationSpeed: 3 // Faster finishing movement
+    expectedDuration: 8,
+    simulationSpeed: 1.0 // Moderate finishing speed
   },
   {
     id: 'completed',
@@ -216,46 +216,51 @@ export function PremiumLoader({
       // Calculate simulation speed based on current stage
       const baseSpeed = stageInfo.simulationSpeed;
       
-      // 🔥 NEVER STOP MOVING: Always maintain minimum movement speed
-      const minimumSpeed = 0.05; // Always move at least 0.05% per second
+      // 🔥 REALISTIC CONTINUOUS MOVEMENT: Maintain minimum movement but much slower
+      const minimumSpeed = 0.01; // Much slower minimum - only 0.01% per second
       const currentProgress = simulatedProgressRef.current;
       
-      // Adaptive speed calculation - slower as we get higher, but NEVER stops
+      // Realistic speed calculation - much slower but still moving
       let dynamicSpeed = baseSpeed;
       
-      // Slow down gradually but never completely stop
-      if (currentProgress > 80) {
-        dynamicSpeed = Math.max(minimumSpeed * 2, baseSpeed * 0.3); // Very slow but moving
-      } else if (currentProgress > 60) {
-        dynamicSpeed = Math.max(minimumSpeed * 3, baseSpeed * 0.6); // Slower but moving
-      } else if (currentProgress > 40) {
-        dynamicSpeed = Math.max(minimumSpeed * 4, baseSpeed * 0.8); // Bit slower but moving
+      // Gradual slowdown that feels natural and realistic
+      if (currentProgress > 85) {
+        dynamicSpeed = Math.max(minimumSpeed, baseSpeed * 0.15); // Very slow near end
+      } else if (currentProgress > 70) {
+        dynamicSpeed = Math.max(minimumSpeed * 2, baseSpeed * 0.3); // Slower in later stages
+      } else if (currentProgress > 50) {
+        dynamicSpeed = Math.max(minimumSpeed * 3, baseSpeed * 0.6); // Moderate slowdown
+      } else if (currentProgress > 30) {
+        dynamicSpeed = Math.max(minimumSpeed * 4, baseSpeed * 0.8); // Slight slowdown
       } else {
-        dynamicSpeed = Math.max(minimumSpeed * 5, baseSpeed); // Normal or faster
+        dynamicSpeed = Math.max(minimumSpeed * 5, baseSpeed); // Normal speed early on
       }
       
-      // Add slight randomness for more natural feel (±20%)
-      const randomFactor = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+      // Add slight randomness for natural feel (±15% instead of ±20%)
+      const randomFactor = 0.85 + Math.random() * 0.3; // 0.85 to 1.15
       dynamicSpeed *= randomFactor;
       
-      // Calculate progress increment (points per second) - ALWAYS POSITIVE
-      const increment = Math.max(0.001, (dynamicSpeed * elapsed) / 1000); // Never less than 0.001%
+      // Calculate progress increment - MUCH SMALLER for realism
+      const increment = Math.max(0.0005, (dynamicSpeed * elapsed) / 1000); // Never less than 0.0005%
       
-      // 🎯 NEVER-STOPPING UPDATE: Always increment, no ceiling restrictions until 98%
-      if (currentProgress < 98) {
-        simulatedProgressRef.current = Math.min(98, simulatedProgressRef.current + increment);
+      // 🎯 REALISTIC UPDATE: Much slower progression, caps at 95% until backend completion
+      if (currentProgress < 90) {
+        simulatedProgressRef.current = Math.min(90, simulatedProgressRef.current + increment);
+      } else if (currentProgress < 95) {
+        // Very slow movement from 90-95%
+        simulatedProgressRef.current = Math.min(95, simulatedProgressRef.current + (minimumSpeed * elapsed) / 2000);
       } else {
-        // At 98%+, move very slowly but keep moving
-        simulatedProgressRef.current = Math.min(99.8, simulatedProgressRef.current + (minimumSpeed * elapsed) / 1000);
+        // Extremely slow movement above 95%, waiting for real completion
+        simulatedProgressRef.current = Math.min(98.5, simulatedProgressRef.current + (minimumSpeed * elapsed) / 5000);
       }
 
-      // 🚀 HEARTBEAT EFFECT: Ensure tiny movement every few seconds even when slow
+      // 🚀 REALISTIC HEARTBEAT: Much smaller nudges, less frequent
       const timeSinceLastUpdate = now - lastSimulationTimeRef.current;
-      if (timeSinceLastUpdate > 3000 && currentProgress < 98) { // Every 3 seconds
-        simulatedProgressRef.current = Math.min(98, simulatedProgressRef.current + 0.1); // Tiny 0.1% nudge
+      if (timeSinceLastUpdate > 5000 && currentProgress < 90) { // Every 5 seconds, smaller nudge
+        simulatedProgressRef.current = Math.min(90, simulatedProgressRef.current + 0.05); // Tiny 0.05% nudge
       }
 
-      // Use the higher of simulated or backend progress (but backend can push us forward)
+      // Use the higher of simulated or backend progress (backend can push us forward)
       const finalProgress = Math.max(
         simulatedProgressRef.current,
         backendProgressRef.current || 0
@@ -264,6 +269,10 @@ export function PremiumLoader({
       // If backend gives us higher progress, jump to it and continue from there
       if (backendProgressRef.current && backendProgressRef.current > simulatedProgressRef.current) {
         simulatedProgressRef.current = backendProgressRef.current;
+        // If backend shows completion (100%), override our simulation
+        if (backendProgressRef.current >= 100) {
+          simulatedProgressRef.current = 100;
+        }
       }
       
       // Update overall progress
@@ -322,18 +331,18 @@ export function PremiumLoader({
     }
   }, [currentStage, overallProgress, onComplete]);
 
-  // Smooth progress animation - ULTRA-RESPONSIVE for continuous movement
+  // Smooth progress animation - REALISTIC for slower movement
   useEffect(() => {
     const interval = setInterval(() => {
       setSmoothProgress(prev => {
         const diff = overallProgress - prev;
-        if (Math.abs(diff) < 0.05) return overallProgress; // Even smaller threshold for ultra-smooth
+        if (Math.abs(diff) < 0.02) return overallProgress; // Smaller threshold for smoother feel
         
-        // 🚀 FASTER, MORE RESPONSIVE animation for continuous feel
-        const speed = Math.min(0.6, Math.max(0.1, diff * 0.15)); // Faster animation speed
+        // 🎯 REALISTIC animation speed - not too fast, not too slow
+        const speed = Math.min(0.3, Math.max(0.05, diff * 0.08)); // More moderate animation speed
         return prev + diff * speed;
       });
-    }, 8); // 120fps for ultra-smooth animation (even smoother than 60fps)
+    }, 16); // Keep 60fps but with more realistic speed
     
     return () => clearInterval(interval);
   }, [overallProgress]);
