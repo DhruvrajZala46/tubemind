@@ -70,6 +70,15 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
     }
   }, [isSignedIn, searchParams, router]);
 
+  // Show thumbnail when a valid YouTube URL is entered
+  useEffect(() => {
+    if (videoId) {
+      setThumbnail(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+    } else {
+      setThumbnail(null);
+    }
+  }, [videoId]);
+
   const handleProcess = async (url: string, fromQuery = false) => {
     if (!isSignedIn) {
       router.push('/sign-in');
@@ -420,8 +429,9 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       <div className="hidden sm:block w-full">
         <MainHeader />
       </div>
-      {/* Mobile: Centered message only */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'calc(100vh - 3.5rem - 4.5rem)' }}>
+      
+      {/* Mobile: Centered message only - REDUCED HEIGHT for better spacing */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'calc(100vh - 10rem)' }}>
         <h1
           className="text-[2.1rem] font-extrabold text-white text-center mb-2"
           style={{
@@ -436,6 +446,14 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
           Watch Less, Learn More
         </h1>
       </div>
+      
+      {/* Video Thumbnail Preview - MOBILE FRIENDLY VERSION */}
+      {thumbnailUrl && !error && !isProcessing && (
+        <div className="mt-4 mb-4 p-3 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center sm:hidden">
+          <img src={thumbnailUrl} alt="Video thumbnail" className="w-full h-auto max-h-44 rounded-lg object-cover" />
+        </div>
+      )}
+      
       {/* Desktop: Main content area as before */}
       <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 mb-4 sm:mb-8 hidden sm:block">
         {/* Video Input Section - Claude AI style */}
@@ -483,22 +501,58 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
           )}
         </form>
         
-        {/* Video Thumbnail Preview */}
-        {thumbnailUrl && !error && (
+        {/* Video Thumbnail Preview - DESKTOP ONLY */}
+        {thumbnailUrl && !error && !isProcessing && (
           <div className="mt-4 p-4 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center">
             <img src={thumbnailUrl} alt="Video thumbnail" className="w-80 h-44 rounded-lg object-cover mb-2" />
           </div>
         )}
       </div>
-      {/* Mobile: Fixed bottom input bar - UPDATED for better native feel and bg match */}
+      
+      {/* Error Display */}
+      {errorType && (
+        <div className="w-full max-w-3xl mx-auto mt-4">
+          {errorType === 'rate-limit' && <RateLimitError />}
+          {errorType === 'network' && <NetworkError />}
+          {errorType === 'subscription' && <SubscriptionError />}
+          {errorType === 'general' && <ThemedError message={error} />}
+        </div>
+      )}
+      
+      {/* Processing Status - IMPROVED MOBILE POSITIONING */}
+      {isProcessing && processingStage !== 'idle' && (
+        <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 px-2 sm:px-0 pb-28 sm:pb-0">
+          <PremiumLoader
+            currentStage={
+              ({
+                'fetching': 'pending',
+                'pending': 'pending',
+                'queued': 'pending',
+                'transcribing': 'transcribing',
+                'extracting': 'transcribing',
+                'summarizing': 'summarizing',
+                'analyzing': 'summarizing',
+                'finalizing': 'finalizing',
+                'complete': 'completed',
+                'completed': 'completed',
+                'error': 'failed',
+                'failed': 'failed',
+              } as const)[processingStage] || 'pending'
+            }
+            progress={progress}
+          />
+        </div>
+      )}
+      
+      {/* Mobile: Fixed bottom input bar - IMPROVED POSITIONING */}
       <div
-        className={`fixed bottom-0 left-0 w-full z-40 border-t border-[#22292F] sm:hidden transition-all duration-300`}
+        className={`fixed bottom-0 left-0 w-full z-50 border-t border-[#22292F] sm:hidden transition-all duration-300`}
         style={{
-          background: 'rgba(0,0,0,0.65)',
+          background: 'rgba(0,0,0,0.85)', // Slightly darker for better contrast
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           borderTop: '1px solid #22292F',
-          padding: '1.1rem 1.2rem calc(env(safe-area-inset-bottom) + 1.1rem) 1.2rem',
+          padding: '0.9rem 1.2rem calc(env(safe-area-inset-bottom) + 0.9rem) 1.2rem',
           boxSizing: 'border-box',
         }}
       >
@@ -523,7 +577,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
               background: 'rgba(0,0,0,0.65)',
               backdropFilter: 'blur(16px)',
               WebkitBackdropFilter: 'blur(16px)',
-              padding: '0.7rem 1.1rem',
+              padding: '0.5rem 1rem',
               margin: 0,
             }}
           >
@@ -545,11 +599,11 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
               }}
               onBlur={() => setTouched(true)}
               placeholder="Enter YouTube video URL to summarize..."
-              className="flex-1 bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-[17px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
+              className="flex-1 bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-secondary)] text-[16px] font-normal font-sans rounded-2xl focus:ring-0 focus:outline-none"
               style={{
                 minWidth: 0,
-                padding: '1.1rem 1rem',
-                fontSize: 17,
+                padding: '0.8rem 0.5rem',
+                fontSize: 16,
                 marginRight: 8,
                 background: 'transparent',
               }}
@@ -557,55 +611,20 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
             />
             <button
               type="submit"
-              className="ml-2 flex items-center justify-center h-12 w-12 rounded-2xl bg-[var(--btn-dashboard-bg)] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
+              className="flex items-center justify-center h-10 w-10 rounded-xl bg-[var(--btn-dashboard-bg)] hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md focus:shadow-lg border-none"
               disabled={!!error || !input.trim() || isSubmitting || isProcessing || isMobileMenuOpen}
               style={{ minWidth: 0 }}
             >
-              {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-5 h-5 text-[var(--btn-primary-text)]" />}
+              {(isSubmitting || isProcessing) ? <ElegantLoader size="sm" /> : <ArrowUp className="w-4 h-4 text-[var(--btn-primary-text)]" />}
             </button>
           </div>
         </form>
         {error && touched && (
-          <div className="text-[var(--text-primary)] font-medium text-xs mt-2 min-h-[20px] w-full text-left px-1 font-sans">
+          <div className="text-[var(--text-primary)] font-medium text-xs mt-1 min-h-[16px] w-full text-left px-1 font-sans">
             {error}
           </div>
         )}
       </div>
-      
-      {/* Error Display */}
-      {errorType && (
-        <div className="w-full max-w-3xl mx-auto mt-4">
-          {errorType === 'rate-limit' && <RateLimitError />}
-          {errorType === 'network' && <NetworkError />}
-          {errorType === 'subscription' && <SubscriptionError />}
-          {errorType === 'general' && <ThemedError message={error} />}
-        </div>
-      )}
-      
-      {/* Processing Status */}
-      {isProcessing && processingStage !== 'idle' && (
-        <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 px-2 sm:px-0">
-          <PremiumLoader
-            currentStage={
-              ({
-                'fetching': 'pending',
-                'pending': 'pending',
-                'queued': 'pending',
-                'transcribing': 'transcribing',
-                'extracting': 'transcribing',
-                'summarizing': 'summarizing',
-                'analyzing': 'summarizing',
-                'finalizing': 'finalizing',
-                'complete': 'completed',
-                'completed': 'completed',
-                'error': 'failed',
-                'failed': 'failed',
-              } as const)[processingStage] || 'pending'
-            }
-            progress={progress}
-          />
-        </div>
-      )}
     </div>
   );
 }
