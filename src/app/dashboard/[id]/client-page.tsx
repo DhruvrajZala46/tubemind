@@ -54,123 +54,78 @@ function ProcessingStatusPoller({
     onComplete: (data: any) => void;
 }) {
   const [isFatalError, setIsFatalError] = useState(false);
-  const lastPollTimeRef = useRef<number>(Date.now());
-  const pollCountRef = useRef<number>(0);
-  const simulatedProgressRef = useRef<number>(0);
-  const currentStageRef = useRef<ProcessingStage>('pending');
-  const lastProgressRef = useRef<number>(0);
-  const progressRateRef = useRef<number>(0.2); // Progress points per second
-
-  // Function to simulate continuous progress between polls
-  const simulateProgress = () => {
-    if (!lastPollTimeRef.current) return;
-    
-    const now = Date.now();
-    const timeSinceLastPoll = (now - lastPollTimeRef.current) / 1000; // in seconds
-    const stageRange = getProgressRangeForStage(currentStageRef.current);
-    
-    // Calculate how much progress to add based on time elapsed and current stage
-    let newProgress = lastProgressRef.current;
-    
-    // Increase progress based on time elapsed and stage-specific rate
-    // Slow down as we approach the upper bound of the stage
-    const remainingInStage = stageRange.max - newProgress;
-    const progressIncrement = Math.min(
-      remainingInStage * 0.1, // Don't move more than 10% of remaining progress at once
-      timeSinceLastPoll * progressRateRef.current
-    );
-    
-    newProgress += progressIncrement;
-    
-    // Ensure progress stays within stage bounds
-    newProgress = Math.min(newProgress, stageRange.max - 1); // -1 to leave room for actual completion
-    
-    // Update the simulated progress
-    simulatedProgressRef.current = newProgress;
-    
-    // Send update to parent component
-    onUpdate({ 
-      status: currentStageRef.current,
-      processing_progress: newProgress,
-      simulated: true
-    });
-  };
+  const pollerState = useRef({
+    isMounted: true,
+    pollCount: 0,
+    currentStage: 'pending' as ProcessingStage,
+    lastRealProgress: 0,
+    simulatedProgress: 0,
+    pollTimeoutId: null as NodeJS.Timeout | null,
+    simulationIntervalId: null as NodeJS.Timeout | null,
+  });
 
   useEffect(() => {
-    if (!summaryId || isFatalError) return;
+    const state = pollerState.current;
 
-    let pollTimeoutId: NodeJS.Timeout | null = null;
-    let simulationIntervalId: NodeJS.Timeout | null = null;
-    let isMounted = true;
+    const simulateProgress = () => {
+      const stageRange = getProgressRangeForStage(state.currentStage);
+      // Increment a small amount each interval
+      // The rate can be dynamic based on stage
+      let increment = 0.25; // default increment
+      if(state.currentStage === 'summarizing') increment = 0.15; // Slower for summarizing
+      if(state.currentStage === 'finalizing') increment = 0.5; // Faster for finalizing
 
-    // Start simulating progress immediately
-    simulationIntervalId = setInterval(() => {
-      if (isMounted) {
-        simulateProgress();
+      let newProgress = state.simulatedProgress + increment;
+
+      // Don't let simulation go beyond the current stage's max
+      newProgress = Math.min(newProgress, stageRange.max - 0.5);
+      
+      if (newProgress > state.simulatedProgress) {
+        state.simulatedProgress = newProgress;
+        onUpdate({
+          status: state.currentStage,
+          processing_progress: state.simulatedProgress,
+          simulated: true,
+        });
       }
-    }, 500); // Update simulation every 500ms for smooth progress
+    };
 
     const pollStatus = async () => {
-      if (!isMounted) return;
-      
+      if (!state.isMounted) return;
+
       try {
-        lastPollTimeRef.current = Date.now();
-        pollCountRef.current += 1;
-        
+        state.pollCount++;
         const response = await fetch(`/api/summaries/${summaryId}/status`);
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
         
         const data = await response.json();
         
-        if (isMounted) {
-          // Update the current stage reference for simulation
-          if (data.status) {
-            const newStage = mapApiStatusToProcessingStage(data.status);
-            
-            // If stage changed, adjust progress rate based on new stage
-            if (newStage !== currentStageRef.current) {
-              currentStageRef.current = newStage;
-              
-              // Adjust progress rate based on stage
-              switch (newStage) {
-                case 'transcribing': progressRateRef.current = 3; break; // Faster for transcribing
-                case 'summarizing': progressRateRef.current = 2; break; // Medium for summarizing
-                case 'finalizing': progressRateRef.current = 5; break; // Faster for finalizing
-                default: progressRateRef.current = 2;
-              }
-            }
+        if (state.isMounted) {
+          const newStage = mapApiStatusToProcessingStage(data.status);
+          if (newStage !== state.currentStage) {
+            state.currentStage = newStage;
           }
-          
-          // Use the real progress if provided, otherwise keep simulating
+
           if (typeof data.processing_progress === 'number') {
-            lastProgressRef.current = data.processing_progress;
-            simulatedProgressRef.current = data.processing_progress;
+            state.lastRealProgress = data.processing_progress;
+            // Ensure simulated progress doesn't fall behind real progress
+            state.simulatedProgress = Math.max(state.simulatedProgress, state.lastRealProgress);
           }
           
-          // Send update to parent with real data
           onUpdate(data);
 
           if (data.status === 'completed' || data.status === 'failed') {
             onComplete(data);
           } else {
-            // Adaptive polling: poll more frequently during active stages
-            const pollInterval = 
-              currentStageRef.current === 'summarizing' ? 1500 : // Poll faster during summarizing
-              currentStageRef.current === 'finalizing' ? 800 : // Poll even faster during finalizing
-              2000; // Default poll interval
-            
-            pollTimeoutId = setTimeout(pollStatus, pollInterval);
+            const pollInterval = state.currentStage === 'summarizing' ? 2000 : 1500;
+            state.pollTimeoutId = setTimeout(pollStatus, pollInterval);
           }
         }
       } catch (err) {
-        if (isMounted) {
+        if (state.isMounted) {
           console.error("Polling error:", err);
-          
-          // Don't fail immediately, retry a few times
-          if (pollCountRef.current < 5) {
-            pollTimeoutId = setTimeout(pollStatus, 1000);
+          if (state.pollCount < 5) {
+            state.pollTimeoutId = setTimeout(pollStatus, 3000);
           } else {
             setIsFatalError(true);
             onComplete({ status: 'failed', error: 'Failed to get status.' });
@@ -178,18 +133,19 @@ function ProcessingStatusPoller({
         }
       }
     };
-    
-    // Start polling immediately
+
+    // Start polling and simulation
     pollStatus();
-    
+    state.simulationIntervalId = setInterval(simulateProgress, 400);
+
     return () => {
-      isMounted = false;
-      if (pollTimeoutId) clearTimeout(pollTimeoutId);
-      if (simulationIntervalId) clearInterval(simulationIntervalId);
+      state.isMounted = false;
+      if (state.pollTimeoutId) clearTimeout(state.pollTimeoutId);
+      if (state.simulationIntervalId) clearInterval(state.simulationIntervalId);
     };
   }, [summaryId, isFatalError, onUpdate, onComplete]);
 
-  return null; // This component does not render anything itself
+  return null;
 }
 
 // Main client component
@@ -200,29 +156,22 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
   );
   const [progress, setProgress] = useState(initialSummary?.processing_progress || 0);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const processingStageRef = useRef<ProcessingStage>('pending');
 
   const handlePollUpdate = (data: any) => {
-    setLastUpdateTime(Date.now());
-    
     if (data.status) {
       setProcessingStatus(data.status);
       processingStageRef.current = mapApiStatusToProcessingStage(data.status);
     }
     
     if (typeof data.processing_progress === 'number') {
-      // Ensure progress never decreases (unless we're starting a new summary)
+      // Ensure progress never decreases
       setProgress((prev: number) => Math.max(prev, data.processing_progress));
     }
   };
 
   const handlePollComplete = async (data: any) => {
     setProcessingStatus(data.status);
-    
-    if (typeof data.processing_progress === 'number') {
-      setProgress(data.processing_progress);
-    }
     
     if (data.status === 'completed') {
       // Ensure progress shows 100% when completed
@@ -241,6 +190,8 @@ export default function VideoSummaryClientPage({ initialSummary, videoId, summar
       } finally {
         setIsLoadingSummary(false);
       }
+    } else if (typeof data.processing_progress === 'number') {
+      setProgress(data.processing_progress);
     }
   };
 
