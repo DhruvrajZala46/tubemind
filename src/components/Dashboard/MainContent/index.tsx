@@ -431,7 +431,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       </div>
       
       {/* Mobile: Centered message only - REDUCED HEIGHT for better spacing */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'calc(100vh - 10rem)' }}>
+      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'auto', marginBottom: '1rem' }}>
         <h1
           className="text-[2.1rem] font-extrabold text-white text-center mb-2"
           style={{
@@ -449,7 +449,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       
       {/* Video Thumbnail Preview - MOBILE FRIENDLY VERSION */}
       {thumbnailUrl && !error && !isProcessing && (
-        <div className="mt-4 mb-4 p-3 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center sm:hidden">
+        <div className="mt-2 mb-3 p-3 bg-[var(--bg-input)] rounded-[8px] border border-[var(--border-color)] flex flex-col items-center sm:hidden">
           <img src={thumbnailUrl} alt="Video thumbnail" className="w-full h-auto max-h-44 rounded-lg object-cover" />
         </div>
       )}
@@ -521,7 +521,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       
       {/* Processing Status - IMPROVED MOBILE POSITIONING */}
       {isProcessing && processingStage !== 'idle' && (
-        <div className="w-full max-w-4xl mx-auto mt-4 sm:mt-6 px-2 sm:px-0 pb-28 sm:pb-0">
+        <div className="w-full max-w-4xl mx-auto mt-0 sm:mt-6 px-2 sm:px-0 pb-28 sm:pb-0">
           <PremiumLoader
             currentStage={
               ({

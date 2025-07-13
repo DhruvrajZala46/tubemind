@@ -407,14 +407,13 @@ export function PremiumLoader({
       "border border-white/10 shadow-xl",
       "transition-all duration-500 ease-out transform",
       isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4",
-      "min-h-[260px] sm:min-h-[350px]", // Reduced minimum height on mobile
-      "mx-0 sm:mx-auto", // Remove horizontal margin on mobile
+      "min-h-[350px]", // Same height for mobile and desktop
       className
     )}>
       {/* Overall progress bar */}
       {showProgress && (
         <div className="mb-6 sm:mb-8 relative">
-          <div className="h-2 sm:h-3 bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+          <div className="h-3 bg-white/5 rounded-full overflow-hidden backdrop-blur-sm">
             <div 
               ref={progressBarRef}
               className={cn(
@@ -441,7 +440,7 @@ export function PremiumLoader({
             
             {/* Pulse animation at the end of progress bar */}
             <div 
-              className="absolute top-1/2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#DC143C]/70 animate-ping" 
+              className="absolute top-1/2 w-2 h-2 rounded-full bg-[#DC143C]/70 animate-ping" 
               style={{ 
                 left: `${smoothProgress}%`, 
                 transform: 'translate(-50%, -50%)',
@@ -452,11 +451,11 @@ export function PremiumLoader({
           
           <div className="flex justify-between items-center mt-2 sm:mt-3">
             <div className="flex items-center gap-1 sm:gap-2">
-              <p className="text-xs text-white/70 font-medium">
+              <p className="text-xs sm:text-xs text-white/70 font-medium">
                 {Math.round(smoothProgress)}% complete
               </p>
               <div className={cn(
-                "text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded-full",
+                "text-xs px-1.5 py-0.5 rounded-full",
                 progressActivity === 'fast' ? "bg-green-500/20 text-green-400" :
                 progressActivity === 'slow' ? "bg-yellow-500/20 text-yellow-400" :
                 "bg-blue-500/20 text-blue-400"
@@ -466,7 +465,7 @@ export function PremiumLoader({
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#DC143C] animate-pulse"></span>
+              <span className="inline-block w-2 h-2 rounded-full bg-[#DC143C] animate-pulse"></span>
               <p className="text-xs text-white/70 font-medium">
                 {Math.max(1, currentStageIndex + 1)}/{STAGES.length - 1}
               </p>
@@ -476,7 +475,7 @@ export function PremiumLoader({
       )}
 
       {/* Processing steps */}
-      <div className="space-y-3 sm:space-y-5">
+      <div className="space-y-4 sm:space-y-5">
         {STAGES.filter(stage => stage.id !== 'completed' && stage.id !== 'pending').map((stage, index) => {
           const isActive = stage.id === currentStage;
           const isCompleted = currentStageIndex > index + 1; // +1 to account for pending
@@ -486,7 +485,7 @@ export function PremiumLoader({
             <div 
               key={stage.id}
               className={cn(
-                "flex items-start gap-3 sm:gap-4 py-3 sm:py-4 px-3 sm:px-5 rounded-xl transition-all duration-500 border backdrop-blur-md",
+                "flex items-start gap-4 py-4 px-5 rounded-xl transition-all duration-500 border backdrop-blur-md",
                 "text-sm transform",
                 isActive ? 
                   "bg-white/10 border-[#DC143C]/40 shadow-lg scale-[1.02] translate-x-1" : 
@@ -501,19 +500,19 @@ export function PremiumLoader({
             >
               {/* Status icon with animation */}
               <div className={cn(
-                "mt-0.5 flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center",
+                "mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
                 isActive ? "bg-[#DC143C]/20" : isCompleted ? "bg-white/10" : "bg-white/5",
                 "transition-all duration-500"
               )}>
                 {isCompleted ? (
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-[#DC143C] animate-scale-in" />
+                  <CheckCircle className="h-5 w-5 text-[#DC143C] animate-scale-in" />
                 ) : isActive ? (
                   <div className="relative w-full h-full flex items-center justify-center">
                     <div className="absolute inset-0 rounded-full bg-[#DC143C]/20 animate-ping opacity-75"></div>
-                    <span className="relative text-base sm:text-lg animate-float">{stage.icon}</span>
+                    <span className="relative text-lg animate-float">{stage.icon}</span>
                   </div>
                 ) : (
-                  <span className="text-base sm:text-lg opacity-50">{stage.icon}</span>
+                  <span className="text-lg opacity-50">{stage.icon}</span>
                 )}
               </div>
               
@@ -533,7 +532,7 @@ export function PremiumLoader({
                 
                 {/* Dynamic description with animated gradient on active */}
                 <p className={cn(
-                  "text-[11px] sm:text-xs mt-0.5 sm:mt-1",
+                  "text-xs mt-1",
                   isActive ? "text-white/80" : 
                   isCompleted ? "text-white/60" :
                   "text-white/40"
@@ -543,7 +542,7 @@ export function PremiumLoader({
                 
                 {/* Animated indicator for active state */}
                 {isActive && (
-                  <div className="mt-1 sm:mt-2 flex space-x-1">
+                  <div className="mt-2 flex space-x-1">
                     <div className="w-1 h-1 rounded-full bg-[#DC143C] animate-bounce-delay-1"></div>
                     <div className="w-1 h-1 rounded-full bg-[#DC143C] animate-bounce-delay-2"></div>
                     <div className="w-1 h-1 rounded-full bg-[#DC143C] animate-bounce-delay-3"></div>
@@ -557,16 +556,16 @@ export function PremiumLoader({
       
       {/* Completed animation */}
       {currentStage === 'completed' && (
-        <div className="mt-4 sm:mt-6 flex flex-col items-center justify-center animate-fade-in">
-          <div className="relative w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4">
+        <div className="mt-6 flex flex-col items-center justify-center animate-fade-in">
+          <div className="relative w-16 h-16 mb-4">
             <div className="absolute inset-0 rounded-full bg-[#DC143C]/20 animate-ping opacity-50"></div>
             <div className="absolute inset-0 rounded-full bg-[#DC143C]/10 animate-pulse"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-[#DC143C] animate-scale-in" />
+              <CheckCircle className="h-10 w-10 text-[#DC143C] animate-scale-in" />
             </div>
           </div>
-          <h3 className="text-lg sm:text-xl font-medium text-white animate-slide-up">Summary Complete!</h3>
-          <p className="text-white/70 text-xs sm:text-sm mt-1 animate-slide-up-delay">Your video summary is ready to view</p>
+          <h3 className="text-xl font-medium text-white animate-slide-up">Summary Complete!</h3>
+          <p className="text-white/70 text-sm mt-1 animate-slide-up-delay">Your video summary is ready to view</p>
         </div>
       )}
     </div>
