@@ -313,6 +313,23 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
   throw new Error(errorMessage);
 }
 
+export function formatFullTranscriptWithTimestamps(transcript: TranscriptItem[]): string {
+  if (!transcript || transcript.length === 0) {
+    return '';
+  }
+
+  // Helper to format seconds into HH:MM:SS
+  const formatTime = (seconds: number): string => {
+    const date = new Date(0);
+    date.setSeconds(seconds);
+    return date.toISOString().substr(11, 8);
+  };
+
+  return transcript
+    .map(item => `[${formatTime(item.start)}] ${item.text.trim()}`)
+    .join('\n');
+}
+
 export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDuration: number = 60, totalDurationSeconds?: number): string {
   if (!transcript || transcript.length === 0) return '';
 

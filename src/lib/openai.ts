@@ -3,6 +3,9 @@ import { formatTranscriptByMinutes } from './youtube';
 import { SYSTEM_PROMPT } from './system-prompt';
 import { createLogger } from './logger';
 import { timeToSeconds } from './utils';
+import {
+  formatFullTranscriptWithTimestamps,
+} from './youtube';
 // @ts-ignore: No types available for gpt-3-encoder
 import { encode } from 'gpt-3-encoder';
 
@@ -531,41 +534,46 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
 }
 
 // Helper: OpenAI call with retry, exponential backoff, and longer timeout
-async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, chunkIndex: number, maxRetries = 3, timeoutMs = 120000, temperature = 0.9) {
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, context: string, maxRetries = 3, timeoutMs = 180000, temperature = 0.7) {
   let lastError;
-  const backoffSchedule = [2000, 5000, 10000]; // 2s, 5s, 10s
+  const backoffSchedule = [5000, 15000, 30000]; // 5s, 15s, 30s
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const timeout = setTimeout(() => {
+        logger.warn(`[API] Aborting OpenAI call due to timeout (${timeoutMs}ms) for ${context} (attempt ${attempt}/${maxRetries})`);
+        controller.abort();
+      }, timeoutMs);
+      
       const response = await getOpenAIClient().chat.completions.create({
         model,
         messages,
         temperature,
-        max_tokens: 4096,
+        max_tokens: 4096, // Standard max_tokens for gpt-4o-mini
         stream: false
       }, { signal: controller.signal });
+
       clearTimeout(timeout);
       return response;
     } catch (err: any) {
       lastError = err;
       if (err.name === 'AbortError') {
-        logger.warn(`[CHUNK] OpenAI call ABORTED due to timeout (${timeoutMs}ms) for chunk ${chunkIndex + 1} (attempt ${attempt}/${maxRetries})`, { chunkIndex, timeoutMs });
+        logger.warn(`[API] OpenAI call ABORTED due to timeout for ${context} (attempt ${attempt}/${maxRetries})`);
       } else {
-        logger.warn(`[CHUNK] OpenAI call failed (attempt ${attempt}/${maxRetries}) for chunk ${chunkIndex + 1}: ${err.message}`, { stack: err.stack, chunkIndex });
+        logger.warn(`[API] OpenAI call failed (attempt ${attempt}/${maxRetries}) for ${context}: ${err.message}`);
       }
       if (attempt < maxRetries) {
-        const backoff = backoffSchedule[attempt - 1] || 10000;
-        logger.info(`[CHUNK] Waiting ${backoff}ms before retrying chunk ${chunkIndex + 1} (attempt ${attempt + 1})`);
+        const backoff = backoffSchedule[attempt - 1] || 30000;
+        logger.info(`[API] Waiting ${backoff}ms before retrying for ${context} (attempt ${attempt + 1})`);
         await new Promise(res => setTimeout(res, backoff));
       }
     }
   }
-  logger.error(`[CHUNK] OpenAI call failed after ${maxRetries} attempts for chunk ${chunkIndex + 1}.`, { error: lastError?.message, stack: lastError?.stack, chunkIndex });
+  logger.error(`[API] OpenAI call failed after ${maxRetries} attempts for ${context}.`, { error: lastError?.message, stack: lastError?.stack });
   throw new Error('AI processing failed due to a network or API timeout. Please try again later.');
 }
 
-// Main function with chunked summarization for long videos
+// Main function with a single, direct call to OpenAI
 export async function extractKnowledgeWithOpenAI(
   transcript: any[],
   videoTitle: string,
@@ -583,92 +591,62 @@ export async function extractKnowledgeWithOpenAI(
   totalCost: number,
   videoDurationSeconds: number
 }> {
-  // REVERTED: Use gpt-4o-mini for videos > 20 min (1200s), else gpt-4.1-nano
-  const model = totalDuration > 1200 ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
-  const chunkSeconds = 360; // 6 minutes
-  const overlapSeconds = 180; // 3 minutes
-  logger.info(`[MODEL] Using model: ${model}, chunkSeconds: ${chunkSeconds}, overlapSeconds: ${overlapSeconds}`);
+  
+  // STEP 1: Beautify the entire transcript into a single string
+  await updateProgress?.('summarizing', 10, 'Formatting full transcript...');
+  logger.info('[WORKFLOW] Formatting full transcript...');
+  const formattedTranscript = formatFullTranscriptWithTimestamps(transcript);
+  
+  if (!formattedTranscript) {
+    throw new OpenAIServiceError('No transcript available for analysis or transcript is empty', 'MISSING_TRANSCRIPT', 400, false);
+  }
+  logger.info('[WORKFLOW] Transcript formatted successfully.');
 
-  if (!transcript || transcript.length === 0) {
-    throw new OpenAIServiceError('No transcript available for analysis', 'MISSING_TRANSCRIPT', 400, false);
+  // STEP 2: Select model and validate token count for a single call
+  const model = 'gpt-4o-mini'; 
+  logger.info(`[MODEL] Using model: ${model} for a single-call summarization.`);
+
+  const systemPromptTokens = encode(SYSTEM_PROMPT).length;
+  const transcriptTokens = encode(formattedTranscript).length;
+  const userPromptTemplateTokens = encode(`I have the full transcript for a video titled "" The total video duration is . Your task is to act as a master storyteller... Here is the full transcript to synthesize:`).length;
+  const estimatedInputTokens = systemPromptTokens + transcriptTokens + userPromptTemplateTokens;
+
+  const modelInfo = OFFICIAL_OPENAI_PRICING[model as keyof typeof OFFICIAL_OPENAI_PRICING];
+  // Reserve a safe amount for the output
+  const maxInputTokens = modelInfo.maxContextTokens - 8192; 
+
+  logger.info(`[TOKENS] System: ${systemPromptTokens}, Transcript: ${transcriptTokens}, Template: ${userPromptTemplateTokens}`);
+  logger.info(`[TOKENS] Estimated input tokens: ${estimatedInputTokens}`);
+  logger.info(`[TOKENS] Model max input tokens: ${maxInputTokens} (Context: ${modelInfo.maxContextTokens}, Output buffer: 8192)`);
+
+  if (estimatedInputTokens > maxInputTokens) {
+    const excessTokens = estimatedInputTokens - maxInputTokens;
+    logger.error(`[TOKENS] Transcript is too long for a single API call. Exceeds by ${excessTokens} tokens.`);
+    throw new OpenAIServiceError(
+      `Video transcript is too long to process in a single request (exceeds by ~${Math.round(excessTokens / 1000)}k tokens). Please try a shorter video.`,
+      'TRANSCRIPT_TOO_LONG',
+      400,
+      false
+    );
   }
 
-  const chunks = splitTranscriptIntoChunks(transcript, chunkSeconds, overlapSeconds, totalDuration);
-  const batchSize = 10;
-  logger.info(`[MAP] Split transcript into ${chunks.length} chunks. Processing in batches of ${batchSize}.`);
+  // STEP 3: Construct the final prompt for the single API call
+  await updateProgress?.('summarizing', 20, 'Preparing final request for AI...');
+  logger.info('[WORKFLOW] Constructing final prompt...');
 
-  await updateProgress?.('summarizing', 20, `Analyzing ${chunks.length} content chunks...`);
+  const finalUserPrompt = `I have the full transcript for a video titled "${videoTitle}". The total video duration is ${formatTime(totalDuration)}.
 
-  let chunkSummaries: (string | null)[] = [];
-  for (let i = 0; i < chunks.length; i += batchSize) {
-    const batch = chunks.slice(i, i + batchSize);
-    logger.info(`[MAP] Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(chunks.length / batchSize)}...`);
-    
-    const batchResults = await Promise.all(batch.map(async (chunk, index) => {
-      const chunkIndex = i + index;
-      const chunkTranscript = chunk.chunk.map((item: any) => `[${formatTime(item.start)}] ${item.text.trim()}`).join('\n');
-      
-      const userPrompt = `This is chunk ${chunkIndex + 1} of ${chunks.length} from a video titled "${videoTitle}". The video's total duration is ${formatTime(totalDuration)}. This chunk covers the time range from approximately ${formatTime(chunk.start)} to ${formatTime(chunk.end)}. Your mission is to act as a **Content Restructurer and Clarifier**, not a summarizer. Your goal is to take the raw transcript chunk and make it perfectly clear and readable **without losing a single piece of information.**
+Your task is to act as a master storyteller and synthesizer, following the rules in the system prompt. Create a single, cohesive, and comprehensive final summary that flows perfectly and covers the entire video from start to finish.
 
-      **CRITICAL RESTRUCTURING RULES:**
-      1.  **DO NOT OMIT ANY DETAILS:** You must include every point, example, story, and nuance from the transcript. Your output should contain 100% of the original information, just presented more clearly.
-      2.  **USE SIMPLE LANGUAGE:** Rewrite complex sentences into clear, simple English that a 12-year-old can easily understand.
-      3.  **EXPLAIN ALL JARGON:** If you encounter ANY technical term, you MUST immediately explain it in simple terms within parentheses. For example: "neuroplasticity (the brain's ability to change)".
-      4.  **ADAPTIVE FORMATTING:** If the speaker lists items, steps, or types of things, you MUST format them as a bulleted or numbered list. Use paragraphs for storytelling.
-      5.  **MAINTAIN FLOW:** Present the content in the exact chronological order it appears in the transcript chunk.
-      6.  **DETECT CONVERSATIONS:** If the transcript appears to be a conversation between two or more people, preserve that back-and-forth dynamic. Do not reformat it as a monologue from a single speaker. Structure the text to make it clear that a dialogue is taking place.
-      7.  **INCLUDE DIALOGUE:** Provide at least two direct quotes from speakers in this chunk to keep the conversational energy alive.
+**CRITICAL INSTRUCTIONS:**
+1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
+2.  **USE THE FULL TRANSCRIPT:** The full transcript with timestamps is provided below. You must process all of it.
+3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
+4.  **INTELLIGENT SEGMENTATION:** Create logical segments based on the actual topic flow of the content. The timestamps in the transcript are your guide.
+5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the transcript is included in the final output. Nothing can be left out.
 
-      Your output for this chunk must be a complete and clear representation of the original content.
-
-      **TRANSCRIPT CHUNK TO RESTRUCTURE AND CLARIFY:**
-      ${chunkTranscript}`;
-
-      const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
-        role: 'system',
-        content: "You are an expert Content Restructurer and Clarifier. Your task is to take a raw video transcript chunk and make it perfectly clear, readable, and easy to understand, without omitting any information. Your job is to clarify and format, not to shorten."
-      }, {
-        role: 'user',
-        content: userPrompt
-      }];
-
-      try {
-        const response = await callOpenAIWithRetry(messages, model, chunkIndex, 3, 120000, 0.5);
-        return response.choices[0]?.message?.content || null;
-      } catch (error) {
-        logger.error(
-          `[CHUNK] Error processing chunk ${chunkIndex + 1}:`,
-          {
-            error: error instanceof Error ? { message: error.message, stack: error.stack } : error 
-          }
-        );
-        return null; // Return null on error to avoid breaking the whole process
-      }
-    }));
-    
-    chunkSummaries.push(...batchResults);
-    await updateProgress?.('summarizing', 20 + Math.round((Math.min(i + batchSize, chunks.length) / chunks.length) * 50), `Analyzed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks...`);
-  }
-
-  const validSummaries = chunkSummaries.filter(s => s !== null) as string[];
-  logger.info(`[REDUCE] Starting merge level 1. Merging ${validSummaries.length} summaries into 1.`);
-  await updateProgress?.('summarizing', 75, 'Merging chunk summaries...');
-
-  const combinedSummary = validSummaries.map((summary, index) => `--- Summary of Chunk ${index + 1} ---\n${summary}`).join('\n\n');
-
-  const finalUserPrompt = `I have processed a video titled "${videoTitle}" in several chunks. Below are the summaries for each chunk. Your task is to act as a master storyteller and synthesizer. Your goal is to weave these individual summaries into a single, cohesive, and comprehensive final summary that flows perfectly.
-
-  **CRITICAL INSTRUCTIONS:**
-  1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Ultimate Fast-Flow Video Summary System" prompt for the final output's structure, tone, and formatting.
-  2.  **CREATE A SEAMLESS NARRATIVE:** Do not simply list the chunk summaries. You must rewrite, rephrase, and connect them to create a single, flowing story. The transitions between topics should feel natural and logical.
-  3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
-  4.  **INTELLIGENT SEGMENTATION:** The chunk summaries are just raw material. You must create new, logical segments based on the actual topic flow of the content. Do not use the original chunk boundaries for your final segments.
-  5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the combined chunk summaries is included in the final output. Nothing can be left out.
-  6.  **FINAL GOAL:** The final output must read as if it were generated from the full transcript at once by a single, brilliant summarizer. The reader should have no idea it was assembled from smaller pieces.
-  7.  **STRONG TRANSITIONS:** Begin every segment with a clear transition sentence that references the previous segment’s last key point and explains why this new topic follows.
-
-  Here are the chunk summaries to synthesize:
-  ${combinedSummary}`;
+Here is the full transcript to synthesize:
+${formattedTranscript}`;
 
   const finalMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [{
     role: 'system',
@@ -677,100 +655,44 @@ export async function extractKnowledgeWithOpenAI(
     role: 'user',
     content: finalUserPrompt,
   }];
-
-  logger.info(`[REDUCE] Calling final merge API...`);
-  const finalResponse = await callOpenAIWithRetry(finalMessages, 'gpt-4o-mini', -1, 3, 120000, 0.3); // Use a more capable model for merging
+  
+  // STEP 4: Make the single, powerful API call
+  await updateProgress?.('summarizing', 30, 'Sending request to AI. This may take a few minutes...');
+  logger.info('[WORKFLOW] Calling final generation API...');
+  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Summary Generation", 3, 300000, 0.5); // 5-minute timeout for long videos
   const rawOutput = finalResponse.choices[0]?.message?.content || '';
   await updateProgress?.('summarizing', 95, 'Finalizing summary...');
 
   if (!rawOutput) {
-    throw new OpenAIServiceError('OpenAI returned empty response during final merge', 'EMPTY_RESPONSE', 500, true);
+    throw new OpenAIServiceError('OpenAI returned empty response during final generation', 'EMPTY_RESPONSE', 500, true);
   }
+  logger.info('[WORKFLOW] Received final response from AI.');
 
-  logger.info('RAW FINAL OPENAI OUTPUT', { rawOutput });
-
+  // STEP 5: Parse and enhance the final output
   const parsedResponse = parseOpenAIResponse(rawOutput, videoTitle, totalDuration);
-  // --- NEW: Post-process for readability ---
   const enhancedOutput = enhanceReadability(rawOutput);
+  
+  // Add model name to title for debugging/tracking
   parsedResponse.mainTitle = `[Model: ${model}] ${parsedResponse.mainTitle}`;
+  logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(parsedResponse.segments[0]?.startTime ?? 0)} to ${formatTime(parsedResponse.segments[parsedResponse.segments.length - 1]?.endTime ?? totalDuration)}`);
 
-  // CRITICAL FIX: Ensure complete video coverage
-  if (parsedResponse.segments && parsedResponse.segments.length > 0) {
-    const firstSegment = parsedResponse.segments[0];
-    const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
-    
-    if (firstSegment.startTime > 30) {
-      logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
-      parsedResponse.segments.unshift({
-        title: 'Introduction',
-        startTime: 0,
-        endTime: firstSegment.startTime,
-        timestamp: `0:00–${formatTime(firstSegment.startTime)}`,
-        hook: 'Video introduction and setup',
-        narratorSummary: 'The video begins with an introduction and setup phase.'
-      });
-    }
-    
-    if (lastSegment.endTime < totalDuration - 30) {
-      logger.warn(`🚨 CRITICAL: Last segment ends at ${formatTime(lastSegment.endTime)}, but video ends at ${formatTime(totalDuration)}. Adding final segment!`);
-      parsedResponse.segments.push({
-        title: 'Conclusion and Final Thoughts',
-        startTime: lastSegment.endTime,
-        endTime: totalDuration,
-        timestamp: `${formatTime(lastSegment.endTime)}–${formatTime(totalDuration)}`,
-        hook: 'Wrapping up the video content',
-        narratorSummary: 'The video concludes with final thoughts, takeaways, and any closing remarks.'
-      });
-    } else if (lastSegment.endTime < totalDuration) {
-      logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adjusting to video end ${formatTime(totalDuration)}`);
-      lastSegment.endTime = totalDuration;
-      lastSegment.timestamp = `${formatTime(lastSegment.startTime)}–${formatTime(totalDuration)}`;
-    }
-    
-    for (let i = 0; i < parsedResponse.segments.length - 1; i++) {
-      const current = parsedResponse.segments[i];
-      const next = parsedResponse.segments[i + 1];
-      const gap = next.startTime - current.endTime;
-      
-      if (gap > 60) {
-        logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
-        parsedResponse.segments.splice(i + 1, 0, {
-          title: 'Additional Content',
-          startTime: current.endTime,
-          endTime: next.startTime,
-          timestamp: `${formatTime(current.endTime)}–${formatTime(next.startTime)}`,
-          hook: 'Continued discussion and examples',
-          narratorSummary: 'The video continues with additional content and examples.'
-        });
-        i++;
-      }
-    }
-    
-    const finalFirst = parsedResponse.segments[0];
-    const finalLast = parsedResponse.segments[parsedResponse.segments.length - 1];
-    
-    if (finalFirst.startTime > 0) {
-      logger.error(`🚨 CRITICAL ERROR: First segment doesn't start at 0:00! It starts at ${formatTime(finalFirst.startTime)}`);
-    }
-    
-    if (finalLast.endTime < totalDuration) {
-      logger.error(`🚨 CRITICAL ERROR: Last segment doesn't end at video duration! It ends at ${formatTime(finalLast.endTime)}, should be ${formatTime(totalDuration)}`);
-    }
-    
-    logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(finalFirst.startTime)} to ${formatTime(finalLast.endTime)} (target: 0:00 to ${formatTime(totalDuration)})`);
-  }
+  // STEP 6: Calculate costs and return final structure
+  const promptTokens = finalResponse.usage?.prompt_tokens || 0;
+  const completionTokens = finalResponse.usage?.completion_tokens || 0;
+  
+  const costResult = calculateExactCost(model, promptTokens, completionTokens, 'Final Summary Generation');
 
   return {
     ...parsedResponse,
     rawOpenAIOutput: rawOutput,
-    transcriptSent: "Transcript processed in chunks.",
+    transcriptSent: formattedTranscript, // Send the full formatted transcript
     openaiOutput: enhancedOutput,
-    promptTokens: finalResponse.usage?.prompt_tokens || 0,
-    completionTokens: finalResponse.usage?.completion_tokens || 0,
-    totalTokens: finalResponse.usage?.total_tokens || 0,
-    inputCost: 0,
-    outputCost: 0,
-    totalCost: 0,
+    promptTokens,
+    completionTokens,
+    totalTokens: promptTokens + completionTokens,
+    inputCost: costResult.inputCostUSD,
+    outputCost: costResult.outputCostUSD,
+    totalCost: costResult.totalCostUSD,
     videoDurationSeconds: totalDuration
   };
 }
