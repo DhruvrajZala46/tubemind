@@ -45,7 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           
           {/* Content */}
           <div className="relative z-10 h-full">
-            {children}
+        {children}
           </div>
         </div>
       </main>

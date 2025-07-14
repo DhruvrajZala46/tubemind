@@ -195,83 +195,61 @@ export function PremiumLoader({
       return;
     }
 
-    // Initialize simulated progress when stage changes
-    const stageInfo = STAGES.find(stage => stage.id === currentStage);
-    if (!stageInfo) return;
-
-    // Get the current stage base progress and next stage base progress for range calculation
+    // Get the current stage index
     const currentStageIndex = STAGES.findIndex(stage => stage.id === currentStage);
-    const nextStageIndex = currentStageIndex + 1;
-    const nextStageInfo = STAGES[nextStageIndex];
-    
-    // Calculate the progress range for this stage
-    const stageStartProgress = stageInfo.baseProgress;
-    const stageEndProgress = nextStageInfo ? nextStageInfo.baseProgress : 100;
-    const stageRange = stageEndProgress - stageStartProgress;
-    
-    // Start with the appropriate progress for this stage
-    // If we're just starting this stage, use the stage's base progress
-    // If we're already in this stage, continue from current progress
+    // Calculate the progress range for all stages except completed/failed
+    const stageStartProgress = STAGES[currentStageIndex]?.baseProgress ?? 0;
+    const stageEndProgress = 100;
+    const totalRange = stageEndProgress - stageStartProgress;
+
+    // If we're just starting, use the stage's base progress
     if (simulatedProgressRef.current < stageStartProgress) {
       simulatedProgressRef.current = stageStartProgress;
     }
-    
+
     // Set up simulation interval (60fps for smooth animation)
     simulationIntervalRef.current = setInterval(() => {
       const now = Date.now();
       const elapsed = now - lastSimulationTimeRef.current;
       lastSimulationTimeRef.current = now;
 
-      // Skip if no time has passed
       if (elapsed <= 0) return;
 
-      // Calculate simulation speed based on current stage
-      const baseSpeed = stageInfo.simulationSpeed;
-      
-      // Calculate progress increment
-      const increment = (baseSpeed * elapsed) / 1000;
-      
-      // Calculate how far through this stage we are (0-1)
-      const progressInStage = (simulatedProgressRef.current - stageStartProgress) / stageRange;
-      
-      // Slow down slightly as we approach the end of the stage
-      let dynamicSpeed = baseSpeed;
-      if (progressInStage > 0.8) {
-        dynamicSpeed = baseSpeed * 0.7; // Slow down at the end of the stage
-      } else if (progressInStage > 0.5) {
-        dynamicSpeed = baseSpeed * 0.85; // Slight slowdown in the middle
-      }
-      
+      // Simulate progress speed: fast at first, slow as it nears 100%
+      let progress = simulatedProgressRef.current;
+      let percent = progress;
+      // Calculate how far through the total process we are (0-1)
+      const progressRatio = percent / 100;
+      // Use a curve: fast at first, slow at the end
+      let baseSpeed = 1.2 - 0.9 * progressRatio; // 1.2 at 0%, 0.3 at 100%
+      baseSpeed = Math.max(0.08, baseSpeed); // Never stop
       // Add slight randomness for natural feel
-      const randomFactor = 0.9 + Math.random() * 0.2; // 0.9 to 1.1
-      dynamicSpeed *= randomFactor;
-      
+      const randomFactor = 0.93 + Math.random() * 0.14; // 0.93 to 1.07
+      let dynamicSpeed = baseSpeed * randomFactor;
       // Calculate the final increment
       const finalIncrement = (dynamicSpeed * elapsed) / 1000;
-      
-      // Update progress, but don't exceed the next stage's starting point
+      // Never exceed 99.5% unless backend says completed
+      let maxProgress = 99.5;
+      if (backendProgressRef.current && backendProgressRef.current > maxProgress) {
+        maxProgress = backendProgressRef.current;
+      }
+      // Update progress, but don't exceed maxProgress
       simulatedProgressRef.current = Math.min(
-        stageEndProgress - 0.5, // Leave a small gap before next stage
+        maxProgress,
         simulatedProgressRef.current + finalIncrement
       );
-      
       // Use the higher of simulated or backend progress
       const finalProgress = Math.max(
         simulatedProgressRef.current,
         backendProgressRef.current || 0
       );
-      
       // If backend gives us higher progress, jump to it
       if (backendProgressRef.current && backendProgressRef.current > simulatedProgressRef.current) {
         simulatedProgressRef.current = backendProgressRef.current;
       }
-      
-      // Update overall progress
       setOverallProgress(finalProgress);
-      
       // Update particle count for visual feedback - more particles at higher speeds
       setParticleCount(Math.max(3, Math.min(6, Math.floor(dynamicSpeed * 3))));
-      
     }, 16); // 60fps for ultra-smooth animation
 
     return () => {

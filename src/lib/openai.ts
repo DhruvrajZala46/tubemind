@@ -603,8 +603,10 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('[WORKFLOW] Transcript formatted successfully.');
 
   // STEP 2: Select model and validate token count for a single call
-  const model = 'gpt-4.1-nano-2025-04-14'; 
-  logger.info(`[MODEL] Using model: ${model} for a single-call summarization.`);
+  // Use 4.1 mini for videos longer than 45 minutes, otherwise use 4.1 nano
+  const useMini = totalDuration >= 45 * 60; // 45 minutes in seconds
+  const model = useMini ? 'gpt-4.1-mini-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
+  logger.info(`[MODEL] Using model: ${model} for a single-call summarization. (Video duration: ${totalDuration}s)`);
 
   const systemPromptTokens = encode(SYSTEM_PROMPT).length;
   const transcriptTokens = encode(formattedTranscript).length;
