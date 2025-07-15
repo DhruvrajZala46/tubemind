@@ -49,6 +49,19 @@ The reader must feel:
 
 ---
 
+## 🔄 MANDATORY SEGMENT CONSISTENCY RULE (CRITICAL)
+**EVERY SINGLE SEGMENT** must follow these exact same rules:
+- ✅ Full detailed recreation (not summary)
+- ✅ Include ALL stories, quotes, examples, reactions
+- ✅ Explain every concept in simple terms
+- ✅ Maintain conversational flow
+- ✅ Use proper formatting with spacing
+- ✅ Connect smoothly to previous segment
+
+⚠️ **CRITICAL**: Do not reduce detail level after first segment. Each segment must be as comprehensive as the first one.
+
+---
+
 ## 🔗 PERFECT SEGMENT FLOW RULES (MANDATORY):
 
 ### 🌊 SEAMLESS TRANSITIONS:
@@ -259,21 +272,32 @@ Every segment MUST feel like a continuation of the previous one — like a real 
 - ❌ Skipping why the speaker changed topics  
 - ❌ Leaving the reader confused about why something is being discussed
 
-### ✅ GOOD EXAMPLE:
+### ✅ PERFECT SEGMENT EXAMPLE (FOLLOW THIS EXACTLY):
 > ## 🧠 4:00–8:00 | Why Focus Became His #1 Success Secret  
-> After explaining how he got started, the host now asks:  
-> "What's one thing you wish you knew earlier?"  
-> That sparks a deeper conversation about focus — and why it became the guest's greatest tool...
-
-### ❌ BAD EXAMPLE:
-> ## 4:00–8:00 | Focus and Persistence Discussion  
-> In this section, they discuss focus and persistence...
+> **After explaining how he got started, the host now asks: "What's one thing you wish you knew earlier?"**
+> 
+> **That sparks a deeper conversation about focus — and why it became the guest's greatest tool...**
+> 
+> [Then include FULL detailed conversation with all quotes, stories, reactions, explanations]
+> 
+> **This discussion about focus naturally leads them to explore his daily routines and habits...**
 
 ### 🔄 Every Segment Must:
 - Start with what just happened  
 - Explain why this new thing is coming up  
 - Flow naturally like watching the video  
 - Feel like a real back-and-forth conversation — not a disconnected summary
+
+---
+
+## 🔍 SEGMENT QUALITY CONTROL (MANDATORY)
+Before moving to next segment, verify:
+✅ This segment is as detailed as segment 1
+✅ No summarization or condensing occurred
+✅ All stories and examples included
+✅ Proper formatting maintained
+✅ Context and explanations provided
+✅ Full conversational flow recreated
 
 ---
 
@@ -597,4 +621,13 @@ Use your knowledge to enhance understanding:
 - Provide context for comparisons and references
 - Add relevant examples and analogies for clarity
 - Fill knowledge gaps the video assumes viewers have
-- Always base enhancements on context, never add random information`;
+- Always base enhancements on context, never add random information
+
+# 🔥 ANTI-SUMMARIZATION REMINDER (CRITICAL)
+⚠️ **EVERY SEGMENT MUST BE EQUALLY DETAILED** ⚠️
+- Segment 1: Full detailed recreation ✅
+- Segment 2: Full detailed recreation ✅
+- Segment 3: Full detailed recreation ✅
+- ALL segments: Same level of comprehensive detail ✅
+
+**NO EXCEPTIONS. NO REDUCING DETAIL AFTER FIRST SEGMENT.**`;
