@@ -182,7 +182,7 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
   const youtubeUrl = getYouTubeUrl(videoId);
   const params = {
     url: youtubeUrl,
-    text: true
+    text: false // ENFORCE: Always request array format with real timestamps
   };
   const headers = {
     'x-api-key': TRANSCRIPT_CONFIG.supadataApiKey,
@@ -238,8 +238,8 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
         logger.info(`[Transcript] ✅ Using real timestamps from SupaData.ai response (array format)`);
         const transcript = response.data.content.map((item: any) => ({
           text: item.text,
-          start: typeof item.start === 'number' ? item.start : 0,
-          duration: typeof item.duration === 'number' ? item.duration : 0
+          start: typeof item.offset === 'number' ? Math.floor(item.offset / 1000) : 0, // Convert ms to seconds
+          duration: typeof item.duration === 'number' ? Math.floor(item.duration / 1000) : 0
         }));
         if (TRANSCRIPT_CONFIG.cacheEnabled) {
           cacheManager.cacheYouTubeTranscript(videoId, transcript);
@@ -248,44 +248,9 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
       }
       // === END CRITICAL FIX ===
 
-      // Fallback: If content is a string (legacy/rare), use old logic
-      if (response.data && typeof response.data.content === 'string' && response.data.content.length > 0) {
-        logger.info(`[Transcript] ⚠️ SupaData.ai returned string content, using fallback segmentation (no real timestamps)`);
-        const targetSegments = totalDurationSeconds ? Math.max(Math.ceil(totalDurationSeconds / 3), 50) : 50;
-        const content = response.data.content;
-        let textSegments: string[];
-        const sentenceSplit = content.split(/(?<=[.!?])\s+/).filter(Boolean);
-        if (sentenceSplit.length >= targetSegments) {
-          textSegments = sentenceSplit;
-        } else {
-          const words = content.split(/\s+/).filter(Boolean);
-          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 8);
-          textSegments = [];
-          for (let i = 0; i < words.length; i += wordsPerSegment) {
-            const segment = words.slice(i, i + wordsPerSegment).join(' ');
-            if (segment.trim()) {
-              textSegments.push(segment.trim());
-            }
-          }
-        }
-        logger.info(`[Transcript] Created ${textSegments.length} segments for ${totalDurationSeconds}s video (target: ${targetSegments})`);
-        const transcript: TranscriptItem[] = textSegments.map((text: string, idx: number) => {
-          const segmentDuration = totalDurationSeconds ? Math.floor(totalDurationSeconds / textSegments.length) : 3;
-          const startTime = totalDurationSeconds ? Math.floor((idx / textSegments.length) * totalDurationSeconds) : idx * 3;
-          return {
-            text: text.trim(),
-            start: startTime,
-            duration: segmentDuration
-          };
-        });
-        if (TRANSCRIPT_CONFIG.cacheEnabled) {
-          cacheManager.cacheYouTubeTranscript(videoId, transcript);
-        }
-        return fixTranscript(transcript, totalDurationSeconds);
-      }
-      
-      lastError = new Error(response.data?.error || 'No transcript returned from SupaData.ai service');
-      logger.error('[Transcript] SupaData.ai API error response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
+      // FATAL: If not array, throw error (do NOT fallback to fake timestamps)
+      logger.error('[Transcript] ❌ SupaData did not return array format. Failing to prevent fake timestamps.');
+      throw new Error('SupaData transcript API did not return array format. Check API parameters and documentation.');
       
     } catch (error) {
       lastError = error;
