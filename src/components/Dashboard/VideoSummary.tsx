@@ -172,6 +172,12 @@ function ChatGPTMarkdown({
             code: ({node, ...props}) => <code className="bg-[var(--bg-input)] px-1 py-0.5 rounded" {...props} />,
             blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[var(--border-color)] pl-4 py-1 my-4 text-[var(--text-primary)] bg-white/5 rounded-r" {...props} />,
             hr: ({node, ...props}) => <hr className="my-6 border-t border-[var(--border-color)]" {...props} />,
+            table: ({node, ...props}) => <div className="overflow-x-auto my-6"><table className="w-full text-left border-collapse" {...props} /></div>,
+            thead: ({node, ...props}) => <thead className="bg-white/10" {...props} />,
+            tbody: ({node, ...props}) => <tbody {...props} />,
+            tr: ({node, ...props}) => <tr className="border-b border-white/10" {...props} />,
+            th: ({node, ...props}) => <th className="p-3 font-semibold" {...props} />,
+            td: ({node, ...props}) => <td className="p-3" {...props} />,
           }}
         >
           {displayed}
