@@ -233,26 +233,33 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
 
       logger.info('[Transcript] SupaData.ai response', { status: response.status, data: response.data, request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
       
+      // === CRITICAL FIX: Use real timestamps if available ===
+      if (response.data && Array.isArray(response.data.content) && response.data.content.length > 0) {
+        logger.info(`[Transcript] ✅ Using real timestamps from SupaData.ai response (array format)`);
+        const transcript = response.data.content.map((item: any) => ({
+          text: item.text,
+          start: typeof item.start === 'number' ? item.start : 0,
+          duration: typeof item.duration === 'number' ? item.duration : 0
+        }));
+        if (TRANSCRIPT_CONFIG.cacheEnabled) {
+          cacheManager.cacheYouTubeTranscript(videoId, transcript);
+        }
+        return fixTranscript(transcript, totalDurationSeconds);
+      }
+      // === END CRITICAL FIX ===
+
+      // Fallback: If content is a string (legacy/rare), use old logic
       if (response.data && typeof response.data.content === 'string' && response.data.content.length > 0) {
-        logger.info(`[Transcript] ✅ SUCCESS with SupaData.ai API on attempt ${attempt + 1}`);
-        
-        // OPTIMIZED: More efficient transcript segmentation
+        logger.info(`[Transcript] ⚠️ SupaData.ai returned string content, using fallback segmentation (no real timestamps)`);
         const targetSegments = totalDurationSeconds ? Math.max(Math.ceil(totalDurationSeconds / 3), 50) : 50;
         const content = response.data.content;
-        
-        // OPTIMIZED: Smart segmentation based on content structure
         let textSegments: string[];
-        
-        // Try sentence-based segmentation first (most natural)
         const sentenceSplit = content.split(/(?<=[.!?])\s+/).filter(Boolean);
-        
         if (sentenceSplit.length >= targetSegments) {
           textSegments = sentenceSplit;
         } else {
-          // Fallback to word-based segmentation with optimal chunk size
           const words = content.split(/\s+/).filter(Boolean);
-          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 8); // Min 8 words per segment
-          
+          const wordsPerSegment = Math.max(Math.floor(words.length / targetSegments), 8);
           textSegments = [];
           for (let i = 0; i < words.length; i += wordsPerSegment) {
             const segment = words.slice(i, i + wordsPerSegment).join(' ');
@@ -261,26 +268,19 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
             }
           }
         }
-        
         logger.info(`[Transcript] Created ${textSegments.length} segments for ${totalDurationSeconds}s video (target: ${targetSegments})`);
-        
-        // OPTIMIZED: More efficient transcript item creation
         const transcript: TranscriptItem[] = textSegments.map((text: string, idx: number) => {
           const segmentDuration = totalDurationSeconds ? Math.floor(totalDurationSeconds / textSegments.length) : 3;
           const startTime = totalDurationSeconds ? Math.floor((idx / textSegments.length) * totalDurationSeconds) : idx * 3;
-          
           return {
             text: text.trim(),
             start: startTime,
             duration: segmentDuration
           };
         });
-        
-        // Cache the result using the central CacheManager
         if (TRANSCRIPT_CONFIG.cacheEnabled) {
           cacheManager.cacheYouTubeTranscript(videoId, transcript);
         }
-        
         return fixTranscript(transcript, totalDurationSeconds);
       }
       
@@ -297,10 +297,8 @@ export async function getVideoTranscript(videoId: string, totalDurationSeconds?:
       } else {
         logger.warn(`[Transcript] SupaData.ai API failed (attempt ${attempt + 1}):`, { error: String(error), request: { url, params, headers: { ...headers, 'x-api-key': maskedKey }, videoId, youtubeUrl } });
       }
-      
-      // OPTIMIZED: Faster retry with exponential backoff but shorter delays
       if (attempt < maxRetries - 1) {
-        const delay = Math.min(500 * Math.pow(2, attempt), 2000); // Cap at 2 seconds instead of longer delays
+        const delay = Math.min(500 * Math.pow(2, attempt), 2000);
         logger.info(`[Transcript] Retrying in ${delay}ms...`, { delay });
         await sleep(delay);
       }
