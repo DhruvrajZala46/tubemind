@@ -28,9 +28,6 @@ function ChatGPTMarkdown({
   const isAnimating = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Add state to track if we're in special sections
-  const [currentSection, setCurrentSection] = useState<'none' | 'key-takeaways' | 'big-picture'>('none');
-  
   const cleanedMarkdown = useRef<string>('');
   
   // Check if this summary has been viewed before
@@ -115,58 +112,14 @@ function ChatGPTMarkdown({
         <ReactMarkdown
           components={{
             h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-2 sm:mt-3 lg:mt-4 lightning-heading" {...props} />,
-            h2: ({node, ...props}) => {
-              const content = props.children?.toString() || '';
-              
-              // Special styling for KEY TAKEAWAYS section
-              if (content.includes('🔑 KEY TAKEAWAYS')) {
-                // Set state to indicate we're in the KEY TAKEAWAYS section
-                setTimeout(() => setCurrentSection('key-takeaways'), 0);
-                return (
-                  <div className="key-takeaways-container lightning-section">
-                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
-                  </div>
-                );
-              }
-              
-              // Special styling for BIG PICTURE section
-              if (content.includes('🎯 BIG PICTURE')) {
-                // Set state to indicate we're in the BIG PICTURE section
-                setTimeout(() => setCurrentSection('big-picture'), 0);
-                return (
-                  <div className="big-picture-container lightning-section">
-                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
-                  </div>
-                );
-              }
-              
-              // If we encounter another h2, we're no longer in a special section
-              if (currentSection !== 'none') {
-                setTimeout(() => setCurrentSection('none'), 0);
-              }
-              
-              // Regular h2 styling for other sections - OPTIMIZED for speed reading
-              return (
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-3 sm:mt-4 lg:mt-5 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
-              );
-            },
+            h2: ({node, ...props}) => (
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-3 sm:mt-4 lg:mt-5 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
+            ),
             h3: ({node, ...props}) => <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 mt-4 sm:mt-5 lg:mt-6" {...props} />,
-            ul: ({node, ...props}) => {
-              // Use our state variable to determine if we're in a special section
-              if (currentSection === 'key-takeaways') {
-                return <ul className="list-disc list-inside space-y-2 my-4 key-takeaways-list" {...props} />;
-              }
-              return <ul className="list-disc list-inside space-y-2 my-4" {...props} />;
-            },
+            ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 my-4" {...props} />,
             ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 my-4" {...props} />,
             li: ({node, ...props}) => <li className="leading-relaxed my-1 pl-2" {...props} />,
-            p: ({node, ...props}) => {
-              // Special styling for paragraphs in the BIG PICTURE section
-              if (currentSection === 'big-picture') {
-                return <p className="mb-4 leading-relaxed big-picture-text" {...props} />;
-              }
-              return <p className="mb-4 leading-relaxed" {...props} />;
-            },
+            p: ({node, ...props}) => <p className="mb-4 leading-relaxed" {...props} />,
             strong: ({node, ...props}) => <strong className="font-bold text-[var(--text-primary)]" {...props} />,
             em: ({node, ...props}) => <em className="italic text-[var(--text-secondary)]" {...props} />,
             code: ({node, ...props}) => <code className="bg-[var(--bg-input)] px-1 py-0.5 rounded" {...props} />,
