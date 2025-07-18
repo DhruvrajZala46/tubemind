@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '../../../lib/logger';
 import env from '../../../lib/env';
+import { requireAdmin } from '../../../lib/auth-utils';
 
 const sql = neon(env.DATABASE_URL);
 const logger = createLogger('debug:payment');
 
 export async function GET(request: NextRequest) {
+  // Block in production unless admin authenticated
+  if (env.NODE_ENV === 'production') {
+    const auth = await requireAdmin();
+    if (!auth.authorized) {
+      return NextResponse.json({ error: 'Endpoint disabled' }, { status: 404 });
+    }
+  }
+
   const url = new URL(request.url);
   const email = url.searchParams.get('email');
   

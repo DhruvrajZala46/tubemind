@@ -15,16 +15,58 @@ import { PaywallProvider } from '../components/ui/paywall-provider';
 import { CreditProvider } from '../lib/credit-context';
 
 export const metadata: Metadata = {
-  title: "TubeMind - YouTube Video Summarizer",
-  description: "Chatgpt For Youtube - Extract knowledge from any YouTube video instantly with AI-powered summaries.",
-  openGraph:{
-    images:[
+  metadataBase: new URL('https://www.tubemind.live/'),
+  title: {
+    default: 'TubeMind - YouTube Video Summarizer',
+    template: '%s | TubeMind',
+  },
+  description:
+    'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
+  keywords: [
+    'TubeMind',
+    'ChatGPT for YouTube',
+    'YouTube video summaries',
+    'AI summarizer',
+    'Video summarizer',
+    'YouTube transcript',
+    'YouTube AI',
+  ],
+  openGraph: {
+    title: 'TubeMind - YouTube Video Summarizer',
+    description:
+      'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
+    url: 'https://www.tubemind.live/',
+    siteName: 'TubeMind',
+    images: [
       {
- url:'./opengraph-image.png'
-      }
-     
-    ]
-  }
+        url: '/opengraph-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'TubeMind – AI-powered YouTube Video Summaries',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TubeMind - YouTube Video Summarizer',
+    description:
+      'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
+    images: ['/opengraph-image.png'],
+    creator: '@TubeMind',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  alternates: {
+    canonical: 'https://www.tubemind.live/',
+  },
 };
 
 export default function RootLayout({
