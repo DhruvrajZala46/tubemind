@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     siteName: 'TubeMind',
     images: [
       {
-        url: '/opengraph-image.png',
+        url: 'https://www.tubemind.live/opengraph-image.png', // ABSOLUTE URL
         width: 1200,
         height: 630,
         alt: 'TubeMind – AI-powered YouTube Video Summaries',
@@ -53,8 +53,8 @@ export const metadata: Metadata = {
     title: 'TubeMind - YouTube Video Summarizer',
     description:
       'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
-    images: ['/opengraph-image.png'],
-    creator: '@TubeMind',
+      images: ['https://www.tubemind.live/opengraph-image.png'], // ABSOLUTE HERE TOO
+      creator: '@TubeMind',
   },
   robots: {
     index: true,
