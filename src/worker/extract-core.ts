@@ -48,7 +48,7 @@ export async function processVideo(
   const { executeQuery } = await import('../lib/db');
   const { getVideoTranscript } = await import('../lib/youtube');
   const { extractKnowledgeWithOpenAI } = await import('../lib/openai');
-  const { consumeCredits } = await import('../lib/subscription');
+  const { consumeCredits, releaseCredits } = await import('../lib/subscription');
   
   // Enhanced Logging Helper
   const logStep = (step: string, status: 'START' | 'SUCCESS' | 'FAILURE', details?: object) => {
@@ -282,14 +282,14 @@ export async function processVideo(
       summaryDbId,
       stack: error.stack 
     });
-    // Consume credits on failure to prevent abuse.
+    // Release reserved credits on failure so the user is not charged.
     try {
-      await consumeCredits(userId, creditsNeeded);
+      await releaseCredits(userId, creditsNeeded);
       // Force cache invalidation to ensure UI updates
       const { getCacheManager } = await import('../lib/cache');
       getCacheManager().invalidateUserSubscription(userId);
     } catch (creditError: any) {
-      logger.error(`Failed to consume credits on failure: ${creditError.message}`);
+      logger.error(`Failed to release credits on failure: ${creditError.message}`);
     }
     throw error; // Re-throw to propagate the error
   }
