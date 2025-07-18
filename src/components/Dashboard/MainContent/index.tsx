@@ -546,7 +546,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
       
       {/* Mobile: Fixed bottom input bar - IMPROVED POSITIONING */}
       <div
-        className={`fixed bottom-0 left-0 w-full z-50 border-t border-[#22292F] sm:hidden transition-all duration-300`}
+        className={`fixed bottom-0 left-0 w-full z-40 border-t border-[#22292F] sm:hidden transition-all duration-300`}
         style={{
           background: 'rgba(0,0,0,0.85)', // Slightly darker for better contrast
           backdropFilter: 'blur(16px)',
@@ -559,7 +559,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         {/* Blur overlay when sidebar is open */}
         {isMobileMenuOpen && (
           <div
-            className="absolute inset-0 w-full h-full z-50 backdrop-blur-md bg-black/60 pointer-events-auto transition-all duration-300"
+            className="absolute inset-0 w-full h-full z-40 backdrop-blur-md bg-black/60 pointer-events-auto transition-all duration-300"
             style={{ borderRadius: '1.25rem' }}
           />
         )}

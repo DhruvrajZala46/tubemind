@@ -237,9 +237,8 @@ function Footer() {
           </div>
           
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8">
-            <a href="#about" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition">About</a>
-            <a href="#pricing" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition">Pricing</a>
-            <a href="mailto:support@tubemind.com" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition">Contact</a>
+            <a href="/about" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition">About</a>
+            <a href="/contact" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition">Contact</a>
           </div>
           
           <div className="flex items-center gap-4">
@@ -459,7 +458,10 @@ export default function HomePage() {
 
           {/* Pricing Cards Section */}
           <section id="pricing" className="w-full max-w-7xl mx-auto mt-6 sm:mt-8 flex flex-col items-center px-4">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-6 sm:mb-8 text-center">Plans that fit your learning journey</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-2 sm:mb-4 text-center">Plans that fit your learning journey</h2>
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-xl text-center mb-6">
+            You only pay for the <span className="font-semibold text-white">total minutes</span> of content you process — not the number of videos. For example, if you process a 30-minute video, it uses 30 minutes from your monthly balance.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 w-full justify-center max-w-5xl">
               {/* Free Plan Card */}
               <Card className="bg-[var(--card-bg)] border-[var(--border-color)] text-[var(--text-primary)] w-full max-w-sm mx-auto">
@@ -472,7 +474,7 @@ export default function HomePage() {
                   <ul className="mb-4 sm:mb-6 space-y-2 sm:space-y-3 text-xs sm:text-sm text-[var(--text-secondary)]">
                     <li className="flex items-center">
                       <span className="text-[var(--text-primary)] mr-2">✔️</span>
-                      60 minutes content processing
+                      60 minutes total — use it on any number of videos.
                     </li>
                   </ul>
                 </CardContent>
@@ -507,7 +509,7 @@ export default function HomePage() {
                   <ul className="mb-4 sm:mb-6 space-y-2 sm:space-y-3 text-xs sm:text-sm text-[var(--text-secondary)]">
                     <li className="flex items-center">
                       <span className="text-[var(--text-primary)] mr-2">✔️</span>
-                      1 hr/day content processing (≈1,800 min/mo)
+                      1,800 minutes a month — use it on any number of videos.
                     </li>
                     <li className="flex items-center">
                       <span className="text-[var(--text-primary)] mr-2">✔️</span>
@@ -551,7 +553,7 @@ export default function HomePage() {
                   <ul className="mb-4 sm:mb-6 space-y-2 sm:space-y-3 text-xs sm:text-sm text-[var(--text-secondary)]">
                     <li className="flex items-center">
                       <span className="text-[var(--text-primary)] mr-2">✔️</span>
-                      3 hr/day content processing (≈6,000 min/mo)
+                      6,000 minutes a month — use it on any number of videos.
                     </li>
                     <li className="flex items-center">
                       <span className="text-[var(--text-primary)] mr-2">✔️</span>
