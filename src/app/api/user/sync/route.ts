@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
   try {
     const user = await currentUser();
     if (!user) {
-      logger.warn('Authentication failed - no user found');
+      // Not signed in; this is expected for public visitors hitting protected pages
+      logger.debug('User sync skipped – no authenticated user');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
