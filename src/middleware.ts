@@ -17,7 +17,8 @@ const bypassAuthMiddleware = (req: NextRequest) => {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;");
+  const csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https: data:";
+  response.headers.set('Content-Security-Policy', csp);
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   
   return response;
@@ -44,7 +45,8 @@ const middleware = isDevelopment && shouldBypassAuth
       response.headers.set('X-XSS-Protection', '1; mode=block');
       response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
       response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-      response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;");
+      const csp2 = "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https: data:";
+      response.headers.set('Content-Security-Policy', csp2);
       response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
       
       return response;
