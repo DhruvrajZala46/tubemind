@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeQuery } from '../../../../lib/db';
 import { createLogger } from '../../../../lib/logger';
+import { requireAdmin, createUnauthorizedResponse } from '../../../../lib/auth-utils';
 
 const logger = createLogger('api:migrate-db');
 
 export async function POST(request: NextRequest) {
+  // SECURITY: Require admin authentication
+  const authResult = await requireAdmin();
+  if (!authResult.authorized) {
+    logger.warn('Unauthorized access attempt to migrate-db endpoint', {
+      data: { error: authResult.error, ip: request.ip || 'unknown' }
+    });
+    return createUnauthorizedResponse(authResult.error);
+  }
+
   try {
     logger.info('Running database migration for processing progress columns');
     

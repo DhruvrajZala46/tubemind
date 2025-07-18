@@ -78,6 +78,25 @@ export function logError(message: string, options: LogOptions = {}) {
  * Create a logger instance for a specific module
  */
 export function createLogger(module: string) {
+  // Utility to sanitize sensitive data from logs
+  function sanitizeSensitiveData(input: any, depth = 0): any {
+    if (depth > 3) return '[REDACTED]'; // Prevent deep recursion
+    if (input === null || input === undefined) return input;
+    if (Array.isArray(input)) return input.map(item => sanitizeSensitiveData(item, depth + 1));
+    if (typeof input === 'object') {
+      const sanitized: Record<string, any> = {};
+      for (const [key, value] of Object.entries(input)) {
+        if (/token|key|secret|password|signature|authorization/i.test(key)) {
+          sanitized[key] = '[REDACTED]';
+        } else {
+          sanitized[key] = sanitizeSensitiveData(value, depth + 1);
+        }
+      }
+      return sanitized;
+    }
+    return input;
+  }
+
   const log = (level: LogLevel, message: string, options: Omit<LogOptions, 'module'> = {}) => {
     const timestamp = new Date().toISOString();
     const logData = {
@@ -86,26 +105,28 @@ export function createLogger(module: string) {
       email: options.email,
     };
 
+    const sanitizedData = sanitizeSensitiveData(logData);
+
     // Main log message
     const logMessage = `[${timestamp}] [${level}] [${module}] ${message}`;
 
     // Log to console with structured data
     switch (level) {
       case LogLevel.ERROR:
-        console.error(logMessage, logData);
+        console.error(logMessage, sanitizedData);
         break;
       case LogLevel.WARN:
-        console.warn(logMessage, logData);
+        console.warn(logMessage, sanitizedData);
         break;
       case LogLevel.DEBUG:
         // Avoid verbose debug logs in production
         if (process.env.NODE_ENV !== 'production') {
-          console.debug(logMessage, logData);
+          console.debug(logMessage, sanitizedData);
         }
         break;
       case LogLevel.INFO:
       default:
-        console.info(logMessage, logData);
+        console.info(logMessage, sanitizedData);
         break;
     }
   };

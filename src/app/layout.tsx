@@ -16,7 +16,15 @@ import { CreditProvider } from '../lib/credit-context';
 
 export const metadata: Metadata = {
   title: "TubeMind - YouTube Video Summarizer",
-  description: "Extract knowledge from any YouTube video instantly with AI-powered summaries.",
+  description: "Chatgpt For Youtube - Extract knowledge from any YouTube video instantly with AI-powered summaries.",
+  openGraph:{
+    images:[
+      {
+ url:'./opengraph-image.png'
+      }
+     
+    ]
+  }
 };
 
 export default function RootLayout({

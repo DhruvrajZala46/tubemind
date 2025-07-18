@@ -154,15 +154,14 @@ export async function canUserPerformAction(
       }
     }
 
-    // Check credits limit - DO NOT double-count reserved credits!
-    // Reserved credits are already accounted for when they were reserved
-    const totalUsed = subscription.creditsUsed; // Don't add reserved credits here
-    const totalAvailable = subscription.creditsLimit - totalUsed;
+    // Check credits limit - include RESERVED credits to prevent double-spending
+    const totalUsedOrReserved = subscription.creditsUsed + subscription.creditsReserved;
+    const totalAvailable = subscription.creditsLimit - totalUsedOrReserved;
     
     if (creditsRequired > totalAvailable) {
       return { 
         allowed: false, 
-        reason: `Credit limit exceeded. You need ${creditsRequired} credits for this video but only have ${totalAvailable} credits available.`
+        reason: `Credit limit exceeded. You need ${creditsRequired} credits but only have ${totalAvailable} credits available (including reserved).`
       };
     }
 

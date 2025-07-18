@@ -17,6 +17,8 @@ const bypassAuthMiddleware = (req: NextRequest) => {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;");
+  response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   
   return response;
 };
@@ -24,6 +26,12 @@ const bypassAuthMiddleware = (req: NextRequest) => {
 // Choose the appropriate middleware based on environment
 const isDevelopment = process.env.NODE_ENV === 'development';
 const shouldBypassAuth = process.env.DEBUG_BYPASS_AUTH === 'true';
+
+// SECURITY FIX: Prevent auth bypass in production
+if (process.env.NODE_ENV === 'production' && shouldBypassAuth) {
+  console.error('⚠️ CRITICAL SECURITY ERROR: Attempted to bypass authentication in production');
+  throw new Error('Authentication bypass is not allowed in production');
+}
 
 // Use bypass middleware in development mode if DEBUG_BYPASS_AUTH is set
 const middleware = isDevelopment && shouldBypassAuth 
@@ -36,6 +44,8 @@ const middleware = isDevelopment && shouldBypassAuth
       response.headers.set('X-XSS-Protection', '1; mode=block');
       response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
       response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+      response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;");
+      response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
       
       return response;
     });

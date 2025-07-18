@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis, initializeRedis } from '@/lib/redis-client';
+import { requireAdmin, createUnauthorizedResponse } from '@/lib/auth-utils';
 
 export async function POST(request: NextRequest) {
+  // Add admin authentication check
+  const authResult = await requireAdmin();
+  if (!authResult.authorized) {
+    return createUnauthorizedResponse(authResult.error);
+  }
+
   try {
     console.log('🧹 STARTING REDIS QUEUE CLEANUP...');
     
