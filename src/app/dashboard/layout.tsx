@@ -28,10 +28,16 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
         console.log('🔄 Syncing user data...');
         const response = await fetch('/api/user/sync', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Ensure Clerk auth cookies are sent
         });
         const result = await response.json();
         console.log('✅ User sync result:', result);
+
+        if (response.status === 401) {
+          console.log('🔐 User not authenticated – redirecting to sign-in');
+          window.location.href = '/sign-in';
+        }
       } catch (error) {
         console.error('❌ User sync failed:', error);
       }
