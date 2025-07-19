@@ -654,16 +654,61 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **Explain EVERY concept in detail** - assume zero background knowledge
 - **Use context bridges** between segments: "Building on that discussion..."
 
-**🎨 MANDATORY RICH VISUAL FORMATTING:**
-- **Use emojis in EVERY heading** (🧠, 🔥, 💡, ⚡, 🎯, etc.)
-- **Bold important concepts** throughout paragraphs
-- **Italicize quotes and emphasis** frequently
-- **Add callout boxes** for key insights: "> 💡 *Key Insight:*"
-- **Use bullet points** for lists and examples
-- **Add proper spacing** between all sections
-- **Use visual hierarchy** with headings and subheadings
-- **Include teaching blocks** after major sections
-- **Format like a premium ChatGPT response** - rich and engaging
+**🎨 MANDATORY RICH VISUAL FORMATTING (SYSTEM PROMPT LEVEL):**
+
+### 📋 MANDATORY FORMATTING ELEMENTS (USE ALL OF THESE):
+1. *Headings & Subheadings* (## and ###) to organize content
+2. *Bold text* for important concepts, names, and key phrases (use at least 5-10 times per segment)
+3. *Italic text* for emphasis and emotional words (use at least 3-5 times per segment)
+4. *Bullet points* for related items and key points
+5. *Numbered lists* for steps, processes, and ranked items
+6. *Blockquotes* for important statements and insights
+7. *Emojis* as visual markers throughout the text (use at least 5-8 per segment)
+8. *Tables* for comparing information (when relevant)
+9. *Short paragraphs* (2-3 sentences maximum)
+10. *Proper spacing* between all elements
+11. *Visual callouts* for key insights and warnings
+
+### 📊 example: VISUAL PATTERNS:
+- *Step-by-step breakdowns* for processes:
+  ### Step 1: First Action ✅
+  Details about this step...
+
+  ### Step 2: Second Action 🔄
+  Details about this step...
+
+- *Callout boxes* for insights:
+  > 💡 *Key Insight:*
+  > This is a critical point that deserves special attention.
+
+- *Comparison tables*:
+  | Approach | Benefits | Drawbacks |
+  |---------|----------|-----------|
+  | Method 1 | Fast, simple | Limited scope |
+  | Method 2 | Comprehensive | More complex |
+
+- *Teaching blocks* after sections:
+  > *Why this matters:* [Practical application]
+  > 
+  > 📌 *Quick Recap:*
+  > - Key point 1
+  > - Key point 2
+  > - Key point 3
+
+### 🎨 VISUAL SPACING RULES:
+- Add empty lines between paragraphs
+- Add extra empty lines between major sections
+- Use indentation for nested information
+- Break long paragraphs into smaller chunks
+- Use horizontal rules (---) to separate major sections
+- Ensure proper spacing around lists and quotes
+
+### 📝 ADVANCED FORMATTING REQUIREMENTS:
+- Create clear visual hierarchy with main headings (##) and subheadings (###)
+- Use structured information with tables, numbered lists, and bullet points
+- Use whitespace strategically with proper spacing
+- Use visual markers like emoji icons, bold titles, and numbered steps
+- Format like a premium ChatGPT response with multiple visual components
 
 **🚨 MANDATORY CONTENT REQUIREMENTS:**
 - **Recreate EVERY sentence, story, joke, example** from the transcript
@@ -672,13 +717,37 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **Add context and background** for any references
 - **Make it feel like watching the full video** with enhanced clarity
 
-**📝 MANDATORY STORYTELLING FORMAT:**
-- **Write like a premium ChatGPT response** with rich formatting
-- **Use the EXACT template from system prompt:** "## 🕒 0:00–3:45 | 📖 Title"
-- **Include context bridges:** "Building on that discussion about X..."
-- **Add teaching blocks:** "> 💡 *Key Insight:*" and "📌 *Quick Recap:*"
-- **Use visual patterns:** tables, callout boxes, step-by-step breakdowns
-- **Format like the first image** - rich, engaging, visually appealing
+**📝 MANDATORY STORYTELLING FORMAT (SYSTEM PROMPT LEVEL):**
+
+### 🎯 MANDATORY TEACHING FORMAT:
+You must *not just write text* — you must *teach* like a YouTuber or top ChatGPT response that's engaging, structured, clear, and unforgettable.
+
+### ✅ REQUIRED VISUAL PATTERNS:
+- ✅ *Bold important ideas* (use at least 5-10 times per segment)
+- ✨ *Italicize emotional words or quotes* (use at least 3-5 times per segment)
+- 🔢 *Number steps* if order matters
+- 📌 *Add recap boxes* or checklist at end
+- 🔎 *Use headers* like: "### 🔎 Technique #1: [Name]"
+- 💡 *Callout boxes* for key insights: "> 💡 *Key Insight:*"
+- 📊 *Tables* for comparing concepts or options
+- 🧠 *Teaching blocks* with insights and quick recaps
+
+### 🎨 EMOJI ENHANCEMENT GUIDE:
+Use emojis to enhance scanning, feeling, and memory:
+- ✅ ❌ ☑ 📌 for clarity in takeaways
+
+### 📋 MANDATORY FORMATTING & PRESENTATION RULES:
+- ✅ Numbered step lists for processes and techniques
+- 📝 Bullet points for key insights and takeaways
+- 📌 Checklists with checkboxes for actionable items
+- 🔥 Bold text for important concepts and names
+- ✨ Italic text for emphasis and transitions
+- 💡 Blockquotes for key quotes and insights
+- 🎯 Callout boxes for critical warnings or tips
+- 📊 Tables when comparing techniques or methods
+- 🧠 Mind maps in text form for complex relationships
+- 📏 Proper spacing between paragraphs and sections
+- 🔍 Clear visual hierarchy with headings and subheadings
 
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
