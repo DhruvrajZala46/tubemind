@@ -45,12 +45,6 @@ const RATE_LIMIT_CONFIG = {
   jitter: true,
 };
 
-const CHUNK_STRATEGY = {
-  secondsPerChunk: 180, // ⏱️ 3-minute logical chunks keep token size small
-  overlapSeconds: 30,   // 🔗 30-second overlap to maintain narrative flow between chunks
-  concurrency: 3        // 🚀 run up to 3 OpenAI calls in parallel for speed
-};
-
 // 💰 OFFICIAL OPENAI PRICING (Verified Dec 2024)
 // Source: https://openai.com/api/pricing/ and official OpenAI documentation
 const OFFICIAL_OPENAI_PRICING = {
@@ -608,58 +602,11 @@ export async function extractKnowledgeWithOpenAI(
   }
   logger.info('[WORKFLOW] Transcript formatted successfully.');
 
-  // 👇 NEW: Decide whether to use chunk strategy
-  const CHUNK_THRESHOLD_SECONDS = 15 * 60; // >15 min → chunk
-  if (totalDuration > CHUNK_THRESHOLD_SECONDS) {
-    const chunks = splitTranscriptIntoChunks(transcript, CHUNK_STRATEGY.secondsPerChunk, CHUNK_STRATEGY.overlapSeconds, totalDuration);
-    const totalSegments = chunks.length;
-    const summaries: string[] = [];
-    let totalPrompt = 0, totalCompletion = 0, totalInputCost = 0, totalOutputCost = 0;
-
-    for (let i = 0; i < chunks.length; i += CHUNK_STRATEGY.concurrency) {
-      const batch = chunks.slice(i, i + CHUNK_STRATEGY.concurrency);
-      const results = await Promise.all(batch.map((chunk, idx) => generateExpandedSegmentSummary({
-        transcriptSlice: chunk.chunk,
-        videoTitle,
-        startTime: chunk.start,
-        endTime: chunk.end,
-        segmentNumber: i + idx + 1,
-        totalSegments,
-        totalDuration
-      })));
-      for (const res of results) {
-        summaries.push(res.content);
-        totalPrompt += res.promptTokens;
-        totalCompletion += res.completionTokens;
-        totalInputCost += res.inputCostUSD;
-        totalOutputCost += res.outputCostUSD;
-      }
-    }
-
-    const combinedOutput = summaries.join('\n\n');
-    const parsedResponse = parseOpenAIResponse(combinedOutput, videoTitle, totalDuration);
-    const enhancedOutput = enhanceReadability(combinedOutput);
-
-    return {
-      ...parsedResponse,
-      rawOpenAIOutput: combinedOutput,
-      transcriptSent: formattedTranscript,
-      openaiOutput: enhancedOutput,
-      promptTokens: totalPrompt,
-      completionTokens: totalCompletion,
-      totalTokens: totalPrompt + totalCompletion,
-      inputCost: totalInputCost,
-      outputCost: totalOutputCost,
-      totalCost: totalInputCost + totalOutputCost,
-      videoDurationSeconds: totalDuration
-    };
-  }
-
   // STEP 2: Select model and validate token count for a single call
   // Use 4.1 mini for videos longer than 45 minutes, otherwise use 4.1 nano
   const useMini = totalDuration >= 45 * 60; // 45 minutes in seconds
   const model = useMini ? 'gpt-4.1-mini-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
-  logger.info(`[MODEL] Using model: ${model} for a single-call summarization. (Video duration: ${totalDuration}s)`);
+  logger.info(`[MODEL] Using model: ${model} for a single-call video recreation. (Video duration: ${totalDuration}s)`);
 
   const systemPromptTokens = encode(SYSTEM_PROMPT).length;
   const transcriptTokens = encode(formattedTranscript).length;
@@ -667,11 +614,11 @@ export async function extractKnowledgeWithOpenAI(
   const estimatedInputTokens = systemPromptTokens + transcriptTokens + userPromptTemplateTokens;
 
   const modelInfo = OFFICIAL_OPENAI_PRICING[model as keyof typeof OFFICIAL_OPENAI_PRICING];
-  const maxInputTokens = modelInfo.maxContextTokens - 2048; // Allow larger outputs for small videos (2k buffer)
+  const maxInputTokens = modelInfo.maxContextTokens - 1000; // Minimal buffer to maximize output space
 
   logger.info(`[TOKENS] System: ${systemPromptTokens}, Transcript: ${transcriptTokens}, Template: ${userPromptTemplateTokens}`);
   logger.info(`[TOKENS] Estimated input tokens: ${estimatedInputTokens}`);
-  logger.info(`[TOKENS] Model max input tokens: ${maxInputTokens} (Context: ${modelInfo.maxContextTokens}, Output buffer: 2048)`);
+  logger.info(`[TOKENS] Model max input tokens: ${maxInputTokens} (Context: ${modelInfo.maxContextTokens}, Output buffer: 1000)`);
 
   if (estimatedInputTokens > maxInputTokens) {
     const excessTokens = estimatedInputTokens - maxInputTokens;
@@ -713,9 +660,9 @@ ${formattedTranscript}`;
   // STEP 4: Make the single, powerful API call
   await updateProgress?.('summarizing', 30, 'Sending request to AI. This may take a few minutes...');
   logger.info('[WORKFLOW] Calling final generation API...');
-  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Summary Generation", 3, 300000, 0.5, 16384); // 5-minute timeout for long videos, max_tokens set to 16384
+  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Video Recreation", 3, 300000, 0.5, 32000); // 5-minute timeout for long videos, max_tokens set to 32000 for full coverage
   const rawOutput = finalResponse.choices[0]?.message?.content || '';
-  await updateProgress?.('summarizing', 95, 'Finalizing summary...');
+  await updateProgress?.('summarizing', 95, 'Finalizing video recreation...');
 
   if (!rawOutput) {
     throw new OpenAIServiceError('OpenAI returned empty response during final generation', 'EMPTY_RESPONSE', 500, true);
@@ -734,7 +681,7 @@ ${formattedTranscript}`;
   const promptTokens = finalResponse.usage?.prompt_tokens || 0;
   const completionTokens = finalResponse.usage?.completion_tokens || 0;
   
-  const costResult = calculateExactCost(model, promptTokens, completionTokens, 'Final Summary Generation');
+  const costResult = calculateExactCost(model, promptTokens, completionTokens, 'Final Video Recreation');
 
   return {
     ...parsedResponse,
@@ -780,7 +727,7 @@ function parseOpenAIResponse(
     
     // Extract segments using various patterns - IMPROVED REGEX to capture all segments
     // This new pattern is more flexible and captures segments with different emoji patterns and formats
-    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯��🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅💫🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
+    const segmentRegex = /##\s+(?:\*\*)?(?:(?:[🔍🔎🔬🔭📊📈📉📌📍🔖🔗📎📏📐✂️🔒🔓🔏🔐🔑🗝️🔨🪓⛏️🚪🛏️🛋️🪑🚽🚿🛁🧴🧷🧹🧺🧻🧼🧽🧯🛢️⛽🚨🚥🚦🚧⚓⛵🚤🛳️⛴️🛥️🚢✈️🛩️🛫🛬🪂💺🚁🚟🚠🚡🚀🛸🛎️🧳⌛⏳⌚⏰⏱️⏲️🕰️]|[💻🚀📈💡⚡🔧🎯🏃‍♂️🥗❤️🧠💊🔥📚🎓✨🔍📝🌟🎭🎨🌅��🎪💰📊💎🏦💸🔑]|[🌑🌒🌓🌔🌕🌖🌗🌘🌙🌚🌛🌜🌡️☀️🌝🌞🪐⭐🌟🌠🌌☁️⛅⛈️🌤️🌥️🌧️🌨️🌩️🌪️🌫️🌬️🌈🌂☂️☔⛱️⚡❄️☃️⛄☄️🔥💧🌊])?\s*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*(.+?)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
     
     // If the above regex fails, use a simpler fallback pattern that will match most common formats
     const simpleSegmentRegex = /##\s+(?:[^\n|]*)?(\d+:\d+(?::\d+)?(?:\s*[–-]\s*\d+:\d+(?::\d+)?)?)\s*\|\s*([^\n]+)\n([\s\S]+?)(?=##\s+|🔑|$)/g;
@@ -1032,7 +979,7 @@ export async function generateExpandedSegmentSummary({
   totalCostUSD: number
 }> {
   
-  logger.info(`\n=== Generating Expanded Segment Summary ===`);
+  logger.info(`\n=== Generating Expanded Segment Recreation ===`);
   logger.info(`Segment ${segmentNumber}/${totalSegments}: ${formatTime(startTime)}–${formatTime(endTime)}`);
   
   const segmentText = transcriptSlice.length > 0
@@ -1042,11 +989,11 @@ export async function generateExpandedSegmentSummary({
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     {
       role: 'system',
-      content: `You are an expert content analyst. Create a detailed, engaging analysis of this specific video segment following the storytelling principles outlined in the main system prompt.`
+      content: `You are an expert content recreator. Recreate this specific video segment in full detail following the ZERO-LOSS storytelling principles outlined in the main system prompt.`
     },
     {
       role: 'user',
-      content: `Analyze this specific segment of the video "${videoTitle}":
+      content: `Recreate this specific segment of the video "${videoTitle}" in FULL DETAIL:
 
 **Segment Details:**
 - Time Range: ${formatTime(startTime)}–${formatTime(endTime)}
@@ -1056,12 +1003,12 @@ export async function generateExpandedSegmentSummary({
 **Transcript for this time range:**
 ${segmentText}
 
-Recreate this segment in full detail (zero loss). Use the required storytelling format:
+**CRITICAL: Recreate this segment in FULL DETAIL (ZERO LOSS).** Use the required storytelling format:
 
 ## ${formatTime(startTime)} – ${formatTime(endTime)} | [Descriptive Title with Emoji]
 🔥 [Compelling hook/question from this segment]
 
-[Detailed, storytelling-style summary that covers everything in this segment. Write as if explaining to a friend, maintaining chronological order, and including specific quotes and examples. Make it engaging and complete.]
+[Detailed, storytelling-style recreation that covers EVERYTHING in this segment. Write as if explaining to a friend, maintaining chronological order, and including specific quotes and examples. Make it engaging and complete. DO NOT SUMMARIZE - RECREATE EVERY DETAIL.]
 
 Focus only on this specific time segment and maintain the engaging, conversational tone specified in the system prompt.`
     }
