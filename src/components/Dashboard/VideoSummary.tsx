@@ -409,6 +409,51 @@ function ChatGPTMarkdown({
           border-radius: 0 0.375rem 0.375rem 0;
           color: var(--text-primary);
         }
+        /* --- TABLE STYLING: Compact, modern, themed --- */
+        .chatgpt-markdown table {
+          font-size: 0.95em;
+          border-collapse: collapse;
+          width: 100%;
+          margin: 1.5rem 0;
+          background: #18181b;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .chatgpt-markdown th, .chatgpt-markdown td {
+          border: 1px solid #23232b;
+          padding: 0.5em 0.75em;
+          text-align: left;
+          vertical-align: middle;
+        }
+        .chatgpt-markdown th {
+          background: #23232b;
+          color: #fafafa;
+          font-weight: 600;
+          font-size: 1em;
+        }
+        .chatgpt-markdown tr {
+          border-bottom: 1px solid #23232b;
+        }
+        .chatgpt-markdown tbody tr:last-child {
+          border-bottom: none;
+        }
+        .chatgpt-markdown thead {
+          border-bottom: 2px solid #23232b;
+        }
+        .chatgpt-markdown td {
+          color: #e6e6e6;
+        }
+        .chatgpt-markdown table {
+          margin-bottom: 1.5rem;
+        }
+        /* Responsive: allow horizontal scroll on small screens */
+        .chatgpt-markdown table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+        /* --- END TABLE STYLING --- */
       `}</style>
     </div>
   );
