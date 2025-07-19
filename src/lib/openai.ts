@@ -1143,9 +1143,43 @@ export async function checkOpenAIHealth(): Promise<boolean> {
 }
 
 // ===== Helper: Enhance readability of OpenAI output =====
+// --- Table fixer: Convert malformed markdown tables to valid format ---
+function fixMalformedMarkdownTables(text: string): string {
+  // Regex to find tables that are all on one line (with repeated pipes and separator rows)
+  // This will match tables with at least 2 pipes, a separator row, and at least one data row, all on one line
+  return text.replace(/((?:\|[^\n])+\|\s*\|[-:| ]+\|(?:\s*\|[^\n]+\|)+)/g, (tableBlock) => {
+    // Try to split the table into header, separator, and rows
+    // Remove extra pipes and split by pipe
+    let parts = tableBlock.split('|').map(s => s.trim()).filter(Boolean);
+    if (parts.length < 4) return tableBlock; // Not a real table
+    // Try to reconstruct header, separator, and rows
+    // Find the separator row (--- or :--- etc)
+    let sepIdx = parts.findIndex(p => /^-+|:?-+:?$/.test(p));
+    if (sepIdx === -1 || sepIdx === 0 || sepIdx === parts.length-1) return tableBlock;
+    let header = parts.slice(0, sepIdx);
+    let separator = parts.slice(sepIdx, sepIdx + header.length);
+    let rows: string[][] = [];
+    let i = sepIdx + header.length;
+    while (i + header.length <= parts.length) {
+      let row = parts.slice(i, i + header.length);
+      if (row.length === header.length) rows.push(row);
+      i += header.length;
+    }
+    // Rebuild the table in valid markdown
+    let out = '| ' + header.join(' | ') + ' |\n';
+    out += '| ' + separator.join(' | ') + ' |\n';
+    for (const row of rows) {
+      out += '| ' + row.join(' | ') + ' |\n';
+    }
+    return out.trim();
+  });
+}
+
 function enhanceReadability(text: string): string {
+  // Fix malformed tables first
+  let processed = fixMalformedMarkdownTables(text);
   // Replace bullet characters • with markdown dash
-  let processed = text.replace(/^•\s+/gm, '- ');
+  processed = processed.replace(/^•\s+/gm, '- ');
 
   // Split long paragraphs into blocks of max 2 sentences
   const lines = processed.split(/\n/);

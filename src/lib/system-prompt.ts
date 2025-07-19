@@ -40,6 +40,15 @@ The reader must feel:
 6. Blockquotes for important statements and insights
 7. Emojis as visual markers throughout the text
 8. Tables for comparing information (when relevant)
+   - **MANDATORY: All tables must use valid markdown table syntax.**
+   - **Only one header separator row (e.g. |---|---|---|), never repeat it.**
+   - **Each table row must be on its own line.**
+   - **Do NOT put the entire table on one line.**
+   - **If you are unsure, always use the following format:**
+     | Column 1 | Column 2 | Column 3 |
+     |----------|----------|----------|
+     | Row 1    | Row 1    | Row 1    |
+     | Row 2    | Row 2    | Row 2    |
 9. Short paragraphs (2-3 sentences maximum)
 10. Proper spacing between all elements
 11. Visual callouts for key insights and warnings
