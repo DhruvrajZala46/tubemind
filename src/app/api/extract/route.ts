@@ -144,12 +144,12 @@ export async function POST(request: NextRequest) {
       }, { status: 402 });
     }
 
-    // Restore the check for already processed videos
-    const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string}[]>(sql => 
-      sql`SELECT v.id, vs.id as summary_id 
+    // 👉 Robust check: if ANY summary already exists for this video (except failed) just return it
+    const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string, status: string}[]>(sql => 
+      sql`SELECT v.id, vs.id as summary_id, vs.processing_status 
           FROM videos v
          JOIN video_summaries vs ON v.id = vs.video_id 
-         WHERE v.video_id = ${videoId!} AND v.user_id = ${userId} AND vs.processing_status = 'completed'`
+         WHERE v.video_id = ${videoId!} AND v.user_id = ${userId} AND vs.processing_status <> 'failed'`
     );
 
     if (existingVideoAndSummary && existingVideoAndSummary.length > 0) {
@@ -229,7 +229,8 @@ export async function POST(request: NextRequest) {
     
     await executeQuery(sql => 
       sql`INSERT INTO video_summaries (id, video_id, main_title, processing_status, video_duration_seconds, overall_summary, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost)
-         VALUES (${summaryData.id}, ${summaryData.video_id}, ${summaryData.main_title}, ${summaryData.processing_status}, ${summaryData.video_duration_seconds}, ${summaryData.overall_summary}, ${summaryData.raw_ai_output}, ${summaryData.transcript_sent}, ${summaryData.prompt_tokens}, ${summaryData.completion_tokens}, ${summaryData.total_tokens}, ${summaryData.input_cost}, ${summaryData.output_cost}, ${summaryData.total_cost})`
+         VALUES (${summaryData.id}, ${summaryData.video_id}, ${summaryData.main_title}, ${summaryData.processing_status}, ${summaryData.video_duration_seconds}, ${summaryData.overall_summary}, ${summaryData.raw_ai_output}, ${summaryData.transcript_sent}, ${summaryData.prompt_tokens}, ${summaryData.completion_tokens}, ${summaryData.total_tokens}, ${summaryData.input_cost}, ${summaryData.output_cost}, ${summaryData.total_cost})
+         ON CONFLICT (video_id) DO UPDATE SET processing_status = EXCLUDED.processing_status RETURNING id`
     );
 
     logger.info(`✅ Job created and saved to DB. Summary ID: ${summaryId}`, { userId, videoId });

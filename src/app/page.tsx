@@ -41,19 +41,29 @@ function Header({ theme, setTheme }: { theme: string; setTheme: (t: string) => v
             <a href="#problem-with-youtube" className="hover:text-white transition cursor-pointer">Features</a>
             <a href="#pricing" className="hover:text-white transition cursor-pointer">Pricing</a>
             <a href="#about" className="hover:text-white transition cursor-pointer">About</a>
+            {/* Authentication buttons */}
             {!isSignedIn && (
-              <SignInButton mode="modal">
-                <button className="px-4 py-2 text-[var(--text-primary)] bg-transparent hover:bg-white/10 rounded-full transition font-medium cursor-pointer text-base pill-btn ml-4">
-                  Sign in
-                </button>
-              </SignInButton>
+              <>
+                <SignInButton mode="modal">
+                  <button className="px-4 py-2 text-[var(--text-primary)] bg-transparent hover:bg-white/10 rounded-full transition font-medium cursor-pointer text-base pill-btn ml-4">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="px-5 py-2 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full transition font-semibold cursor-pointer text-base pill-btn shadow-md ml-2">
+                    Get Started
+                  </button>
+                </SignUpButton>
+              </>
             )}
-            <button
-              onClick={handleGetStarted}
-              className="px-5 py-2 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full transition font-semibold cursor-pointer text-base pill-btn shadow-md ml-2"
-            >
-              Get Started
-            </button>
+            {isSignedIn && (
+              <button
+                onClick={() => router.push('/dashboard/new')}
+                className="px-5 py-2 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full transition font-semibold cursor-pointer text-base pill-btn shadow-md ml-2"
+              >
+                Get Started
+              </button>
+            )}
           </div>
           {/* Hamburger for mobile */}
           <div className="flex lg:hidden items-center gap-2 ml-auto">
@@ -81,17 +91,30 @@ function Header({ theme, setTheme }: { theme: string; setTheme: (t: string) => v
             <a href="#problem-with-youtube" className="block text-[var(--text-secondary)] hover:text-white text-base font-medium py-2 rounded-xl text-center transition">Features</a>
             <a href="#pricing" className="block text-[var(--text-secondary)] hover:text-white text-base font-medium py-2 rounded-xl text-center transition">Pricing</a>
             <a href="#about" className="block text-[var(--text-secondary)] hover:text-white text-base font-medium py-2 rounded-xl text-center transition">About</a>
+            {/* Mobile auth buttons */}
             {!isSignedIn && (
-              <SignInButton mode="modal">
-                <button className="w-full py-3 bg-white/10 hover:bg-white/20 text-[var(--text-primary)] rounded-full font-semibold text-base pill-btn mt-2">Sign in</button>
-              </SignInButton>
+              <>
+                <SignInButton mode="modal">
+                  <button className="w-full py-3 bg-white/10 hover:bg-white/20 text-[var(--text-primary)] rounded-full font-semibold text-base pill-btn mt-2">Sign in</button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="w-full py-3 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full font-semibold text-base pill-btn shadow-md mt-2">
+                    Get Started
+                  </button>
+                </SignUpButton>
+              </>
             )}
-            <button
-              onClick={handleGetStarted}
-              className="w-full py-3 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full font-semibold text-base pill-btn shadow-md mt-2"
-            >
-              Get Started
-            </button>
+            {isSignedIn && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push('/dashboard/new');
+                }}
+                className="w-full py-3 bg-[var(--btn-primary-bg)] hover:bg-white/90 text-[var(--btn-primary-text)] rounded-full font-semibold text-base pill-btn shadow-md mt-2"
+              >
+                Get Started
+              </button>
+            )}
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-[var(--text-primary)] focus:outline-none"

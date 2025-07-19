@@ -430,8 +430,8 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         <MainHeader />
       </div>
       
-      {/* Mobile: Centered message only - REDUCED HEIGHT for better spacing */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full sm:hidden" style={{ minHeight: 'auto', marginBottom: '1rem' }}>
+      {/* Mobile: Centered message only – reduced spacing */}
+      <div className="flex flex-col items-center w-full sm:hidden mt-4">
         <h1
           className="text-[2.1rem] font-extrabold text-white text-center mb-2"
           style={{
@@ -544,11 +544,11 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
         </div>
       )}
       
-      {/* Mobile: Fixed bottom input bar - IMPROVED POSITIONING */}
+      {/* Mobile: Fixed bottom input bar – hidden when sidebar open */}
       <div
-        className={`fixed bottom-0 left-0 w-full z-40 border-t border-[#22292F] sm:hidden transition-all duration-300`}
+        className={`fixed bottom-0 left-0 w-full z-40 border-t border-[#22292F] sm:hidden transition-transform duration-300 ${isMobileMenuOpen ? 'translate-y-full pointer-events-none' : 'translate-y-0'}`}
         style={{
-          background: 'rgba(0,0,0,0.85)', // Slightly darker for better contrast
+          background: 'rgba(0,0,0,0.85)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           borderTop: '1px solid #22292F',
