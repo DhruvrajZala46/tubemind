@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 👉 Robust check: if ANY summary already exists for this video (except failed) just return it
-    const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string, status: string}[]>(sql => 
+    const existingVideoAndSummary = await executeQuery<{id: string, summary_id: string, processing_status: string}[]>(sql => 
       sql`SELECT v.id, vs.id as summary_id, vs.processing_status 
           FROM videos v
          JOIN video_summaries vs ON v.id = vs.video_id 
@@ -153,13 +153,16 @@ export async function POST(request: NextRequest) {
     );
 
     if (existingVideoAndSummary && existingVideoAndSummary.length > 0) {
-        logger.info(`Video already processed for user. Returning existing summary.`, { userId, videoId, summaryId: existingVideoAndSummary[0].summary_id });
+      const existing = existingVideoAndSummary[0];
+      logger.info(`Existing summary detected (status: ${existing.processing_status}). Reusing.`, { userId, videoId, summaryId: existing.summary_id });
+
+      // If the summary is still processing, just return its IDs – **do not** reserve credits again.
       return NextResponse.json({
-            message: 'Video already processed. Returning existing summary.',
-            videoId: existingVideoAndSummary[0].id,
-            summaryId: existingVideoAndSummary[0].summary_id,
-            status: 'completed'
-        }, { status: 200 });
+        message: 'Video already submitted. Returning current processing status.',
+        videoId: existing.id,
+        summaryId: existing.summary_id,
+        status: existing.processing_status
+      }, { status: 202 });
     }
 
     await reserveCredits(userId, creditsNeeded);
