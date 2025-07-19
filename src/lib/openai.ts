@@ -654,12 +654,31 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **Explain EVERY concept in detail** - assume zero background knowledge
 - **Use context bridges** between segments: "Building on that discussion..."
 
+**🎨 MANDATORY RICH VISUAL FORMATTING:**
+- **Use emojis in EVERY heading** (🧠, 🔥, 💡, ⚡, 🎯, etc.)
+- **Bold important concepts** throughout paragraphs
+- **Italicize quotes and emphasis** frequently
+- **Add callout boxes** for key insights: "> 💡 *Key Insight:*"
+- **Use bullet points** for lists and examples
+- **Add proper spacing** between all sections
+- **Use visual hierarchy** with headings and subheadings
+- **Include teaching blocks** after major sections
+- **Format like a premium ChatGPT response** - rich and engaging
+
 **🚨 MANDATORY CONTENT REQUIREMENTS:**
 - **Recreate EVERY sentence, story, joke, example** from the transcript
 - **Explain technical terms immediately** when they appear
 - **Include all quotes and reactions** exactly as spoken
 - **Add context and background** for any references
 - **Make it feel like watching the full video** with enhanced clarity
+
+**📝 MANDATORY STORYTELLING FORMAT:**
+- **Write like a premium ChatGPT response** with rich formatting
+- **Use the EXACT template from system prompt:** "## 🕒 0:00–3:45 | 📖 Title"
+- **Include context bridges:** "Building on that discussion about X..."
+- **Add teaching blocks:** "> 💡 *Key Insight:*" and "📌 *Quick Recap:*"
+- **Use visual patterns:** tables, callout boxes, step-by-step breakdowns
+- **Format like the first image** - rich, engaging, visually appealing
 
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
