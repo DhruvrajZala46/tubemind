@@ -605,7 +605,7 @@ export async function extractKnowledgeWithOpenAI(
   // STEP 2: Select model and validate token count for a single call
   // Use 4.1 mini for videos longer than 45 minutes, otherwise use 4.1 nano
   const useMini = totalDuration >= 45 * 60; // 45 minutes in seconds
-  const model = useMini ? 'gpt-4.1-mini-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
+  const model = useMini ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
   logger.info(`[MODEL] Using model: ${model} for a single-call video recreation. (Video duration: ${totalDuration}s)`);
 
   const systemPromptTokens = encode(SYSTEM_PROMPT).length;
