@@ -639,6 +639,28 @@ export async function extractKnowledgeWithOpenAI(
 
 Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
 
+**🚨 MANDATORY TIMESTAMP REQUIREMENTS:**
+- **EVERY segment MUST have EXACT timestamp ranges** (e.g., "0:00–3:45 | Title")
+- **Use the transcript timestamps to create accurate time ranges**
+- **Cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}**
+- **NO gaps in timeline** - each segment must connect to the next
+- **Segment by topic changes, not arbitrary time blocks**
+
+**🚨 MANDATORY FORMATTING REQUIREMENTS:**
+- **Follow the EXACT system prompt format** with rich visual elements
+- **Use proper headings:** "## 🕒 0:00–3:45 | 📖 Descriptive Title"
+- **Include emojis, bold text, bullet points, blockquotes**
+- **Write detailed storytelling paragraphs** - NOT bullet point lists
+- **Explain EVERY concept in detail** - assume zero background knowledge
+- **Use context bridges** between segments: "Building on that discussion..."
+
+**🚨 MANDATORY CONTENT REQUIREMENTS:**
+- **Recreate EVERY sentence, story, joke, example** from the transcript
+- **Explain technical terms immediately** when they appear
+- **Include all quotes and reactions** exactly as spoken
+- **Add context and background** for any references
+- **Make it feel like watching the full video** with enhanced clarity
+
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
 2.  **USE THE FULL TRANSCRIPT:** The full transcript with timestamps is provided below. You must process all of it.
@@ -675,7 +697,32 @@ ${formattedTranscript}`;
   
   // Add model name to title for debugging/tracking
   parsedResponse.mainTitle = `[Model: ${model}] ${parsedResponse.mainTitle}`;
-  logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(parsedResponse.segments[0]?.startTime ?? 0)} to ${formatTime(parsedResponse.segments[parsedResponse.segments.length - 1]?.endTime ?? totalDuration)}`);
+  
+  // 🚨 CRITICAL: Validate timestamp coverage
+  if (parsedResponse.segments.length > 0) {
+    const firstSegment = parsedResponse.segments[0];
+    const lastSegment = parsedResponse.segments[parsedResponse.segments.length - 1];
+    
+    logger.info(`✅ Video coverage verification: ${parsedResponse.segments.length} segments from ${formatTime(firstSegment?.startTime ?? 0)} to ${formatTime(lastSegment?.endTime ?? totalDuration)}`);
+    
+    // Validate complete coverage
+    if (firstSegment.startTime > 30) {
+      logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)} - missing beginning coverage`);
+    }
+    if (lastSegment.endTime < totalDuration - 30) {
+      logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)} - missing ending coverage (video ends at ${formatTime(totalDuration)})`);
+    }
+    
+    // Check for gaps
+    for (let i = 0; i < parsedResponse.segments.length - 1; i++) {
+      const current = parsedResponse.segments[i];
+      const next = parsedResponse.segments[i + 1];
+      const gap = next.startTime - current.endTime;
+      if (gap > 60) {
+        logger.warn(`⚠️ Gap detected: ${formatTime(current.endTime)} to ${formatTime(next.startTime)} (${gap}s gap)`);
+      }
+    }
+  }
 
   // STEP 6: Calculate costs and return final structure
   const promptTokens = finalResponse.usage?.prompt_tokens || 0;
