@@ -669,7 +669,7 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 10. *Proper spacing* between all elements
 11. *Visual callouts* for key insights and warnings
 
-### 📊 example: VISUAL PATTERNS:
+### 📊 CRITICAL VISUAL PATTERNS:
 - *Step-by-step breakdowns* for processes:
   ### Step 1: First Action ✅
   Details about this step...

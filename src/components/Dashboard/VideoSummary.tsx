@@ -113,11 +113,11 @@ function ChatGPTMarkdown({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-2 sm:mt-3 lg:mt-4 lightning-heading" {...props} />,
+            h1: ({node, ...props}) => <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 mt-6 lightning-heading" {...props} />, // BIGGEST
             h2: ({node, ...props}) => (
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-3 sm:mt-4 lg:mt-5 border-b border-[var(--border-color)] pb-1 lightning-heading" {...props} />
-            ),
-            h3: ({node, ...props}) => <h3 className="text-base sm:text-lg lg:text-xl font-semibold mb-2 mt-4 sm:mt-5 lg:mt-6" {...props} />,
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 mt-5 border-b border-[var(--border-color)] pb-2 lightning-heading" {...props} />
+            ), // BIG
+            h3: ({node, ...props}) => <h3 className="text-xl sm:text-2xl lg:text-3xl font-semibold mb-2 mt-4" {...props} />, // MEDIUM
             ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 my-4" {...props} />,
             ol: ({node, ...props}) => <ol className="list-decimal list-inside space-y-2 my-4" {...props} />,
             li: ({node, ...props}) => <li className="leading-relaxed my-1 pl-2" {...props} />,
