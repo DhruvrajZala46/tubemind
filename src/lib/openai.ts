@@ -649,45 +649,6 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 **🚨 MANDATORY FORMATTING REQUIREMENTS:**
 - **Follow the EXACT system prompt format** with rich visual elements
 
-**🎨 MANDATORY RICH VISUAL FORMATTING (SYSTEM PROMPT LEVEL):**
-
-### 📋 MANDATORY FORMATTING ELEMENTS (USE ALL OF THESE):
-- **Follow the EXACT system prompt format** with rich visual elements
-
-
-### 📊 CRITICAL VISUAL PATTERNS:
-- *Step-by-step breakdowns* for processes:
-  ### Step 1: First Action ✅
-  Details about this step...
-
-  ### Step 2: Second Action 🔄
-  Details about this step...
-
-- *Callout boxes* for insights:
-  > 💡 *Key Insight:*
-  > This is a critical point that deserves special attention.
-
-- *Comparison tables*:
-  | Approach | Benefits | Drawbacks |
-  |---------|----------|-----------|
-  | Method 1 | Fast, simple | Limited scope |
-  | Method 2 | Comprehensive | More complex |
-
-- *Teaching blocks* after sections:
-  > *Why this matters:* [Practical application]
-  > 
-  > 📌 *Quick Recap:*
-  > - Key point 1
-  > - Key point 2
-  > - Key point 3
-
-### 🎨 VISUAL SPACING RULES:
--- **Follow the EXACT system prompt format** with rich visual elements
-
-
-### 📝 ADVANCED FORMATTING REQUIREMENTS:
-- **Follow the EXACT system prompt format** with rich visual elements
-
 **🚨 MANDATORY CONTENT REQUIREMENTS:**
 - **Recreate EVERY sentence, story, joke, example** from the transcript
 - **Explain technical terms immediately** when they appear
@@ -695,29 +656,15 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **Add context and background** for any references
 - **Make it feel like watching the full video** with enhanced clarity
 
-**📝 MANDATORY STORYTELLING FORMAT (SYSTEM PROMPT LEVEL):**
-
-### 🎯 MANDATORY TEACHING FORMAT:
-You must *not just write text* — you must *teach* like a YouTuber or top ChatGPT response that's engaging, structured, clear, and unforgettable.
-
-### ✅ REQUIRED VISUAL PATTERNS:
-- **Follow the EXACT system prompt format** with rich visual elements
-
-
-### 🎨 EMOJI ENHANCEMENT GUIDE:
-Use emojis to enhance scanning, feeling, and memory:
-- ✅ ❌ ☑ 📌 for clarity in takeaways
-
-### 📋 MANDATORY FORMATTING & PRESENTATION RULES:
-- **Follow the EXACT system prompt format** with rich visual elements
-
-
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
 2.  **USE THE FULL TRANSCRIPT:** The full transcript with timestamps is provided below. You must process all of it.
 3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
 4.  **INTELLIGENT SEGMENTATION:** Create logical segments based on the actual topic flow of the content. The timestamps in the transcript are your guide.
 5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the transcript is included in the final output. Nothing can be left out.
+
+Please recreate the video using the exact formatting, segmentation, and teaching style rules in the system prompt above. Do not summarize. Use all required headings, subheadings, lists, and teaching blocks. Here is the transcript.
+
 
 Here is the full transcript to synthesize:
 ${formattedTranscript}`;
@@ -924,6 +871,21 @@ function parseOpenAIResponse(
     // Deduplicate segments by checking for very similar titles or hooks
     const uniqueSegments = deduplicateSegments(segments);
     logger.info(`🧹 Processed segments: ${segments.length} → ${uniqueSegments.length}`);
+
+    // Filter out invalid segments to prevent DB constraint errors
+    const validSegments = uniqueSegments.filter(
+      seg =>
+        typeof seg.startTime === 'number' &&
+        typeof seg.endTime === 'number' &&
+        seg.endTime > seg.startTime &&
+        seg.startTime >= 0 &&
+        seg.endTime <= totalDuration
+    );
+    if (validSegments.length !== uniqueSegments.length) {
+      logger.warn(
+        `Filtered out ${uniqueSegments.length - validSegments.length} invalid segments (end_time <= start_time or out of bounds)`
+      );
+    }
     
     // Extract key takeaways
     const takeawaysMatch = text.match(/🔑\s*(?:Everything You Just Learned|Key Takeaways)[\s\S]*?\n((?:\s*[-*•]\s*.+\n?)+)/i);
@@ -941,10 +903,10 @@ function parseOpenAIResponse(
     const overallSummary = mainTitle || 'Video analysis completed';
     
     // If no segments found, create segments covering the entire video duration
-    if (uniqueSegments.length === 0) {
-      logger.warn(`⚠️ No segments found in OpenAI response, creating fallback segment`);
+    if (validSegments.length === 0) {
+      logger.warn(`⚠️ No valid segments found in OpenAI response, creating fallback segment`);
       const endTimeStr = formatTime(totalDuration);
-      uniqueSegments.push({
+      validSegments.push({
         title: 'Complete Video Analysis',
         startTime: 0,
         endTime: totalDuration,
@@ -955,14 +917,14 @@ function parseOpenAIResponse(
     }
     
     // CRITICAL FIX: Ensure complete video coverage
-    if (uniqueSegments.length > 0) {
-      const firstSegment = uniqueSegments[0];
-      const lastSegment = uniqueSegments[uniqueSegments.length - 1];
+    if (validSegments.length > 0) {
+      const firstSegment = validSegments[0];
+      const lastSegment = validSegments[validSegments.length - 1];
       
       // Ensure first segment starts at 0:00
       if (firstSegment.startTime > 30) {
         logger.warn(`⚠️ First segment starts at ${formatTime(firstSegment.startTime)}, adding 0:00 segment`);
-        uniqueSegments.unshift({
+        validSegments.unshift({
           title: 'Introduction',
           startTime: 0,
           endTime: firstSegment.startTime,
@@ -975,7 +937,7 @@ function parseOpenAIResponse(
       // Ensure last segment ends at video end
       if (lastSegment.endTime < totalDuration - 30) {
         logger.warn(`⚠️ Last segment ends at ${formatTime(lastSegment.endTime)}, adding final segment to ${formatTime(totalDuration)}`);
-        uniqueSegments.push({
+        validSegments.push({
           title: 'Conclusion and Final Thoughts',
           startTime: lastSegment.endTime,
           endTime: totalDuration,
@@ -991,14 +953,14 @@ function parseOpenAIResponse(
       }
       
       // Check for gaps and fill them
-      for (let i = 0; i < uniqueSegments.length - 1; i++) {
-        const current = uniqueSegments[i];
-        const next = uniqueSegments[i + 1];
+      for (let i = 0; i < validSegments.length - 1; i++) {
+        const current = validSegments[i];
+        const next = validSegments[i + 1];
         const gap = next.startTime - current.endTime;
         
         if (gap > 60) { // Gap larger than 1 minute
           logger.warn(`⚠️ Gap detected between ${formatTime(current.endTime)} and ${formatTime(next.startTime)}, adding filler segment`);
-          uniqueSegments.splice(i + 1, 0, {
+          validSegments.splice(i + 1, 0, {
             title: 'Additional Content',
             startTime: current.endTime,
             endTime: next.startTime,
@@ -1014,7 +976,7 @@ function parseOpenAIResponse(
     return {
       mainTitle,
       overallSummary,
-      segments: uniqueSegments, // CRITICAL FIX: Remove the slice limit to include ALL segments
+      segments: validSegments, // CRITICAL FIX: Only use valid segments
       keyTakeaways: uniqueTakeaways
     };
     
