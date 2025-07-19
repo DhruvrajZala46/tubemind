@@ -65,6 +65,33 @@ async function enqueueJobToCloudTasks(jobData: any): Promise<void> {
 const logger = createLogger('api:extract');
 const cache = getCacheManager();
 
+// 🔧 CREDIT CLEANUP FUNCTION - Fixes corrupted credits automatically
+async function cleanupCorruptedCredits(userId: string) {
+  try {
+    // Fix negative credits_reserved
+    await executeQuery(async (sql) => {
+      return await sql`
+        UPDATE users 
+        SET credits_reserved = 0 
+        WHERE id = ${userId} AND credits_reserved < 0
+      `;
+    });
+
+    // Fix credits_reserved that exceed limits
+    await executeQuery(async (sql) => {
+      return await sql`
+        UPDATE users 
+        SET credits_reserved = 0
+        WHERE id = ${userId} AND credits_reserved > COALESCE(credits_limit, 60)
+      `;
+    });
+
+    logger.info('Credit cleanup completed for user', { userId });
+  } catch (error) {
+    logger.error('Error during credit cleanup', { userId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   logger.info('🎬 Video extraction API request received');
@@ -101,6 +128,9 @@ export async function POST(request: NextRequest) {
       // This should theoretically never happen if the above logic is correct, but it satisfies TypeScript.
       return NextResponse.json({ error: 'Failed to identify user.' }, { status: 500 });
     }
+
+    // 🔧 AUTOMATIC CREDIT CLEANUP - Fix corrupted credits before processing
+    await cleanupCorruptedCredits(userId);
 
     const subscription = await getUserSubscription(userId);
     if (!subscription) {

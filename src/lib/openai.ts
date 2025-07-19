@@ -45,6 +45,12 @@ const RATE_LIMIT_CONFIG = {
   jitter: true,
 };
 
+const CHUNK_STRATEGY = {
+  secondsPerChunk: 180, // ⏱️ 3-minute logical chunks keep token size small
+  overlapSeconds: 30,   // 🔗 30-second overlap to maintain narrative flow between chunks
+  concurrency: 3        // 🚀 run up to 3 OpenAI calls in parallel for speed
+};
+
 // 💰 OFFICIAL OPENAI PRICING (Verified Dec 2024)
 // Source: https://openai.com/api/pricing/ and official OpenAI documentation
 const OFFICIAL_OPENAI_PRICING = {
@@ -602,6 +608,53 @@ export async function extractKnowledgeWithOpenAI(
   }
   logger.info('[WORKFLOW] Transcript formatted successfully.');
 
+  // 👇 NEW: Decide whether to use chunk strategy
+  const CHUNK_THRESHOLD_SECONDS = 15 * 60; // >15 min → chunk
+  if (totalDuration > CHUNK_THRESHOLD_SECONDS) {
+    const chunks = splitTranscriptIntoChunks(transcript, CHUNK_STRATEGY.secondsPerChunk, CHUNK_STRATEGY.overlapSeconds, totalDuration);
+    const totalSegments = chunks.length;
+    const summaries: string[] = [];
+    let totalPrompt = 0, totalCompletion = 0, totalInputCost = 0, totalOutputCost = 0;
+
+    for (let i = 0; i < chunks.length; i += CHUNK_STRATEGY.concurrency) {
+      const batch = chunks.slice(i, i + CHUNK_STRATEGY.concurrency);
+      const results = await Promise.all(batch.map((chunk, idx) => generateExpandedSegmentSummary({
+        transcriptSlice: chunk.chunk,
+        videoTitle,
+        startTime: chunk.start,
+        endTime: chunk.end,
+        segmentNumber: i + idx + 1,
+        totalSegments,
+        totalDuration
+      })));
+      for (const res of results) {
+        summaries.push(res.content);
+        totalPrompt += res.promptTokens;
+        totalCompletion += res.completionTokens;
+        totalInputCost += res.inputCostUSD;
+        totalOutputCost += res.outputCostUSD;
+      }
+    }
+
+    const combinedOutput = summaries.join('\n\n');
+    const parsedResponse = parseOpenAIResponse(combinedOutput, videoTitle, totalDuration);
+    const enhancedOutput = enhanceReadability(combinedOutput);
+
+    return {
+      ...parsedResponse,
+      rawOpenAIOutput: combinedOutput,
+      transcriptSent: formattedTranscript,
+      openaiOutput: enhancedOutput,
+      promptTokens: totalPrompt,
+      completionTokens: totalCompletion,
+      totalTokens: totalPrompt + totalCompletion,
+      inputCost: totalInputCost,
+      outputCost: totalOutputCost,
+      totalCost: totalInputCost + totalOutputCost,
+      videoDurationSeconds: totalDuration
+    };
+  }
+
   // STEP 2: Select model and validate token count for a single call
   // Use 4.1 mini for videos longer than 45 minutes, otherwise use 4.1 nano
   const useMini = totalDuration >= 45 * 60; // 45 minutes in seconds
@@ -614,12 +667,11 @@ export async function extractKnowledgeWithOpenAI(
   const estimatedInputTokens = systemPromptTokens + transcriptTokens + userPromptTemplateTokens;
 
   const modelInfo = OFFICIAL_OPENAI_PRICING[model as keyof typeof OFFICIAL_OPENAI_PRICING];
-  // Reserve a safe amount for the output
-  const maxInputTokens = modelInfo.maxContextTokens - 8192; 
+  const maxInputTokens = modelInfo.maxContextTokens - 2048; // Allow larger outputs for small videos (2k buffer)
 
   logger.info(`[TOKENS] System: ${systemPromptTokens}, Transcript: ${transcriptTokens}, Template: ${userPromptTemplateTokens}`);
   logger.info(`[TOKENS] Estimated input tokens: ${estimatedInputTokens}`);
-  logger.info(`[TOKENS] Model max input tokens: ${maxInputTokens} (Context: ${modelInfo.maxContextTokens}, Output buffer: 8192)`);
+  logger.info(`[TOKENS] Model max input tokens: ${maxInputTokens} (Context: ${modelInfo.maxContextTokens}, Output buffer: 2048)`);
 
   if (estimatedInputTokens > maxInputTokens) {
     const excessTokens = estimatedInputTokens - maxInputTokens;
@@ -638,7 +690,7 @@ export async function extractKnowledgeWithOpenAI(
 
   const finalUserPrompt = `I have the full transcript for a video titled "${videoTitle}". The total video duration is ${formatTime(totalDuration)}.
 
-Your task is to act as a master storyteller and synthesizer, following the rules in the system prompt. Create a single, cohesive, and comprehensive final summary that flows perfectly and covers the entire video from start to finish.
+Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
 
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
@@ -945,56 +997,13 @@ function parseOpenAIResponse(
 // Helper function to deduplicate segments
 function deduplicateSegments(segments: VideoSegment[]): VideoSegment[] {
   if (!segments || segments.length <= 1) return segments;
-  
-  // Use a Map to track unique segments by time range
-  const uniqueSegments = new Map<string, VideoSegment>();
-  
-  // Process segments in order
-  segments.forEach(segment => {
-    const timeKey = segment.timestamp; // Use timestamp as a unique key
-    
-    // If we already have a segment with this time range, keep the more detailed one
-    if (uniqueSegments.has(timeKey)) {
-      const existing = uniqueSegments.get(timeKey)!;
-      // If the new segment has a longer summary, replace the existing one
-      if (segment.narratorSummary.length > existing.narratorSummary.length) {
-        uniqueSegments.set(timeKey, segment);
-      }
-    } else {
-      uniqueSegments.set(timeKey, segment);
+  const unique = new Map<string, VideoSegment>();
+  for (const seg of segments) {
+    if (!unique.has(seg.timestamp)) {
+      unique.set(seg.timestamp, seg);
     }
-  });
-  
-  // Also check for very similar segments by title or hook
-  const result = Array.from(uniqueSegments.values());
-  const finalResult: VideoSegment[] = [];
-  
-  // Helper to check if strings are very similar (80%+ match)
-  const areSimilar = (str1: string, str2: string): boolean => {
-    if (!str1 || !str2) return false;
-    const shorter = str1.length < str2.length ? str1 : str2;
-    const longer = str1.length >= str2.length ? str1 : str2;
-    // Calculate Levenshtein distance (simple version)
-    let distance = 0;
-    for (let i = 0; i < shorter.length; i++) {
-      if (shorter[i] !== longer[i]) distance++;
-    }
-    distance += longer.length - shorter.length;
-    return distance / longer.length < 0.2; // Less than 20% different
-  };
-  
-  // Only add segments that don't have very similar titles or hooks
-  result.forEach(segment => {
-    const isDuplicate = finalResult.some(existing => 
-      (areSimilar(segment.title, existing.title) && segment.title.length > 0) || 
-      (areSimilar(segment.hook, existing.hook) && segment.hook.length > 0)
-    );
-    if (!isDuplicate) {
-      finalResult.push(segment);
-    }
-  });
-  
-  return finalResult;
+  }
+  return Array.from(unique.values()).sort((a, b) => a.startTime - b.startTime);
 }
 
 // Enhanced segment expansion function
@@ -1014,7 +1023,14 @@ export async function generateExpandedSegmentSummary({
   segmentNumber: number,
   totalSegments: number,
   totalDuration: number
-}): Promise<string> {
+}): Promise<{
+  content: string,
+  promptTokens: number,
+  completionTokens: number,
+  inputCostUSD: number,
+  outputCostUSD: number,
+  totalCostUSD: number
+}> {
   
   logger.info(`\n=== Generating Expanded Segment Summary ===`);
   logger.info(`Segment ${segmentNumber}/${totalSegments}: ${formatTime(startTime)}–${formatTime(endTime)}`);
@@ -1040,7 +1056,7 @@ export async function generateExpandedSegmentSummary({
 **Transcript for this time range:**
 ${segmentText}
 
-Create a detailed, engaging summary of this segment following this format:
+Recreate this segment in full detail (zero loss). Use the required storytelling format:
 
 ## ${formatTime(startTime)} – ${formatTime(endTime)} | [Descriptive Title with Emoji]
 🔥 [Compelling hook/question from this segment]
@@ -1062,12 +1078,31 @@ Focus only on this specific time segment and maintain the engaging, conversation
       });
     }, `Segment ${segmentNumber} expansion`);
 
-    return response.choices[0]?.message?.content || 'Segment analysis completed.';
+    // At the very end, instead of returning a string, return detailed object
+    const promptTokens = response.usage?.prompt_tokens || 0;
+    const completionTokens = response.usage?.completion_tokens || 0;
+    const costResult = calculateExactCost('gpt-4.1-nano-2025-04-14', promptTokens, completionTokens, `Segment ${segmentNumber}`);
+    const content = response.choices[0]?.message?.content || 'Segment analysis completed.';
+    return {
+      content,
+      promptTokens,
+      completionTokens,
+      inputCostUSD: costResult.inputCostUSD,
+      outputCostUSD: costResult.outputCostUSD,
+      totalCostUSD: costResult.totalCostUSD
+    };
     
   } catch (error: any) {
     logger.error(`Error expanding segment ${segmentNumber}: ${error instanceof Error ? error.message : String(error)}`);
     // Return a basic summary as fallback
-    return `Processing failed: ${error instanceof Error ? error.message : String(error)}`;
+    return {
+      content: `Processing failed: ${error instanceof Error ? error.message : String(error)}`,
+      promptTokens: 0,
+      completionTokens: 0,
+      inputCostUSD: 0,
+      outputCostUSD: 0,
+      totalCostUSD: 0
+    };
   }
 }
 

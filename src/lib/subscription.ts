@@ -155,8 +155,8 @@ export async function canUserPerformAction(
     }
 
     // Check credits limit - include RESERVED credits to prevent double-spending
-    const totalUsedOrReserved = subscription.creditsUsed + subscription.creditsReserved;
-    const totalAvailable = subscription.creditsLimit - totalUsedOrReserved;
+    const totalUsedOrReserved = subscription.creditsUsed + Math.max(0, subscription.creditsReserved || 0);
+    const totalAvailable = Math.max(0, subscription.creditsLimit - totalUsedOrReserved);
     
     if (creditsRequired > totalAvailable) {
       return { 
@@ -229,10 +229,15 @@ export async function resetMonthlyCredits(): Promise<void> {
  */
 export async function reserveCredits(userId: string, creditsToReserve: number): Promise<void> {
   try {
+    // Validate input
+    if (creditsToReserve <= 0) {
+      throw new Error('Credits to reserve must be positive');
+    }
+
     await executeQuery(async (sql) => {
       return await sql`
       UPDATE users
-        SET credits_reserved = COALESCE(credits_reserved, 0) + ${creditsToReserve}
+        SET credits_reserved = GREATEST(0, COALESCE(credits_reserved, 0) + ${creditsToReserve})
       WHERE id = ${userId}
     `;
     });
