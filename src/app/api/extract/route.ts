@@ -227,11 +227,16 @@ export async function POST(request: NextRequest) {
       total_cost: 0,
     };
     
-    await executeQuery(sql => 
+    const insertedSummaryRows = await executeQuery<{id:string}[]>(sql => 
       sql`INSERT INTO video_summaries (id, video_id, main_title, processing_status, video_duration_seconds, overall_summary, raw_ai_output, transcript_sent, prompt_tokens, completion_tokens, total_tokens, input_cost, output_cost, total_cost)
          VALUES (${summaryData.id}, ${summaryData.video_id}, ${summaryData.main_title}, ${summaryData.processing_status}, ${summaryData.video_duration_seconds}, ${summaryData.overall_summary}, ${summaryData.raw_ai_output}, ${summaryData.transcript_sent}, ${summaryData.prompt_tokens}, ${summaryData.completion_tokens}, ${summaryData.total_tokens}, ${summaryData.input_cost}, ${summaryData.output_cost}, ${summaryData.total_cost})
          ON CONFLICT (video_id) DO UPDATE SET processing_status = EXCLUDED.processing_status RETURNING id`
     );
+
+    // Ensure we have the actual summaryId that exists in DB (new or pre-existing)
+    if (insertedSummaryRows && insertedSummaryRows.length > 0) {
+      summaryId = insertedSummaryRows[0].id;
+    }
 
     logger.info(`✅ Job created and saved to DB. Summary ID: ${summaryId}`, { userId, videoId });
 
