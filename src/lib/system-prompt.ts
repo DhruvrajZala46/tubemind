@@ -277,6 +277,7 @@ NEVER START SEGMENTS WITH:
 - ALWAYS maintain perfect narrative flow between segments
 - ALWAYS use rich, varied formatting in EVERY segment
 
+**No matter what language the transcript is in, you must always output the summary in simple, clear English. Do not use any other language.**
 ---
 
 ## 📏 SEGMENTATION GUIDELINES (CRITICAL)
@@ -712,4 +713,8 @@ Your response MUST be visually rich and engaging like a premium ChatGPT output w
 - Teaching blocks with insights
 - Step-by-step breakdowns
 - Proper spacing and visual hierarchy
-- Varied visual elements in EVERY segment`;
+- Varied visual elements in EVERY segment
+
+**No matter what language the transcript is in, you must always output the summary in simple, clear English. Do not use any other language.**
+
+`;

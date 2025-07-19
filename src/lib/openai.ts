@@ -663,6 +663,8 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 4.  **INTELLIGENT SEGMENTATION:** Create logical segments based on the actual topic flow of the content. The timestamps in the transcript are your guide.
 5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the transcript is included in the final output. Nothing can be left out.
 
+**No matter what language the transcript is in, you must always output the summary in simple, clear English. Do not use any other language.**
+
 Please recreate the video using the exact formatting, segmentation, and teaching style rules in the system prompt above. Do not summarize. Use all required headings, subheadings, lists, and teaching blocks. Here is the transcript.
 
 
