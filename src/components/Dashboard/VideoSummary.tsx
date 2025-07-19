@@ -8,6 +8,7 @@ import { useMainLoading } from '../../lib/main-loading-context.tsx';
 import { ElegantLoader } from '../ui/elegant-loader';
 import { CircularProgressWithLoader } from '../ui/CircularProgressWithLoader';
 import Link from 'next/link';
+import remarkGfm from 'remark-gfm';
 
 // ChatGPT-style markdown renderer with typewriter effect
 function ChatGPTMarkdown({ 
@@ -110,6 +111,7 @@ function ChatGPTMarkdown({
     <div className={`chatgpt-markdown mobile-text-optimize ${className}`}>
       <Suspense fallback={<div>Loading...</div>}>
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 lg:mb-4 mt-2 sm:mt-3 lg:mt-4 lightning-heading" {...props} />,
             h2: ({node, ...props}) => (
