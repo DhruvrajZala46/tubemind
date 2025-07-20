@@ -228,6 +228,7 @@ NEVER START SEGMENTS WITH:
 
 ### 2. 📚 Segmented Story Chapters — Use This Template:
 > ## 🕒 0:00–3:12 | 📖 Why He'd Start a Clothing Brand  
+> ⚠️ NOTE: The time ranges above are just examples. In your output, you must segment the video based on natural topic changes, not by fixed time intervals. The first segment may be any length, depending on the content.
 > Building on their previous discussion about business opportunities, the host now asks about specific ventures...
 > 
 > What unfolds here:  
@@ -298,12 +299,14 @@ NEVER START SEGMENTS WITH:
 - The emotion or energy shifts
 
 ### ❌ NEVER SEGMENT BY TIME BLOCKS ALONE
+- NEVER copy the example time ranges. Always segment by topic, not by time. The first segment can be any length depending on the content.
 
 ### ✅ SEGMENT LABELS MUST:
 - Show timestamp range 
 - Use 1–2 emojis related to content
 - Have a clear, curiosity-driving title  
 > Example: "0:00–2:15 | 🔥 Why He Spent $2.5M at Age 22"
+> ⚠️ NOTE: This is just an example. Do NOT copy these time ranges. Segment boundaries should be determined by topic changes, not by fixed time intervals.
 
 ## 📏 SEGMENTATION RULES (CRITICAL MANDATORY)
 

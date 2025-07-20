@@ -8,9 +8,9 @@ export default function ContactPage() {
         Have any questions or feedback? Reach out — we'd love to hear from you.
       </p>
       <div className="space-y-2 text-center text-sm sm:text-base">
-        <p>Email: <span className="font-mono">hello@example.com</span></p>
+        <p>Email: <span className="font-mono">tubemind@gmail.com</span></p>
         <p>Twitter: <a href="#" className="text-blue-400 underline">@tubemind</a></p>
-        <p>LinkedIn: <a href="#" className="text-blue-400 underline">TubeMind</a></p>
+        <p>Youtube: <a href="#" className="text-blue-400 underline">TubeMind</a></p>
       </div>
     </div>
   );

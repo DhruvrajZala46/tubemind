@@ -640,7 +640,7 @@ export async function extractKnowledgeWithOpenAI(
 Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
 
 **🚨 MANDATORY TIMESTAMP REQUIREMENTS:**
-- **EVERY segment MUST have EXACT timestamp ranges** (e.g., "0:00–3:45 | Title")
+- **EVERY segment MUST have EXACT timestamp ranges**
 - **Use the transcript timestamps to create accurate time ranges**
 - **Cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}**
 - **NO gaps in timeline** - each segment must connect to the next
@@ -1145,34 +1145,41 @@ export async function checkOpenAIHealth(): Promise<boolean> {
 // ===== Helper: Enhance readability of OpenAI output =====
 // --- Table fixer: Convert malformed markdown tables to valid format ---
 function fixMalformedMarkdownTables(text: string): string {
-  // Regex to find tables that are all on one line (with repeated pipes and separator rows)
-  // This will match tables with at least 2 pipes, a separator row, and at least one data row, all on one line
-  return text.replace(/((?:\|[^\n])+\|\s*\|[-:| ]+\|(?:\s*\|[^\n]+\|)+)/g, (tableBlock) => {
-    // Try to split the table into header, separator, and rows
-    // Remove extra pipes and split by pipe
-    let parts = tableBlock.split('|').map(s => s.trim()).filter(Boolean);
-    if (parts.length < 4) return tableBlock; // Not a real table
-    // Try to reconstruct header, separator, and rows
-    // Find the separator row (--- or :--- etc)
-    let sepIdx = parts.findIndex(p => /^-+|:?-+:?$/.test(p));
-    if (sepIdx === -1 || sepIdx === 0 || sepIdx === parts.length-1) return tableBlock;
-    let header = parts.slice(0, sepIdx);
-    let separator = parts.slice(sepIdx, sepIdx + header.length);
-    let rows: string[][] = [];
-    let i = sepIdx + header.length;
-    while (i + header.length <= parts.length) {
+  // Fix tables with repeated separator rows and all rows on one line
+  text = text.replace(/((\|[^\n]+)+\|\s*(\|[-: ]+\|\s*)+((\|[^\n]+)+\|\s*)+)/g, (tableBlock) => {
+    // Split by pipe, filter empty
+    let parts = tableBlock.split('|').map(s => s.trim());
+    // Remove empty at start/end
+    if (parts[0] === '') parts.shift();
+    if (parts[parts.length-1] === '') parts.pop();
+    // Find all separator row indices
+    let sepIndices = parts.map((p, i) => /^-+$/.test(p) ? i : -1).filter(i => i !== -1);
+    if (sepIndices.length < 1) return tableBlock;
+    // Assume first separator is after header
+    let header = parts.slice(0, sepIndices[0]);
+    let separator = header.map(() => '---');
+    // Data rows: everything after first separator, skipping any repeated separators
+    let data: string[][] = [];
+    let i = sepIndices[0] + 1;
+    while (i < parts.length) {
+      // Skip any separator rows
+      if (/^-+$/.test(parts[i])) { i++; continue; }
       let row = parts.slice(i, i + header.length);
-      if (row.length === header.length) rows.push(row);
+      if (row.length === header.length) data.push(row);
       i += header.length;
     }
-    // Rebuild the table in valid markdown
+    // Rebuild table
     let out = '| ' + header.join(' | ') + ' |\n';
     out += '| ' + separator.join(' | ') + ' |\n';
-    for (const row of rows) {
+    for (const row of data) {
       out += '| ' + row.join(' | ') + ' |\n';
     }
     return out.trim();
   });
+  // Ensure blank lines before and after tables
+  text = text.replace(/([^\n])\n(\| [^\n]+\|\n\| ---[^\n]+\|\n)/g, '$1\n\n$2'); // before table
+  text = text.replace(/(\| [^\n]+\|\n\| ---[^\n]+\|\n(?:\| [^\n]+\|\n)+)([^\n])/g, '$1\n\n$2'); // after table
+  return text;
 }
 
 function enhanceReadability(text: string): string {
