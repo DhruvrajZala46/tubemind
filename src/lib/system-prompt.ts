@@ -316,7 +316,28 @@ NEVER START SEGMENTS WITH:
 - *Keep segments focused* on one main discussion thread
 - *Maximum 6 minutes* per segment (increase only if single topic continues)
 - ITS OKAY TO GENRATE MORE SEGMENETS BUT DONT TRY TO FIT EVERY INFO IN BIG TIMEFRAME SEGMENT INSTEAD SPLIT WITH LESS SEGMENTS
+
+## 🚫 ABSOLUTELY NO OVERLAPPING SEGMENTS (CRITICAL RULE)
+
+- Every segment must start exactly where the previous one ended.
+- Segments must be sequential and cover the video from start to finish with NO overlaps and NO gaps.
+- NEVER create a segment that starts before the previous segment ends.
+- NEVER create nested or sub-segments inside another segment.
+
+**Example of BAD (NOT ALLOWED):**
+  - 0:00–3:30
+  - 0:37–1:20
+  - 1:21–2:09
+  - 2:10–3:10
+
+**Example of GOOD (ALLOWED):**
+  - 0:00–0:36
+  - 0:37–1:20
+  - 1:21–2:09
+  - 2:10–3:10
+
 ---
+
 
 ## 🔁 MANDATORY FLOW & CONTEXT RULES (NO ISOLATED SEGMENTS)
 
