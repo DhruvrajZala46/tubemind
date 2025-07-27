@@ -38,7 +38,23 @@ if (process.env.NODE_ENV === 'production' && shouldBypassAuth) {
 // Use bypass middleware in development mode if DEBUG_BYPASS_AUTH is set
 const middleware = isDevelopment && shouldBypassAuth 
   ? bypassAuthMiddleware 
-  : clerkMiddleware((auth) => {
+  : clerkMiddleware((auth, req) => {
+      // 🔧 FIX: Prevent redirect loops by checking URL length
+      const url = req.nextUrl;
+      const pathname = url.pathname;
+      
+      // If URL is too long (indicating redirect loop), redirect to clean sign-up
+      if (url.search.length > 1000) {
+        console.log('🔄 Redirect loop detected, redirecting to clean sign-up');
+        return NextResponse.redirect(new URL('/sign-up', req.url));
+      }
+      
+      // If we're in a sign-up/create loop, redirect to clean sign-up
+      if (pathname.includes('/sign-up/create') && url.search.includes('redirect_url')) {
+        console.log('🔄 Sign-up create loop detected, redirecting to clean sign-up');
+        return NextResponse.redirect(new URL('/sign-up', req.url));
+      }
+      
       // Add security headers to all responses
       const response = NextResponse.next();
       response.headers.set('X-Content-Type-Options', 'nosniff');
