@@ -35,8 +35,8 @@ const DashboardContent: React.FC<{ children: React.ReactNode }> = ({ children })
         console.log('✅ User sync result:', result);
 
         if (response.status === 401) {
-          console.log('🔐 User not authenticated – redirecting to sign-in');
-          window.location.href = '/sign-in';
+          console.log('🔐 User not authenticated – redirecting to sign-up');
+          window.location.href = '/sign-up';
         }
       } catch (error) {
         console.error('❌ User sync failed:', error);

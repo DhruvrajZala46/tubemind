@@ -81,7 +81,7 @@ export default function MainContent({ isMobileMenuOpen = false, setIsMobileMenuO
 
   const handleProcess = async (url: string, fromQuery = false) => {
     if (!isSignedIn) {
-      router.push('/sign-in');
+      router.push('/sign-up');
       return;
     }
 
