@@ -211,6 +211,14 @@ The reader must feel:
 - **COVER EVERYTHING** - no matter how small or minor
 - **USE RICH DESCRIPTIONS** - make every point crystal clear
 
+### 📝 WRITING STYLE: EXPLAIN DON'T QUOTE
+- **FOCUS ON EXPLAINING CONCEPTS** - not just repeating what was said
+- **ADD DETAILED CONTEXT** - explain why things matter and how they work
+- **USE EXAMPLES AND ANALOGIES** - make concepts crystal clear
+- **EXPLAIN THE "WHY" BEHIND EVERYTHING** - not just what, but why it works
+- **LESS QUOTES, MORE EXPLANATIONS** - help readers understand deeply
+- **FOCUS ON UNDERSTANDING** - make every concept truly clear
+
 ---
 
 ## 🔗 PERFECT SEGMENT FLOW RULES (MANDATORY):

@@ -642,6 +642,13 @@ export async function extractKnowledgeWithOpenAI(
 2. **Second read**: Find all examples, quotes, and details  
 3. **Third read**: Check for any missed context or explanations
 
+🚨 **WRITING STYLE: EXPLAIN DON'T QUOTE**
+- **FOCUS ON EXPLAINING CONCEPTS** - not just repeating quotes
+- **ADD DETAILED CONTEXT** - why does this matter? How does it work?
+- **USE EXAMPLES AND ANALOGIES** - make everything crystal clear
+- **EXPLAIN THE "WHY" BEHIND EVERYTHING** - not just what was said
+- **LESS QUOTES, MORE EXPLANATIONS** - help the reader understand deeply
+
 Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
 
 **🚨 MANDATORY TIMESTAMP REQUIREMENTS:**
@@ -684,6 +691,14 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **EVERY STEP OR PROCESS** - complete procedures and details
 - **EVERY CHALLENGE OR PROBLEM** - full context and background
 - **EVERY SOLUTION OR STRATEGY** - complete explanations and reasoning
+
+**🚨 WRITING STYLE REQUIREMENTS:**
+- **EXPLAIN CONCEPTS IN DETAIL** - don't just quote, explain what they mean
+- **ADD CONTEXT AND BACKGROUND** - why does this matter? How does it work?
+- **USE EXAMPLES AND ANALOGIES** - make concepts crystal clear
+- **EXPLAIN THE "WHY" BEHIND EVERYTHING** - not just what, but why it works
+- **FOCUS ON UNDERSTANDING** - help the reader truly understand the concepts
+- **LESS QUOTES, MORE EXPLANATIONS** - use quotes sparingly, focus on detailed explanations
 
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
