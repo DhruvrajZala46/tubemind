@@ -534,7 +534,7 @@ function splitTranscriptIntoChunks(transcript: any[], chunkSeconds: number, over
 }
 
 // Helper: OpenAI call with retry, exponential backoff, and longer timeout
-async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, context: string, maxRetries = 3, timeoutMs = 180000, temperature = 0.7, maxTokens = 4096) {
+async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[], model: string, context: string, maxRetries = 3, timeoutMs = 180000, temperature = 0.7, maxTokens = 128000) {
   let lastError;
   const backoffSchedule = [5000, 15000, 30000]; // 5s, 15s, 30s
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -549,7 +549,7 @@ async function callOpenAIWithRetry(messages: OpenAI.Chat.Completions.ChatComplet
         model,
         messages,
         temperature,
-        max_tokens: maxTokens, // Standard max_tokens for gpt-4o-mini
+        max_tokens: maxTokens, // MAXIMUM TOKENS FOR UNLIMITED OUTPUT
         stream: false
       }, { signal: controller.signal });
 
@@ -614,7 +614,7 @@ export async function extractKnowledgeWithOpenAI(
   const estimatedInputTokens = systemPromptTokens + transcriptTokens + userPromptTemplateTokens;
 
   const modelInfo = OFFICIAL_OPENAI_PRICING[model as keyof typeof OFFICIAL_OPENAI_PRICING];
-  const maxInputTokens = modelInfo.maxContextTokens - 1000; // Minimal buffer to maximize output space
+  const maxInputTokens = modelInfo.maxContextTokens - 100; // MAXIMUM INPUT TOKENS - minimal buffer for maximum content
 
   logger.info(`[TOKENS] System: ${systemPromptTokens}, Transcript: ${transcriptTokens}, Template: ${userPromptTemplateTokens}`);
   logger.info(`[TOKENS] Estimated input tokens: ${estimatedInputTokens}`);
@@ -637,11 +637,16 @@ export async function extractKnowledgeWithOpenAI(
 
   const finalUserPrompt = `I have the full transcript for a video titled "${videoTitle}". The total video duration is ${formatTime(totalDuration)}.
 
+🚨 **CRITICAL INSTRUCTION: READ THE TRANSCRIPT 3 TIMES BEFORE RESPONDING**
+1. **First read**: Identify all main and sub topics everything from the transcript and stories as well.
+2. **Second read**: Find all examples, quotes, and details  
+3. **Third read**: Check for any missed context or explanations
+
 Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
 
 **🚨 MANDATORY TIMESTAMP REQUIREMENTS:**
 - **EVERY segment MUST have EXACT timestamp ranges**
-- **Use the transcript timestamps to create accurate time ranges**
+- **Use the transcript timestamps to create accurate time ranges**++++++++++
 - **Cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}**
 - **NO gaps in timeline** - each segment must connect to the next
 - **Segment by topic changes, not arbitrary time blocks**
@@ -656,12 +661,22 @@ Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrat
 - **Add context and background** for any references
 - **Make it feel like watching the full video** with enhanced clarity
 
+**🚨 CRITICAL CONTENT RULE:**
+- **EVERY SINGLE SENTENCE** from the transcript must be covered
+- **EVERY STORY, EXAMPLE, QUOTE, TOPIC** must be included
+- **EVERY "MINOR" DETAIL AND TOPICS** that adds value must be preserved
+- **NO SUMMARIZING** - recreate everything in full detail
+- **IF YOU SAY "they discuss X" - STOP!** Explain what they actually said about X
+- **GENERATE AS MUCH CONTENT AS NEEDED** - no limits on length, be as detailed as possible
+- **DON'T BE GREEDY WITH WORDS** - use as many words as needed to cover everything completely
+
 **CRITICAL INSTRUCTIONS:**
 1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
 2.  **USE THE FULL TRANSCRIPT:** The full transcript with timestamps is provided below. You must process all of it.
 3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
 4.  **INTELLIGENT SEGMENTATION:** Create logical segments based on the actual topic flow of the content. The timestamps in the transcript are your guide.
 5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the transcript is included in the final output. Nothing can be left out.
+6.  **CONTENT VERIFICATION:** Before finishing, scan your response and ask: "Did I cover every single thing mentioned in the transcript?" If not, add the missing content.
 
 **No matter what language the transcript is in, you must always output the summary in simple, clear English. Do not use any other language.**
 
@@ -682,7 +697,7 @@ ${formattedTranscript}`;
   // STEP 4: Make the single, powerful API call
   await updateProgress?.('summarizing', 30, 'Sending request to AI. This may take a few minutes...');
   logger.info('[WORKFLOW] Calling final generation API...');
-  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Video Recreation", 3, 300000, 0.5, 32000); // 5-minute timeout for long videos, max_tokens set to 32000 for full coverage
+  const finalResponse = await callOpenAIWithRetry(finalMessages, model, "Final Video Recreation", 3, 300000, 0.5, 128000); // 5-minute timeout for long videos, MAXIMUM TOKENS FOR UNLIMITED OUTPUT
   const rawOutput = finalResponse.choices[0]?.message?.content || '';
   await updateProgress?.('summarizing', 95, 'Finalizing video recreation...');
 
@@ -1081,7 +1096,7 @@ Focus only on this specific time segment and maintain the engaging, conversation
       return await getOpenAIClient().chat.completions.create({
         model: 'gpt-4.1-nano-2025-04-14',
         messages,
-        max_tokens: 1500,
+        max_tokens: 128000, // MAXIMUM TOKENS FOR UNLIMITED OUTPUT
         temperature: 1.0,
         top_p: 0.95,
       });
@@ -1127,7 +1142,7 @@ export async function checkOpenAIHealth(): Promise<boolean> {
       return await getOpenAIClient().chat.completions.create({
         model: HEALTH_CHECK_MODEL,
         messages: [{ role: 'user', content: 'Hello' }],
-        max_tokens: 5,
+        max_tokens: 128000, // MAXIMUM TOKENS FOR UNLIMITED OUTPUT
         temperature: 1.0,
       });
     }, 'OpenAI health check');

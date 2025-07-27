@@ -17,7 +17,7 @@ import { CreditProvider } from '../lib/credit-context';
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.tubemind.live/'),
   title: {
-    default: 'TubeMind - YouTube Video Summarizer',
+    default: 'TubeMind - Watch Less Learn More',
     template: '%s | TubeMind',
   },
   description:
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     'YouTube AI',
   ],
   openGraph: {
-    title: 'TubeMind - YouTube Video Summarizer',
+    title: 'TubeMind - Watch Less Learn More',
     description:
       'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
     url: 'https://www.tubemind.live/',
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TubeMind - YouTube Video Summarizer',
+    title: 'TubeMind - Watch Less Learn More',
     description:
       'TubeMind – the AI-powered YouTube assistant. Generate instant, accurate video summaries and dive straight to the knowledge you need.',
       images: ['https://www.tubemind.live/opengraph-image.png'], // ABSOLUTE HERE TOO

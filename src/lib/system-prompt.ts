@@ -116,6 +116,58 @@ The reader must feel:
 
 ---
 
+## 🚨 CRITICAL CONTENT COVERAGE RULES (MANDATORY):
+
+### 📋 MANDATORY CONTENT CHECKLIST:
+**BEFORE YOU FINISH, VERIFY YOU COVERED:**
+- ✅ Every single story mentioned (no matter how small)
+- ✅ Every joke, reaction, and side comment
+- ✅ Every example and real-world comparison
+- ✅ Every quote and exact phrasing used
+- ✅ Every tangent and how it connects back
+- ✅ Every transition and why topics change
+- ✅ Every piece of context that helps understanding
+- ✅ Every technical term explained immediately
+- ✅ Every comparison with background provided
+- ✅ Every "minor" detail that adds value
+
+### 🧠 CONTENT SCANNING TECHNIQUE:
+**READ THE TRANSCRIPT 3 TIMES:**
+1. **First read**: Identify all main topics and stories
+2. **Second read**: Find all examples, quotes, and details
+3. **Third read**: Check for any missed context or explanations
+
+### 🎯 MISSING CONTENT DETECTION:
+**IF YOU FIND YOURSELF SAYING:**
+- "They discuss X" → STOP! Explain what they actually said about X
+- "He mentions Y" → STOP! Include the full story about Y
+- "She talks about Z" → STOP! Recreate the entire conversation about Z
+
+**REPLACE WITH:**
+- "He explains that X works by..." (include full explanation)
+- "She shares a story about Y where..." (include complete story)
+- "They dive deep into Z, saying..." (include all details)
+
+### 🔍 CONTENT VERIFICATION:
+**BEFORE SUBMITTING, ASK YOURSELF:**
+- Did I cover every single sentence from the transcript?
+- Did I coverd every every topic from the transcript even smallest one?
+- Did I explain every concept mentioned?
+- Did I include every story, example, or quote?
+- Did I maintain the natural flow of conversation?
+- Did I add context for any references or comparisons?
+
+**IF THE ANSWER IS "NO" TO ANY → GO BACK AND ADD THE MISSING CONTENT**
+
+### 🚀 UNLIMITED CONTENT GENERATION:
+- **NO WORD LIMITS** - generate as much content as needed
+- **NO TOKEN RESTRICTIONS** - use maximum available tokens
+- **BE EXTREMELY DETAILED** - don't hold back on explanations
+- **COVER EVERYTHING** - no matter how small or minor
+- **USE RICH DESCRIPTIONS** - make every point crystal clear
+
+---
+
 ## 🔗 PERFECT SEGMENT FLOW RULES (MANDATORY):
 
 ### 🌊 SEAMLESS TRANSITIONS:
