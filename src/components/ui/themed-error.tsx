@@ -146,7 +146,7 @@ export const NetworkError: React.FC<{
   );
 };
 
-// IMPROVED Subscription error - matches your theme better
+// IMPROVED Subscription error - matches your clean theme
 interface SubscriptionErrorProps {
   requiredCredits?: number;
   availableCredits?: number;
@@ -181,34 +181,34 @@ export const SubscriptionError: React.FC<SubscriptionErrorProps> = ({
 
   return (
     <div className={cn(
-      "bg-[#161B22] border border-[#30363D] rounded-xl p-6 max-w-lg mx-auto",
+      "bg-[#181818] border border-[#363636] rounded-lg p-6 max-w-lg mx-auto",
       className
     )}>
       {/* Header */}
       <div className="text-center mb-4">
-        <h3 className="text-[#F0F6FC] font-medium text-lg mb-2">
+        <h3 className="text-white font-medium text-lg mb-2">
           Credit limit exceeded
         </h3>
-        <p className="text-[#8B949E] text-sm leading-relaxed">
+        <p className="text-[#b0b0b0] text-sm leading-relaxed">
           {getMessage()}
         </p>
       </div>
 
       {/* Credit breakdown if available */}
       {requiredCredits && availableCredits !== undefined && (
-        <div className="bg-[#21262D]/50 rounded-md p-4 mb-4 space-y-2">
+        <div className="bg-[#212121] rounded-md p-4 mb-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-[#8B949E]">Required credits:</span>
-            <span className="text-[#F0F6FC] font-medium">{requiredCredits}</span>
+            <span className="text-[#b0b0b0]">Required credits:</span>
+            <span className="text-white font-medium">{requiredCredits}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-[#8B949E]">Available credits:</span>
-            <span className="text-[#F0F6FC] font-medium">{availableCredits}</span>
+            <span className="text-[#b0b0b0]">Available credits:</span>
+            <span className="text-white font-medium">{availableCredits}</span>
           </div>
-          <div className="border-t border-[#30363D] pt-2 mt-2">
+          <div className="border-t border-[#363636] pt-2 mt-2">
             <div className="flex justify-between text-sm">
-              <span className="text-[#8B949E]">Shortage:</span>
-              <span className="text-[#DC143C] font-medium">
+              <span className="text-[#b0b0b0]">Shortage:</span>
+              <span className="text-white font-medium">
                 {requiredCredits - availableCredits} credits
               </span>
             </div>
@@ -220,14 +220,14 @@ export const SubscriptionError: React.FC<SubscriptionErrorProps> = ({
       <div className="flex flex-col gap-3">
         <button
           onClick={onUpgrade || (() => window.location.href = '/#pricing')}
-          className="w-full bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+          className="w-full bg-[#C1C1C1] hover:bg-[#C1C1C1]/90 text-black font-medium py-3 px-4 rounded-lg transition-colors"
         >
           Upgrade Plan
         </button>
         
         <button
           onClick={() => window.location.href = '/#pricing'}
-          className="w-full text-[#8B949E] hover:text-[#F0F6FC] text-sm transition-colors"
+          className="w-full text-[#b0b0b0] hover:text-white text-sm transition-colors"
         >
           View pricing details
         </button>
@@ -256,16 +256,16 @@ export const CompactSubscriptionError: React.FC<SubscriptionErrorProps> = ({
 
   return (
     <div className={cn(
-      "bg-[#161B22] border border-[#30363D] rounded-lg p-4 text-center",
+      "bg-[#181818] border border-[#363636] rounded-lg p-4 text-center",
       className
     )}>
-      <p className="text-[#8B949E] text-sm mb-3">
+      <p className="text-[#b0b0b0] text-sm mb-3">
         {getShortMessage()}
       </p>
       
       <button
         onClick={onUpgrade || (() => window.location.href = '/#pricing')}
-        className="bg-[#DC143C] hover:bg-[#DC143C]/90 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+        className="bg-[#C1C1C1] hover:bg-[#C1C1C1]/90 text-black font-medium py-2 px-4 rounded-lg text-sm transition-colors"
       >
         Upgrade Plan
       </button>
