@@ -17,7 +17,7 @@ const bypassAuthMiddleware = (req: NextRequest) => {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  const csp = "default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https: data:";
+  const csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com https://challenges.cloudflare.com https://*.cloudflare.com https://www.google.com https://www.gstatic.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com https://challenges.cloudflare.com https://*.cloudflare.com; img-src 'self' data: https: https://challenges.cloudflare.com https://*.cloudflare.com; connect-src 'self' https: https://challenges.cloudflare.com https://*.cloudflare.com; font-src 'self' https: data:; frame-src 'self' https://challenges.cloudflare.com https://*.cloudflare.com;";
   response.headers.set('Content-Security-Policy', csp);
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   
@@ -50,7 +50,7 @@ const middleware = isDevelopment && shouldBypassAuth
       }
       
       // If we're in a sign-up/create loop, redirect to clean sign-up
-      if (pathname.includes('/sign-up/create') && url.search.includes('redirect_url')) {
+      if (pathname.includes('/sign-up/create') || (pathname === '/sign-up' && url.search.includes('redirect_url'))) {
         console.log('🔄 Sign-up create loop detected, redirecting to clean sign-up');
         return NextResponse.redirect(new URL('/sign-up', req.url));
       }
@@ -62,8 +62,8 @@ const middleware = isDevelopment && shouldBypassAuth
       response.headers.set('X-XSS-Protection', '1; mode=block');
       response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
       response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-      const csp2 = "default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https: data:";
-      response.headers.set('Content-Security-Policy', csp2);
+      const csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com https://challenges.cloudflare.com https://*.cloudflare.com https://www.google.com https://www.gstatic.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://js.clerk.dev https://cdn.jsdelivr.net https://clerk.tubemind.live https://*.clerk.dev https://*.clerk.com https://challenges.cloudflare.com https://*.cloudflare.com; img-src 'self' data: https: https://challenges.cloudflare.com https://*.cloudflare.com; connect-src 'self' https: https://challenges.cloudflare.com https://*.cloudflare.com; font-src 'self' https: data:; frame-src 'self' https://challenges.cloudflare.com https://*.cloudflare.com;";
+      response.headers.set('Content-Security-Policy', csp);
       response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
       
       return response;
