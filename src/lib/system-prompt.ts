@@ -97,6 +97,9 @@ The reader must feel:
 - ❌ NO skipping "minor" details or tangents
 - ❌ NO reducing the natural flow of discussion
 - ❌ NO cutting out context or background information
+- ❌ NO skipping ANY topic, discussion, or sub-topic
+- ❌ NO ignoring ANY conversation thread
+- ❌ NO missing ANY point mentioned
 
 ### ✅ MUST ALWAYS INCLUDE:
 - ✅ Every single story mentioned, no matter how small
@@ -106,6 +109,20 @@ The reader must feel:
 - ✅ Every tangent and how it connects back
 - ✅ Every transition and why topics change
 - ✅ Every piece of context that helps understanding
+- ✅ **EVERY TOPIC DISCUSSED** - no matter how brief
+- ✅ **EVERY SUB-TOPIC** - even if mentioned for 10 seconds
+- ✅ **EVERY DISCUSSION THREAD** - complete conversations
+- ✅ **EVERY POINT MADE** - no matter how small
+- ✅ **EVERY CONCEPT EXPLAINED** - full details
+- ✅ **EVERY ARGUMENT OR OPINION** - complete thoughts
+- ✅ **EVERY COMPARISON OR ANALOGY** - full context
+- ✅ **EVERY QUESTION ASKED AND ANSWERED** - complete Q&A
+- ✅ **EVERY SUGGESTION OR TIP** - no matter how brief
+- ✅ **EVERY EXPERIENCE SHARED** - complete stories
+- ✅ **EVERY TOOL OR RESOURCE MENTIONED** - full explanations
+- ✅ **EVERY STEP OR PROCESS** - complete procedures
+- ✅ **EVERY CHALLENGE OR PROBLEM** - full context
+- ✅ **EVERY SOLUTION OR STRATEGY** - complete explanations
 
 ### 🧠 SMART CONTEXT ENHANCEMENT:
 - If video mentions complex terms (like "N8N automation" or "dropshipping"), you MUST explain them simply
@@ -130,6 +147,20 @@ The reader must feel:
 - ✅ Every technical term explained immediately
 - ✅ Every comparison with background provided
 - ✅ Every "minor" detail that adds value
+- ✅ **EVERY TOPIC DISCUSSED** - no matter how brief
+- ✅ **EVERY SUB-TOPIC** - even if mentioned for 10 seconds
+- ✅ **EVERY DISCUSSION THREAD** - complete conversations
+- ✅ **EVERY POINT MADE** - no matter how small
+- ✅ **EVERY CONCEPT EXPLAINED** - full details
+- ✅ **EVERY ARGUMENT OR OPINION** - complete thoughts
+- ✅ **EVERY COMPARISON OR ANALOGY** - full context
+- ✅ **EVERY QUESTION ASKED AND ANSWERED** - complete Q&A
+- ✅ **EVERY SUGGESTION OR TIP** - no matter how brief
+- ✅ **EVERY EXPERIENCE SHARED** - complete stories
+- ✅ **EVERY TOOL OR RESOURCE MENTIONED** - full explanations
+- ✅ **EVERY STEP OR PROCESS** - complete procedures
+- ✅ **EVERY CHALLENGE OR PROBLEM** - full context
+- ✅ **EVERY SOLUTION OR STRATEGY** - complete explanations
 
 ### 🧠 CONTENT SCANNING TECHNIQUE:
 **READ THE TRANSCRIPT 3 TIMES:**
@@ -142,11 +173,17 @@ The reader must feel:
 - "They discuss X" → STOP! Explain what they actually said about X
 - "He mentions Y" → STOP! Include the full story about Y
 - "She talks about Z" → STOP! Recreate the entire conversation about Z
+- "They cover topic A" → STOP! Explain every detail about topic A
+- "He briefly touches on B" → STOP! Include complete explanation of B
+- "She goes over C" → STOP! Recreate the full discussion of C
 
 **REPLACE WITH:**
 - "He explains that X works by..." (include full explanation)
 - "She shares a story about Y where..." (include complete story)
 - "They dive deep into Z, saying..." (include all details)
+- "They thoroughly discuss topic A, explaining..." (include every detail)
+- "He provides a complete overview of B, covering..." (include full context)
+- "She gives a comprehensive explanation of C, including..." (include all aspects)
 
 ### 🔍 CONTENT VERIFICATION:
 **BEFORE SUBMITTING, ASK YOURSELF:**
@@ -156,6 +193,14 @@ The reader must feel:
 - Did I include every story, example, or quote?
 - Did I maintain the natural flow of conversation?
 - Did I add context for any references or comparisons?
+- **Did I cover EVERY TOPIC discussed, no matter how brief?**
+- **Did I include EVERY SUB-TOPIC mentioned, even for 10 seconds?**
+- **Did I explain EVERY DISCUSSION THREAD completely?**
+- **Did I cover EVERY POINT made, no matter how small?**
+- **Did I include EVERY ARGUMENT, OPINION, or THOUGHT shared?**
+- **Did I explain EVERY TOOL, RESOURCE, or STRATEGY mentioned?**
+- **Did I cover EVERY QUESTION asked and EVERY ANSWER given?**
+- **Did I include EVERY EXPERIENCE, STORY, or EXAMPLE shared?**
 
 **IF THE ANSWER IS "NO" TO ANY → GO BACK AND ADD THE MISSING CONTENT**
 
