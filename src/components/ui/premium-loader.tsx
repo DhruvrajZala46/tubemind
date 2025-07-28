@@ -38,35 +38,35 @@ const STAGES: Array<{
     description: 'Getting everything ready...',
     baseProgress: 0,
     icon: '🚀',
-    expectedDuration: 3,
-    simulationSpeed: 2.0 // Faster to get through pending quickly
+    expectedDuration: 1.5, // much faster
+    simulationSpeed: 6.0 // much faster
   },
   {
     id: 'transcribing',
     label: 'Transcribing',
     description: 'Converting video to text...',
-    baseProgress: 0, // Start at 0% for this stage
+    baseProgress: 0,
     icon: '🎙️',
-    expectedDuration: 15,
-    simulationSpeed: 1.0 // Consistent speed
+    expectedDuration: 4, // faster
+    simulationSpeed: 4.0 // faster
   },
   {
     id: 'summarizing',
-    label: 'Summarizing', 
+    label: 'Summarizing',
     description: 'Analyzing content and generating insights...',
-    baseProgress: 33, // Start at 33% for this stage
+    baseProgress: 33,
     icon: '🧠',
-    expectedDuration: 15,
-    simulationSpeed: 1.0 // Consistent speed
+    expectedDuration: 6, // faster
+    simulationSpeed: 2.5 // faster
   },
   {
     id: 'finalizing',
     label: 'Finalizing',
     description: 'Polishing and organizing results...',
-    baseProgress: 66, // Start at 66% for this stage
+    baseProgress: 66,
     icon: '✨',
-    expectedDuration: 15,
-    simulationSpeed: 1.0 // Consistent speed
+    expectedDuration: 7, // a bit faster
+    simulationSpeed: 1.5
   },
   {
     id: 'completed',
@@ -221,15 +221,15 @@ export function PremiumLoader({
       // Calculate how far through the total process we are (0-1)
       const progressRatio = percent / 100;
       // Use a curve: fast at first, slow at the end
-      let baseSpeed = 1.2 - 0.9 * progressRatio; // 1.2 at 0%, 0.3 at 100%
-      baseSpeed = Math.max(0.08, baseSpeed); // Never stop
+      let baseSpeed = 3.0 - 2.7 * progressRatio; // 3.0 at 0%, 0.3 at 100%
+      baseSpeed = Math.max(0.12, baseSpeed); // Never stop
       // Add slight randomness for natural feel
-      const randomFactor = 0.93 + Math.random() * 0.14; // 0.93 to 1.07
+      const randomFactor = 0.95 + Math.random() * 0.10; // 0.95 to 1.05
       let dynamicSpeed = baseSpeed * randomFactor;
       // Calculate the final increment
       const finalIncrement = (dynamicSpeed * elapsed) / 1000;
-      // Never exceed 99.5% unless backend says completed
-      let maxProgress = 99.5;
+      // Never exceed 99.7% unless backend says completed
+      let maxProgress = 99.7;
       if (backendProgressRef.current && backendProgressRef.current > maxProgress) {
         maxProgress = backendProgressRef.current;
       }
@@ -249,7 +249,7 @@ export function PremiumLoader({
       }
       setOverallProgress(finalProgress);
       // Update particle count for visual feedback - more particles at higher speeds
-      setParticleCount(Math.max(3, Math.min(6, Math.floor(dynamicSpeed * 3))));
+      setParticleCount(Math.max(3, Math.min(7, Math.floor(dynamicSpeed * 3 + 2))));
     }, 16); // 60fps for ultra-smooth animation
 
     return () => {
