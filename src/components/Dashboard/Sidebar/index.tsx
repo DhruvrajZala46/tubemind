@@ -104,13 +104,18 @@ export default function Sidebar({ onCollapseChange, isMobileMenuOpen, setIsMobil
     return () => clearTimeout(failsafeTimer);
   };
 
-  // Fetch user summaries using useSWR
-  const { data, error } = useSWR<{
-    data: SummaryItem[]
-  }>(isSignedIn ? '/api/summaries' : null, fetcher);
-
+  // --- FIX: Use userId in SWR key to scope cache per user ---
+  const userId = user?.id;
+  const swrKey = isSignedIn && userId ? `/api/summaries?user=${userId}` : null;
+  const { data, error } = useSWR<{ data: SummaryItem[] }>(swrKey, fetcher);
   const summaries = data?.data;
   const isLoading = !data && !error && isSignedIn;
+  // --- FIX: Clear SWR cache when user changes (robust fix) ---
+  React.useEffect(() => {
+    if (userId) {
+      mutate(`/api/summaries?user=${userId}`);
+    }
+  }, [userId]);
 
   // Close menu when clicking outside
   useEffect(() => {
