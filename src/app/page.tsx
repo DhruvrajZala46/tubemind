@@ -371,7 +371,7 @@ export default function HomePage() {
               </div>
 
               {/* Features Pills - Mobile Optimized */}
-              <div className="flex flex-wrap justify-center gap-2 mt-8 sm:mt-12 px-4">
+              {/* <div className="flex flex-wrap justify-center gap-2 mt-8 sm:mt-12 px-4">
                 {[
                   { icon: "🎯", text: "AI Summary" },
                   { icon: "⚡", text: "Key Points" },
@@ -386,7 +386,7 @@ export default function HomePage() {
                     {text}
                   </div>
                 ))}
-              </div>
+              </div> */}
             </div>
 
             {/* Bottom Wave - Premium Touch */}
