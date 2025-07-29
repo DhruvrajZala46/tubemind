@@ -592,10 +592,14 @@ export async function extractKnowledgeWithOpenAI(
   videoDurationSeconds: number
 }> {
   
-  // STEP 1: Beautify the entire transcript into a single string
+  // STEP 1: Beautify the entire transcript into 2-minute blocks
   await updateProgress?.('summarizing', 10, 'Formatting full transcript...');
-  logger.info('[WORKFLOW] Formatting full transcript...');
-  const formattedTranscript = formatFullTranscriptWithTimestamps(transcript);
+  logger.info('[WORKFLOW] Formatting full transcript into 2-minute blocks...');
+  // Use 2-minute (120s) blocks for transcript formatting
+  const formattedTranscript = formatTranscriptByMinutes(transcript, 120, totalDuration);
+
+  // Log the actual formatted transcript for debugging
+  logger.info('[WORKFLOW] Formatted transcript to be sent to OpenAI:\n' + formattedTranscript);
   
   if (!formattedTranscript) {
     throw new OpenAIServiceError('No transcript available for analysis or transcript is empty', 'MISSING_TRANSCRIPT', 400, false);
