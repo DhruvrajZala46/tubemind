@@ -607,9 +607,8 @@ export async function extractKnowledgeWithOpenAI(
   logger.info('[WORKFLOW] Transcript formatted successfully.');
 
   // STEP 2: Select model and validate token count for a single call
-  // Use 4.1 mini for videos longer than 45 minutes, otherwise use 4.1 nano
-  const useMini = totalDuration >= 45 * 60; // 45 minutes in seconds
-  const model = useMini ? 'gpt-4.1-nano-2025-04-14' : 'gpt-4.1-nano-2025-04-14';
+  // Always use gpt-4.1-mini-2025-04-14 for best quality (user request)
+  const model = 'gpt-4.1-mini-2025-04-14';
   logger.info(`[MODEL] Using model: ${model} for a single-call video recreation. (Video duration: ${totalDuration}s)`);
 
   const systemPromptTokens = encode(SYSTEM_PROMPT).length;
@@ -639,84 +638,34 @@ export async function extractKnowledgeWithOpenAI(
   await updateProgress?.('summarizing', 20, 'Preparing final request for AI...');
   logger.info('[WORKFLOW] Constructing final prompt...');
 
+  // --- CRITICAL: The transcript is provided in 2-minute blocks for efficiency, but you MUST segment the summary by topic change, NOT by time block. ---
   const finalUserPrompt = `I have the full transcript for a video titled "${videoTitle}". The total video duration is ${formatTime(totalDuration)}.
 
-🚨 **CRITICAL INSTRUCTION: READ THE TRANSCRIPT 3 TIMES BEFORE RESPONDING**
-1. **First read**: Identify all main and sub topics everything from the transcript and stories as well.
-2. **Second read**: Find all examples, quotes, and details  
-3. **Third read**: Check for any missed context or explanations
+IMPORTANT: The transcript is provided in 2-minute blocks for efficiency, but you MUST segment the summary by topic change, NOT by time block.
 
-🚨 **WRITING STYLE: EXPLAIN DON'T QUOTE**
-- **FOCUS ON EXPLAINING CONCEPTS** - not just repeating quotes
-- **ADD DETAILED CONTEXT** - why does this matter? How does it work?
-- **USE EXAMPLES AND ANALOGIES** - make everything crystal clear
-- **EXPLAIN THE "WHY" BEHIND EVERYTHING** - not just what was said
-- **LESS QUOTES, MORE EXPLANATIONS** - help the reader understand deeply
+**Segmentation Rules:**
+- Each segment should cover a single topic or discussion, no matter how long or short (segments can cross time blocks).
+- Use transcript timestamps to estimate the start and end of each topic segment as accurately as possible (e.g., 0:00–2:30 if a topic runs across blocks).
+- Do NOT create segments for every 2 minutes. Only create a new segment when the topic or discussion changes.
+- If a topic starts in one block and ends in another, combine the relevant transcript text and use the correct timestamp range.
 
-Your task is to **RECREATE THE ENTIRE VIDEO EXPERIENCE** in a human-style narrative. *Do NOT summarise.* Follow **ZERO-LOSS** rules in the system prompt and maintain perfect flow from start to finish.
+**Coverage Rules:**
+- Do NOT summarize or condense. Recreate every detail, story, joke, example, and quote from the transcript.
+- Explain technical terms immediately when they appear.
+- Include all quotes and reactions exactly as spoken.
+- Add context and background for any references.
+- Make it feel like watching the full video with enhanced clarity.
 
-**🚨 MANDATORY TIMESTAMP REQUIREMENTS:**
-- **EVERY segment MUST have EXACT timestamp ranges**
-- **Use the transcript timestamps to create accurate time ranges**++++++++++
-- **Cover the ENTIRE video from 0:00 to ${formatTime(totalDuration)}**
-- **NO gaps in timeline** - each segment must connect to the next
-- **Segment by topic changes, not arbitrary time blocks**
+**Formatting Rules:**
+- Follow the system prompt's required visual formatting (headings, lists, callouts, etc).
+- Each segment must have an accurate timestamp range based on the transcript, not just 2-minute blocks.
 
-**🚨 MANDATORY FORMATTING REQUIREMENTS:**
-- **Follow the EXACT system prompt format** with rich visual elements
-
-**🚨 MANDATORY CONTENT REQUIREMENTS:**
-- **Recreate EVERY sentence, story, joke, example** from the transcript
-- **Explain technical terms immediately** when they appear
-- **Include all quotes and reactions** exactly as spoken
-- **Add context and background** for any references
-- **Make it feel like watching the full video** with enhanced clarity
-
-**🚨 CRITICAL CONTENT RULE:**
-- **EVERY SINGLE SENTENCE** from the transcript must be covered
-- **EVERY STORY, EXAMPLE, QUOTE, TOPIC** must be included
-- **EVERY "MINOR" DETAIL AND TOPICS** that adds value must be preserved
-- **NO SUMMARIZING** - recreate everything in full detail
-- **IF YOU SAY "they discuss X" - STOP!** Explain what they actually said about X
-- **GENERATE AS MUCH CONTENT AS NEEDED** - no limits on length, be as detailed as possible
-- **DON'T BE GREEDY WITH WORDS** - use as many words as needed to cover everything completely
-
-**🚨 TOPIC COVERAGE REQUIREMENTS:**
-- **EVERY TOPIC DISCUSSED** - no matter how brief (even 10 seconds)
-- **EVERY SUB-TOPIC** - include complete explanations
-- **EVERY DISCUSSION THREAD** - full conversations, not summaries
-- **EVERY POINT MADE** - no matter how small or minor
-- **EVERY ARGUMENT OR OPINION** - complete thoughts and reasoning
-- **EVERY COMPARISON OR ANALOGY** - full context and explanations
-- **EVERY QUESTION AND ANSWER** - complete Q&A sessions
-- **EVERY SUGGESTION OR TIP** - no matter how brief
-- **EVERY EXPERIENCE SHARED** - complete stories and details
-- **EVERY TOOL OR RESOURCE** - full explanations and context
-- **EVERY STEP OR PROCESS** - complete procedures and details
-- **EVERY CHALLENGE OR PROBLEM** - full context and background
-- **EVERY SOLUTION OR STRATEGY** - complete explanations and reasoning
-
-**🚨 WRITING STYLE REQUIREMENTS:**
-- **EXPLAIN CONCEPTS IN DETAIL** - don't just quote, explain what they mean
-- **ADD CONTEXT AND BACKGROUND** - why does this matter? How does it work?
-- **USE EXAMPLES AND ANALOGIES** - make concepts crystal clear
-- **EXPLAIN THE "WHY" BEHIND EVERYTHING** - not just what, but why it works
-- **FOCUS ON UNDERSTANDING** - help the reader truly understand the concepts
-- **LESS QUOTES, MORE EXPLANATIONS** - use quotes sparingly, focus on detailed explanations
-
-**CRITICAL INSTRUCTIONS:**
-1.  **ADHERE TO THE SYSTEM PROMPT:** You must follow the main "Human-Style, Flow-Based, Total Video Recreation System" prompt for the final output's structure, tone, and formatting.
-2.  **USE THE FULL TRANSCRIPT:** The full transcript with timestamps is provided below. You must process all of it.
-3.  **TOTAL VIDEO DURATION:** The total video duration is **${formatTime(totalDuration)}**. Your final timeline and all segments must accurately reflect this, ending at the exact final second.
-4.  **INTELLIGENT SEGMENTATION:** Create logical segments based on the actual topic flow of the content. The timestamps in the transcript are your guide.
-5.  **COMPLETE COVERAGE:** Ensure every key point, example, and story from the transcript is included in the final output. Nothing can be left out.
-6.  **CONTENT VERIFICATION:** Before finishing, scan your response and ask: "Did I cover every single thing mentioned in the transcript?" If not, add the missing content.
-7.  **TOPIC VERIFICATION:** Before finishing, ask: "Did I cover EVERY topic, sub-topic, discussion, argument, opinion, tool, resource, strategy, question, answer, experience, story, example, comparison, analogy, suggestion, tip, step, process, challenge, problem, and solution mentioned?" If not, add the missing content.
-
-**No matter what language the transcript is in, you must always output the summary in simple, clear English. Do not use any other language.**
-
-Please recreate the video using the exact formatting, segmentation, and teaching style rules in the system prompt above. Do not summarize. Use all required headings, subheadings, lists, and teaching blocks. Here is the transcript.
-
+**Instructions:**
+1. Segment by topic change, not by time block.
+2. Use transcript timestamps to estimate segment start/end as closely as possible.
+3. Do not create segments for every 2 minutes.
+4. Recreate every detail, do not summarize.
+5. Use all required formatting from the system prompt.
 
 Here is the full transcript to synthesize:
 ${formattedTranscript}`;

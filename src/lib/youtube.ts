@@ -366,15 +366,16 @@ export function formatTranscriptByMinutes(transcript: TranscriptItem[], chunkDur
   // Format and print each chunk nicely
   const formattedBlocks = Object.entries(chunks)
     .map(([index, texts]) => {
-      const startMin = parseInt(index, 10);
-      const endMin = startMin + 1;
-      
+      const chunkIdx = parseInt(index, 10);
+      const startMin = chunkIdx * (chunkDuration / 60);
+      const endMin = (chunkIdx + 1) * (chunkDuration / 60);
       // If we have total duration, ensure we don't exceed it in the display
-      const actualEndMin = totalDurationSeconds ? 
-        Math.min(endMin, Math.ceil(totalDurationSeconds / 60)) : 
+      const actualEndMin = totalDurationSeconds ?
+        Math.min(endMin, Math.ceil(totalDurationSeconds / 60)) :
         endMin;
-      
-      return `=== Transcript from ${startMin} to ${actualEndMin} minutes ===\n${texts.join(' ')}`;
+      // Format to 0, 2, 4, ... for 2-min blocks, and show as integers if possible
+      const formatMin = (min: number) => Number.isInteger(min) ? min : min.toFixed(2);
+      return `=== Transcript from ${formatMin(startMin)} to ${formatMin(actualEndMin)} minutes ===\n${texts.join(' ')}`;
     })
     .filter(block => block !== undefined)
     .sort((a, b) => {
